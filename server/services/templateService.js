@@ -219,8 +219,8 @@ export async function applyTemplate(templateId, serverId, options = {}) {
 
   const backup = options.backup !== false;
   const result = { success: true, ini: null, sandbox: null, backups: [] };
-  applyIniChanges(template, paths, backup, result);
-  applySandboxChanges(template, paths, backup, result);
+  if (options.applyIni !== false) applyIniChanges(template, paths, backup, result);
+  if (options.applySandbox !== false) applySandboxChanges(template, paths, backup, result);
 
   log.info(`Applied template "${template.meta.name}" to server ${server.id}`);
   return result;
