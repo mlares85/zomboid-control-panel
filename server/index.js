@@ -45,7 +45,7 @@ import { PanelUpdateChecker } from "./services/panelUpdateChecker.js";
 import { LogTailer } from "./services/logTailer.js";
 import authService from "./services/auth.js";
 import { requireRole } from "./services/auth.js";
-import authRoutes from "./routes/auth.js";
+import authRoutes from "./routes/auth/index.js";
 import { loadOrCreateCerts } from "./utils/certs.js";
 import { sanitizeError } from "./utils/sanitize.js";
 import { getSftpCachePath } from "./services/panelBridgeSftp.js";
