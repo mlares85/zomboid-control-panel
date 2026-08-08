@@ -220,7 +220,7 @@ import modsRoutes from "./routes/mods.js";
 import chunksRoutes from "./routes/chunks.js";
 import discordRoutes from "./routes/discord.js";
 import debugRoutes, { addLogToBuffer, getDiskFree } from "./routes/debug.js";
-import serverFinderRoutes from "./routes/serverFinder.js";
+import serverFinderRoutes from "./routes/serverFinder/index.js";
 import panelBridgeRoutes from "./routes/panelBridge.js";
 import backupRoutes from "./routes/backup.js";
 import mapProxyRoutes from "./routes/mapProxy.js";
