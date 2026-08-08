@@ -210,7 +210,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 // Routes
 import serverRoutes from "./routes/server.js";
-import serversRoutes from "./routes/servers.js";
+import serversRoutes from "./routes/servers/index.js";
 import serverFilesRoutes from "./routes/serverFiles.js";
 import playerRoutes from "./routes/players/index.js";
 import rconRoutes from "./routes/rcon.js";
