@@ -219,7 +219,7 @@ import playerRoutes from "./routes/players.js";
 import rconRoutes from "./routes/rcon.js";
 import configRoutes from "./routes/config.js";
 import schedulerRoutes from "./routes/scheduler.js";
-import modsRoutes from "./routes/mods.js";
+import modsRoutes from "./routes/mods/index.js";
 import chunksRoutes from "./routes/chunks/index.js";
 import discordRoutes from "./routes/discord.js";
 import debugRoutes, { addLogToBuffer, getDiskFree } from "./routes/debug.js";

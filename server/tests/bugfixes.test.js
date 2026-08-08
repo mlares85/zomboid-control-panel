@@ -6,13 +6,11 @@ import {
   createLocalResetResponse,
   isLocalPanelRequest,
 } from "../routes/auth.js";
-import {
-  compareDefinitionSets,
-  filterOwnedClientModIds,
-  getModDetailsFromWorkshop,
-  groupIntoPairs,
-  scoreWorkshopDependencyMatch,
-} from "../routes/mods.js";
+import { compareDefinitionSets } from "../utils/mods/conflictScan/definitions.js";
+import { filterOwnedClientModIds } from "../utils/mods/modIdFilter.js";
+import { getModDetailsFromWorkshop } from "../utils/mods/workshopModInfo.js";
+import { groupIntoPairs } from "../utils/mods/conflictScan/pairs.js";
+import { scoreWorkshopDependencyMatch } from "../utils/mods/workshopScore.js";
 import {
   ModChecker,
   minutesToCheckIntervalMs,
