@@ -54,7 +54,8 @@ router.get("/conflicts/diff", async (req, res) => {
     const serverPath = await getServerPath();
     if (!serverPath)
       return res.status(400).json({
-        error: "Server install path not set — configure it in Settings",
+        error: "Server install path not set — configure it in Servers > Edit",
+        fixUrl: "/servers",
       });
     const { workshopIds } = await readIniModLists();
 

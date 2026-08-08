@@ -13,6 +13,20 @@ import {
 const log = createLogger("API:Mods");
 const router = express.Router();
 
+// Both fields live on the Mods & Workshop settings tab — reused across every
+// handler below instead of repeating the same detail/fixUrl per route.
+const COLLECTION_ID_MISSING = {
+  error: "Collection ID not configured",
+  detail: "Set your Workshop collection ID in Settings > Mods & Workshop.",
+  fixUrl: "/settings?tab=mods",
+};
+const STEAM_COOKIES_MISSING = {
+  error: "Steam session cookies not configured",
+  detail:
+    "Paste your Steam sessionid and steamLoginSecure cookies in Settings > Mods & Workshop.",
+  fixUrl: "/settings?tab=mods",
+};
+
 // ── Per-item collection mutations ─────────────────────────────────────────
 // Used by the unified Sync UI: each row in the table has its own
 // add/remove button. Bulk sync (`/collection/sync`) is still available
@@ -22,7 +36,7 @@ router.post("/collection/items", async (req, res) => {
   try {
     const collectionId = await getSetting("workshopCollectionId");
     if (!collectionId) {
-      return res.status(400).json({ error: "Collection ID not configured" });
+      return res.status(400).json(COLLECTION_ID_MISSING);
     }
     const workshopId = String(req.body?.workshopId || "").trim();
     if (!/^\d{1,15}$/.test(workshopId)) {
@@ -44,7 +58,7 @@ router.delete("/collection/items/:workshopId", async (req, res) => {
   try {
     const collectionId = await getSetting("workshopCollectionId");
     if (!collectionId) {
-      return res.status(400).json({ error: "Collection ID not configured" });
+      return res.status(400).json(COLLECTION_ID_MISSING);
     }
     const workshopId = String(req.params.workshopId || "").trim();
     if (!/^\d{1,15}$/.test(workshopId)) {
@@ -89,7 +103,7 @@ router.post("/collection/sync", async (req, res) => {
   try {
     const collectionId = await getSetting("workshopCollectionId");
     if (!collectionId) {
-      return res.status(400).json({ error: "Collection ID not configured" });
+      return res.status(400).json(COLLECTION_ID_MISSING);
     }
     const tracked = await getTrackedMods();
     const trackedIds = tracked.map((m) => String(m.workshop_id));
@@ -155,13 +169,11 @@ router.post("/collection/test", async (req, res) => {
   try {
     const collectionId = await getSetting("workshopCollectionId");
     if (!collectionId)
-      return res.status(400).json({ error: "Collection ID not configured" });
+      return res.status(400).json(COLLECTION_ID_MISSING);
     const sessionId = await getSetting("steamSessionId");
     const loginSecure = await getSetting("steamLoginSecure");
     if (!sessionId || !loginSecure)
-      return res
-        .status(400)
-        .json({ error: "Steam session cookies not configured" });
+      return res.status(400).json(STEAM_COOKIES_MISSING);
 
     const contents = await getCollectionContents(collectionId);
     if (!contents.ok)

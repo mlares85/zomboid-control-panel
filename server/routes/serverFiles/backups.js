@@ -116,9 +116,12 @@ router.post("/save-and-reload", async (req, res) => {
     const rconService = req.app.get("rconService");
 
     if (!rconService || !rconService.isConnected()) {
-      return res
-        .status(400)
-        .json({ error: "RCON not connected. Changes saved but not reloaded." });
+      return res.status(400).json({
+        error: "RCON not connected. Changes saved but not reloaded.",
+        detail:
+          "The server won't pick up these changes until it restarts or RCON reconnects. Check your RCON host, port, and password in Settings > RCON.",
+        fixUrl: "/settings?tab=connection",
+      });
     }
 
     const result = await rconService.reloadOptions();

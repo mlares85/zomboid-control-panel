@@ -29,7 +29,11 @@ router.post("/add-missing-dep", async (req, res) => {
     const serverName = await getServerName();
     const serverPath = await getServerPath();
     if (!serverConfigPath)
-      return res.status(400).json({ error: "Server path not configured." });
+      return res.status(400).json({
+        error: "Server path not configured.",
+        detail: "Set the server install path in Servers > Edit.",
+        fixUrl: "/servers",
+      });
 
     const sanitizedServerName = path.basename(serverName);
     if (

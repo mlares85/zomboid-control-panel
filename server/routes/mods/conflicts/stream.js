@@ -74,7 +74,8 @@ router.get("/conflicts/stream", async (req, res) => {
     const serverPath = await getServerPath();
     if (!serverPath) {
       send("error", {
-        error: "Server install path not set — configure it in Settings",
+        error: "Server install path not set — configure it in Servers > Edit",
+        fixUrl: "/servers",
       });
       res.end();
       return;

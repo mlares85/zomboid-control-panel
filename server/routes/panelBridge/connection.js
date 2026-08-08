@@ -103,6 +103,7 @@ router.post("/refresh", (req, res) => {
       res.json({
         success: false,
         message: "Bridge not configured - use auto-configure first",
+        fixUrl: "/settings?tab=bridge",
       });
     }
   } catch (error) {

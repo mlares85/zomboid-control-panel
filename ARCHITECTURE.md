@@ -38,7 +38,7 @@ At startup and on demand, `mountDiscovery.js` probes common Docker mount paths (
 
 ## Error handling convention
 
-The codebase uses `{success: boolean, error?: string, detail?: string}` result objects, not thrown errors. A custom ESLint rule (`require-result-handling`) enforces that `{success: false}` results are never silently discarded. Config-dependent errors include a `fixUrl` field pointing to the relevant Settings page so the frontend can render "Fix this →" links.
+The codebase uses `{success: boolean, error?: string, detail?: string}` result objects, not thrown errors. A custom ESLint rule (`require-result-handling`) enforces that `{success: false}` results are never silently discarded. Config-dependent errors include a `fixUrl` field pointing to the relevant Settings page so the frontend can render "Fix this →" links. On the client, `ApiError.data` carries the raw error payload; `getErrorFixUrl()` (`lib/errorMessage.ts`) reads `fixUrl` off it, and `errorToastContent()` (`lib/errorToast.tsx`) spreads a `description` + `FixThisAction` toast action in one call — use it (or `getErrorFixUrl` directly, for handlers that already hold a separate message string) instead of hand-rolling the action prop.
 
 ## Auth
 

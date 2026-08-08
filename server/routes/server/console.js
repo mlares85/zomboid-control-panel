@@ -30,7 +30,11 @@ function registerConsoleLogRoute(router) {
       const zomboidDataPath = await resolveZomboidDataPath();
 
       if (!zomboidDataPath) {
-        return res.status(400).json({ error: "Server data path not configured" });
+        return res.status(400).json({
+          error: "Server data path not configured",
+          detail: "Set the Zomboid data path in Servers > Edit.",
+          fixUrl: "/servers",
+        });
       }
 
       const consoleLogPath = path.join(zomboidDataPath, "server-console.txt");

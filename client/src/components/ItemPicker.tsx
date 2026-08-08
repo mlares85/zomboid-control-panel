@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { panelBridgeApi } from '@/lib/api'
 import { useToast } from '@/components/ui/use-toast'
+import { FixThisAction } from '@/components/ui/fix-this-action'
 
 export interface CatalogItem {
   id: string
@@ -150,12 +151,14 @@ export function ItemPicker({ value, onChange, disabled, placeholder = 'Search it
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Scan failed'
       setScanError(msg)
+      const bridgeDown = msg.includes('Bridge not running')
       toast({
         title: 'Item scan failed',
-        description: msg.includes('Bridge not running')
+        description: bridgeDown
           ? 'Server must be online with PanelBridge mod active'
           : msg,
         variant: 'destructive',
+        action: bridgeDown ? <FixThisAction fixUrl="/settings?tab=bridge" /> : undefined,
       })
     } finally {
       setScanning(false)

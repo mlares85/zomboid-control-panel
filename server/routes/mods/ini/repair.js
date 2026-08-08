@@ -18,7 +18,11 @@ router.post("/repair-map-entries", async (req, res) => {
     const serverName = await getServerName();
 
     if (!serverConfigPath || !serverPath) {
-      return res.status(400).json({ error: "Server path not configured." });
+      return res.status(400).json({
+        error: "Server path not configured.",
+        detail: "Set the server install path in Servers > Edit.",
+        fixUrl: "/servers",
+      });
     }
 
     const sanitizedServerName = path.basename(serverName);

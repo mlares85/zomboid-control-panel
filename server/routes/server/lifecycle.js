@@ -108,9 +108,12 @@ export function registerLifecycleRoutes(router) {
 
       // Check if RCON is connected first
       if (!rconService.connected) {
-        return res
-          .status(400)
-          .json({ error: "RCON not connected. Cannot gracefully stop server." });
+        return res.status(400).json({
+          error: "RCON not connected. Cannot gracefully stop server.",
+          detail:
+            "Check your RCON host, port, and password in Settings > RCON, or stop the server from Docker directly.",
+          fixUrl: "/settings?tab=connection",
+        });
       }
 
       // Save first — quitting after a failed save discards everything since

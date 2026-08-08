@@ -309,7 +309,11 @@ router.post("/test-message", async (req, res) => {
     }
 
     if (!discordBot.isRunning) {
-      return res.status(400).json({ error: "Bot is not running" });
+      return res.status(400).json({
+        error: "Bot is not running",
+        detail:
+          "Start the bot below (or enable Auto-start bot) before sending a test message.",
+      });
     }
 
     const sent = await discordBot.sendNotification(
