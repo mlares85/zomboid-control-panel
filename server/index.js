@@ -212,7 +212,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 import serverRoutes from "./routes/server.js";
 import serversRoutes from "./routes/servers.js";
 import serverFilesRoutes from "./routes/serverFiles.js";
-import playerRoutes from "./routes/players.js";
+import playerRoutes from "./routes/players/index.js";
 import rconRoutes from "./routes/rcon.js";
 import configRoutes from "./routes/config.js";
 import schedulerRoutes from "./routes/scheduler.js";
