@@ -5,6 +5,7 @@ import { createLogger } from "../utils/logger.js";
 import { getDataPaths } from "../utils/paths.js";
 import { getActiveServer } from "../database/init.js";
 import { listPersistedVehicles } from "../utils/vehiclesDb.js";
+import { isLocalFileAccess } from "../utils/serverProvider.js";
 const log = createLogger("API:MapProxy");
 
 const router = express.Router();
@@ -483,7 +484,7 @@ let persistedVehicleCache = { key: null, expiresAt: 0, vehicles: [] };
 router.get("/vehicles", async (req, res) => {
   try {
     const activeServer = await getActiveServer();
-    if (!activeServer || activeServer.isRemote || !activeServer.zomboidDataPath) {
+    if (!activeServer || !isLocalFileAccess(activeServer) || !activeServer.zomboidDataPath) {
       return res.json({ vehicles: [] });
     }
     const serverName = activeServer.serverName || activeServer.name;

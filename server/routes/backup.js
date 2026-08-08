@@ -5,6 +5,7 @@ import { createLogger } from "../utils/logger.js";
 import { sanitizeError } from "../utils/sanitize.js";
 import { getActiveServer } from "../database/init.js";
 import { requireRole } from "../services/auth.js";
+import { isLocalFileAccess } from "../utils/serverProvider.js";
 const log = createLogger("API:Backup");
 
 const router = express.Router();
@@ -84,7 +85,7 @@ router.post("/create", async (req, res) => {
   try {
     log.info("POST /create — creating manual backup");
     const activeServer = await getActiveServer();
-    if (activeServer?.isRemote) {
+    if (!isLocalFileAccess(activeServer)) {
       return res
         .status(400)
         .json({
@@ -161,7 +162,7 @@ router.get("/download/:name", async (req, res) => {
 router.post("/restore/:name", requireRole("admin"), async (req, res) => {
   try {
     const activeServer = await getActiveServer();
-    if (activeServer?.isRemote) {
+    if (!isLocalFileAccess(activeServer)) {
       return res
         .status(400)
         .json({
@@ -237,7 +238,7 @@ router.post(
   async (req, res) => {
     try {
       const activeServer = await getActiveServer();
-      if (activeServer?.isRemote) {
+      if (!isLocalFileAccess(activeServer)) {
         return res
           .status(400)
           .json({
