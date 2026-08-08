@@ -25,7 +25,7 @@ import {
   getAllSettings,
 } from "../database/init.js";
 import { sanitizeError } from "../utils/sanitize.js";
-import { checkSandboxBraceBalance } from "./serverFiles.js";
+import { checkSandboxBraceBalance } from "./serverFiles/index.js";
 import panelBridgeService from "../services/panelBridge.js";
 import {
   PZ_MAP_ROOT,

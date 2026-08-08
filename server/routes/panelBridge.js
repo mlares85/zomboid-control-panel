@@ -20,7 +20,7 @@ import {
   logBridgeCommand,
 } from "../database/init.js";
 import { sanitizeError } from "../utils/sanitize.js";
-import { persistSandboxValues } from "./serverFiles.js";
+import { persistSandboxValues } from "./serverFiles/index.js";
 import { requireRole } from "../services/auth.js";
 import {
   getEmbeddedPanelBridgeLua,
