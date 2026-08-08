@@ -215,7 +215,7 @@ import serverFilesRoutes from "./routes/serverFiles.js";
 import playerRoutes from "./routes/players/index.js";
 import rconRoutes from "./routes/rcon.js";
 import configRoutes from "./routes/config/index.js";
-import schedulerRoutes from "./routes/scheduler.js";
+import schedulerRoutes from "./routes/scheduler/index.js";
 import modsRoutes from "./routes/mods.js";
 import chunksRoutes from "./routes/chunks.js";
 import discordRoutes from "./routes/discord/index.js";
