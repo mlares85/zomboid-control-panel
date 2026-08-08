@@ -43,6 +43,7 @@ import { ConflictScanResult, ScanStreamModScanned, ScanStreamConflictFound } fro
 import { WorkshopCollectionPanel } from '@/components/WorkshopCollectionPanel'
 import { ConflictsPanel } from '@/components/mods/ConflictsPanel'
 import { ModRow, WorkshopIdChip, WorkshopLinkAction, WorkshopThumb } from '@/components/mods/ModRow'
+import { SafeModUpdateButton } from '@/components/mods/SafeModUpdateButton'
 import {
   useLocalStorageState,
   type TrackedMod,
@@ -88,7 +89,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useToast } from '@/components/ui/use-toast'
-import { modsApi } from '@/lib/api'
+import { modsApi, serverApi } from '@/lib/api'
 import { buildRequiresMap, computeAutoSortedOrder, createRequirementResolver, type AutoSortResult } from '@/lib/modLoadOrder'
 import { EmptyState } from '@/components/EmptyState'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -191,6 +192,9 @@ export default function Mods() {
   const demoMode = isDemoMode()
   const [mods, setMods] = useState<TrackedMod[]>([])
   const [status, setStatus] = useState<ModStatus | null>(null)
+  // Server run-state — only needed to gate the "Safe Update All" action.
+  const [serverRunning, setServerRunning] = useState(false)
+  const [rconConnected, setRconConnected] = useState(false)
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -777,6 +781,25 @@ export default function Mods() {
       socket.off('mods:updates_available', refresh)
     }
   }, [socket, fetchData])
+
+  // Server run-state — gates the "Safe Update All" action (needs the server
+  // up and RCON connected to warn players and restart safely).
+  useEffect(() => {
+    serverApi.getStatus().then((data) => {
+      setServerRunning(!!data.running)
+      setRconConnected(!!data.rcon?.connected)
+    }).catch(() => { /* best effort — button stays disabled until it resolves */ })
+  }, [])
+
+  useEffect(() => {
+    if (!socket) return
+    const onServerStatus = (data: { running?: boolean; rcon?: { connected?: boolean } }) => {
+      setServerRunning(!!data.running)
+      setRconConnected(!!data.rcon?.connected)
+    }
+    socket.on('server:status', onServerStatus)
+    return () => { socket.off('server:status', onServerStatus) }
+  }, [socket])
 
   useEffect(() => {
     let mounted = true
@@ -3363,6 +3386,14 @@ export default function Mods() {
                                 <span className="inline-flex h-5 items-center rounded-full bg-warning/20 px-2 font-mono text-[11px] tabular-nums text-warning">
                                   {item.count}
                                 </span>
+                                <div className="ml-auto">
+                                  <SafeModUpdateButton
+                                    mods={(status?.modsNeedingUpdate || []).map((m) => ({ workshopId: m.workshopId, name: m.name }))}
+                                    serverRunning={serverRunning}
+                                    rconConnected={rconConnected}
+                                    onComplete={fetchData}
+                                  />
+                                </div>
                               </div>
                             )}
                             {item.type === 'header' && item.group === 'neverChecked' && (

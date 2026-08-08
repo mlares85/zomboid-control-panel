@@ -1222,6 +1222,18 @@ export const modsApi = {
         })
       | null
     >("/mods/conflicts/cached"),
+
+  // Composed "safe update" action: backup -> check updates -> warn players
+  // -> restart -> verify. Runs in the background; progress arrives via the
+  // `modUpdate:step` socket event (see ModUpdateProgress).
+  safeUpdate: (warningSeconds?: number) =>
+    apiPost("/mods/safe-update", { warningSeconds }) as Promise<{
+      success: boolean;
+      message: string;
+      warningSeconds: number;
+    }>,
+  getSafeUpdateStatus: () =>
+    apiGet("/mods/safe-update/status") as Promise<{ inProgress: boolean }>,
 };
 
 // Chunks API (Chunk Cleaner)
