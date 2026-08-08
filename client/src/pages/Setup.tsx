@@ -78,6 +78,10 @@ export default function Setup() {
     setLoading(true)
     try {
       await setup(username, password, rememberMe)
+      // Flag picked up once by Dashboard so it can offer to auto-connect a
+      // discovered server instead of landing the fresh account on an empty
+      // dashboard. Session-scoped so it never re-fires on a later login.
+      try { sessionStorage.setItem('pz-just-completed-setup', 'true') } catch { /* ignore storage failures */ }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Setup failed')
     } finally {
