@@ -62,6 +62,56 @@ export type DepSearchState = {
   steamSearchEnabled?: boolean
 }
 
+// ── Safe Update (SafeModUpdateButton / ModUpdateProgress) ──
+export type SafeUpdateStepKey = 'backup' | 'update' | 'warning' | 'restart' | 'verify'
+export type SafeUpdateStepStatus = 'pending' | 'in_progress' | 'success' | 'failed'
+
+export interface SafeUpdateStepEvent {
+  step: SafeUpdateStepKey
+  status: SafeUpdateStepStatus
+  detail: string | null
+}
+
+export type SafeUpdateStepStates = Record<SafeUpdateStepKey, SafeUpdateStepEvent>
+
+export const SAFE_UPDATE_STEP_ORDER: SafeUpdateStepKey[] = [
+  'backup',
+  'update',
+  'warning',
+  'restart',
+  'verify',
+]
+
+// Rough nominal durations in seconds — only used for the "estimated time
+// remaining" readout. Backup size and server boot time both vary a lot, so
+// this is a ballpark, not a promise.
+const SAFE_UPDATE_STEP_ESTIMATE_SECONDS: Record<SafeUpdateStepKey, number> = {
+  backup: 60,
+  update: 10,
+  warning: 30,
+  restart: 180,
+  verify: 10,
+}
+
+export function initialStepStates(): SafeUpdateStepStates {
+  return SAFE_UPDATE_STEP_ORDER.reduce((states, step) => {
+    states[step] = { step, status: 'pending', detail: null }
+    return states
+  }, {} as SafeUpdateStepStates)
+}
+
+export function estimateSecondsRemaining(
+  steps: SafeUpdateStepStates,
+  warningSeconds: number,
+): number {
+  return SAFE_UPDATE_STEP_ORDER.reduce((total, step) => {
+    const state = steps[step]
+    if (state.status === 'success' || state.status === 'failed') return total
+    const estimate = step === 'warning' ? warningSeconds : SAFE_UPDATE_STEP_ESTIMATE_SECONDS[step]
+    return total + estimate
+  }, 0)
+}
+
 /** useState wrapper that persists the value to localStorage under a stable key. */
 export function useLocalStorageState<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [value, setValue] = useState<T>(() => {

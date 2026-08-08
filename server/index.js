@@ -217,6 +217,7 @@ import rconRoutes from "./routes/rcon.js";
 import configRoutes from "./routes/config/index.js";
 import schedulerRoutes from "./routes/scheduler/index.js";
 import modsRoutes from "./routes/mods.js";
+import modsSafeUpdateRoutes from "./routes/mods/safeUpdate.js";
 import chunksRoutes from "./routes/chunks.js";
 import discordRoutes from "./routes/discord/index.js";
 import debugRoutes, { addLogToBuffer, getDiskFree } from "./routes/debug.js";
@@ -614,6 +615,8 @@ app.use("/api/panel/restart", strictLimiter);
 // Browser cookie extraction spawns PowerShell for DPAPI unwrap — expensive
 // and platform-sensitive, so keep it under the destructive limiter too.
 app.use("/api/mods/collection/extract-cookies", strictLimiter);
+// Composed backup+restart action — same blast radius as /api/server/restart.
+app.use("/api/mods/safe-update", strictLimiter);
 
 // Per-item collection mutations are cheap to the panel, but each one writes
 // to Steam. Do not share their bucket with cookie extraction: a normal sync
@@ -1055,6 +1058,7 @@ app.use("/api/rcon", rconRoutes);
 app.use("/api/config", configRoutes);
 app.use("/api/scheduler", schedulerRoutes);
 app.use("/api/mods", modsRoutes);
+app.use("/api/mods", modsSafeUpdateRoutes);
 app.use("/api/chunks", chunksRoutes);
 app.use("/api/discord", discordRoutes);
 app.use("/api/debug", debugRoutes);
