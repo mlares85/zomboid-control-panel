@@ -137,11 +137,21 @@ router.post("/command", requireRole("admin"), async (req, res) => {
   }
 
   if (!bridge.bridgePath) {
-    return res.status(400).json({ error: "Bridge not configured" });
+    return res.status(400).json({
+      error: "Bridge not configured",
+      detail:
+        "PanelBridge is not configured. Go to Settings > PanelBridge to auto-configure it, or install PanelBridge.lua if not yet installed.",
+      fixUrl: "/settings?tab=bridge",
+    });
   }
 
   if (!bridge.isRunning) {
-    return res.status(400).json({ error: "Bridge not running. Start it first." });
+    return res.status(400).json({
+      error: "Bridge not running. Start it first.",
+      detail:
+        "PanelBridge is not running. Go to Settings > PanelBridge to start it, or install PanelBridge.lua if not yet installed.",
+      fixUrl: "/settings?tab=bridge",
+    });
   }
 
   // Action-specific validation

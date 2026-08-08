@@ -57,7 +57,9 @@ import { rconApi, serverApi, playersApi, panelBridgeApi } from '@/lib/api'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
 import { cn } from '@/lib/utils'
-import { getUserErrorMessage } from '@/lib/errorMessage'
+import { getUserErrorMessage, getErrorFixUrl } from '@/lib/errorMessage'
+import { errorToastContent } from '@/lib/errorToast'
+import { FixThisAction } from '@/components/ui/fix-this-action'
 
 interface Player {
   name: string
@@ -1210,10 +1212,12 @@ export default function Events() {
       pushActivity(successCopy.title, true)
     } catch (error) {
       const message = getUserErrorMessage(error, 'Bridge command failed.')
+      const fixUrl = getErrorFixUrl(error)
       toast({
         title: `${action} failed`,
         description: `${message}. Check bridge/server connection and try again.`,
         variant: 'destructive',
+        action: fixUrl ? <FixThisAction fixUrl={fixUrl} /> : undefined,
       })
       pushActivity(`${action} failed`, false)
     } finally {
@@ -1242,10 +1246,12 @@ export default function Events() {
       pushActivity(successCopy.title, true)
     } catch (error) {
       const message = getUserErrorMessage(error, 'Command failed.')
+      const fixUrl = getErrorFixUrl(error)
       toast({
         title: `${action} failed`,
         description: `${message}. Verify command settings and try again.`,
         variant: 'destructive',
+        action: fixUrl ? <FixThisAction fixUrl={fixUrl} /> : undefined,
       })
       pushActivity(`${action} failed`, false)
     } finally {
@@ -1272,10 +1278,12 @@ export default function Events() {
       pushActivity(successCopy.title, true)
     } catch (error) {
       const message = getUserErrorMessage(error, 'Command failed.')
+      const fixUrl = getErrorFixUrl(error)
       toast({
         title: `${action} failed`,
         description: `${message}. Verify command settings and try again.`,
         variant: 'destructive',
+        action: fixUrl ? <FixThisAction fixUrl={fixUrl} /> : undefined,
       })
       pushActivity(`${action} failed`, false)
     } finally {
@@ -1515,7 +1523,7 @@ export default function Events() {
     } catch (error) {
       toast({
         title: `${label} failed`,
-        description: getUserErrorMessage(error, 'Operation failed.'),
+        ...errorToastContent(error, 'Operation failed.'),
         variant: 'destructive',
       })
     } finally {
@@ -1571,6 +1579,7 @@ export default function Events() {
       })
     } catch (error) {
       const message = getUserErrorMessage(error, 'Bridge operation failed.')
+      const fixUrl = getErrorFixUrl(error)
       setBridgeResultData({
         operation: bridgeOperation,
         success: false,
@@ -1583,6 +1592,7 @@ export default function Events() {
         title: 'Bridge Operation Failed',
         description: message,
         variant: 'destructive',
+        action: fixUrl ? <FixThisAction fixUrl={fixUrl} /> : undefined,
       })
     } finally {
       setBridgeLoading(null)

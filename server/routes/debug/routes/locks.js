@@ -36,9 +36,12 @@ router.post("/clear-stale-locks", async (req, res) => {
 
     const activeServer = await getActiveServer().catch(() => null);
     if (!activeServer) {
-      return res
-        .status(400)
-        .json({ success: false, error: "No active server is configured." });
+      return res.status(400).json({
+        success: false,
+        error: "No active server is configured.",
+        detail: "No server is configured yet. Go to Servers to add one.",
+        fixUrl: "/servers",
+      });
     }
     const zPath = activeServer.zomboidDataPath || null;
     if (!zPath || !activeServer.serverName) {
@@ -46,6 +49,8 @@ router.post("/clear-stale-locks", async (req, res) => {
         success: false,
         error:
           "Active server has no Zomboid data path or server name configured.",
+        detail: "Set both fields in Servers > Edit.",
+        fixUrl: "/servers",
       });
     }
 

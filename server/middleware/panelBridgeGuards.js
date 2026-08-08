@@ -12,7 +12,12 @@ import bridge from "../services/panelBridge.js";
 
 export function requireBridgeConfigured(req, res, next) {
   if (!bridge.bridgePath) {
-    return res.status(400).json({ error: "Bridge not configured" });
+    return res.status(400).json({
+      error: "Bridge not configured",
+      detail:
+        "PanelBridge is not configured. Go to Settings > PanelBridge to auto-configure it, or install PanelBridge.lua if not yet installed.",
+      fixUrl: "/settings?tab=bridge",
+    });
   }
   next();
 }
@@ -22,7 +27,12 @@ export function requireBridgeRunning(
 ) {
   return (req, res, next) => {
     if (!bridge.isRunning) {
-      return res.status(400).json({ error: message });
+      return res.status(400).json({
+        error: message,
+        detail:
+          "PanelBridge is not running. Go to Settings > PanelBridge to start it, or install PanelBridge.lua if not yet installed.",
+        fixUrl: "/settings?tab=bridge",
+      });
     }
     next();
   };

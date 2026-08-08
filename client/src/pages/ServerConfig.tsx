@@ -98,6 +98,7 @@ import { PageHeader } from '@/components/PageHeader'
 // DropdownMenu imports available if needed
 import { serverFilesApi, panelBridgeApi, SpawnPointsByProfession, SpawnRegion, SandboxData, ConfigTemplate } from '@/lib/api'
 import { getUserErrorMessage } from '@/lib/errorMessage'
+import { errorToastContent } from '@/lib/errorToast'
 import { formatModSettingDescription, formatModSettingLabel } from '@/lib/modSettingsLabels'
 import { EmptyState } from '@/components/EmptyState'
 import {
@@ -882,7 +883,7 @@ export default function ServerConfig() {
       setLoadError(getUserErrorMessage(error, 'Failed to load server config.'))
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to load server config.'),
+        ...errorToastContent(error, 'Failed to load server config.'),
         variant: 'destructive'
       })
     } finally {
@@ -903,7 +904,7 @@ export default function ServerConfig() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to load raw content.'),
+        ...errorToastContent(error, 'Failed to load raw content.'),
         variant: 'destructive'
       })
       // Reset to structured mode on error
@@ -952,7 +953,7 @@ export default function ServerConfig() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to download backup.'),
+        ...errorToastContent(error, 'Failed to download backup.'),
         variant: 'destructive'
       })
     }
@@ -971,7 +972,7 @@ export default function ServerConfig() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to copy content to clipboard.'),
+        ...errorToastContent(error, 'Failed to copy content to clipboard.'),
         variant: 'destructive'
       })
     }
@@ -1110,7 +1111,7 @@ export default function ServerConfig() {
         toast({ title: 'Failed to Update', description: response?.error || 'Unknown error', variant: 'destructive' })
       }
     } catch (error) {
-      toast({ title: 'Error', description: getUserErrorMessage(error, 'Failed to set option'), variant: 'destructive' })
+      toast({ title: 'Error', ...errorToastContent(error, 'Failed to set option'), variant: 'destructive' })
     } finally {
       setSavingOptions(prev => {
         const next = new Set(prev)
@@ -1207,7 +1208,7 @@ export default function ServerConfig() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to save settings.'),
+        ...errorToastContent(error, 'Failed to save settings.'),
         variant: 'destructive'
       })
     } finally {
@@ -1268,7 +1269,7 @@ export default function ServerConfig() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to save settings.'),
+        ...errorToastContent(error, 'Failed to save settings.'),
         variant: 'destructive'
       })
     } finally {
@@ -1291,7 +1292,7 @@ export default function ServerConfig() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to save spawn points.'),
+        ...errorToastContent(error, 'Failed to save spawn points.'),
         variant: 'destructive'
       })
     } finally {
@@ -1314,7 +1315,7 @@ export default function ServerConfig() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to save spawn regions.'),
+        ...errorToastContent(error, 'Failed to save spawn regions.'),
         variant: 'destructive'
       })
     } finally {
@@ -1458,7 +1459,7 @@ export default function ServerConfig() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to load backups.'),
+        ...errorToastContent(error, 'Failed to load backups.'),
         variant: 'destructive'
       })
     }
@@ -1474,7 +1475,7 @@ export default function ServerConfig() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to restore backup.'),
+        ...errorToastContent(error, 'Failed to restore backup.'),
         variant: 'destructive'
       })
     }
@@ -1490,7 +1491,7 @@ export default function ServerConfig() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to load templates.'),
+        ...errorToastContent(error, 'Failed to load templates.'),
         variant: 'destructive'
       })
     } finally {
@@ -1525,7 +1526,7 @@ export default function ServerConfig() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to save template.'),
+        ...errorToastContent(error, 'Failed to save template.'),
         variant: 'destructive'
       })
     } finally {
@@ -1547,7 +1548,7 @@ export default function ServerConfig() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to apply template.'),
+        ...errorToastContent(error, 'Failed to apply template.'),
         variant: 'destructive'
       })
     } finally {
@@ -1571,7 +1572,7 @@ export default function ServerConfig() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: getUserErrorMessage(error, 'Failed to delete template.'),
+        ...errorToastContent(error, 'Failed to delete template.'),
         variant: 'destructive'
       })
     }

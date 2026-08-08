@@ -25,7 +25,7 @@ import { useSocket } from '@/contexts/SocketContext'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { cn, copyText } from '@/lib/utils'
-import { getUserErrorMessage } from '@/lib/errorMessage'
+import { errorToastContent } from '@/lib/errorToast'
 import { VerdictBand, WorkList } from '@/components/dashboard/DashboardVerdict'
 import type { Verdict, WorkItem } from '@/components/dashboard/DashboardVerdict'
 
@@ -536,7 +536,7 @@ export default function Dashboard() {
         }, 2000)
       } else { fetchStatus() }
     } catch (error) {
-      toast({ title: 'Error', description: getUserErrorMessage(error, 'Action failed. Please try again.'), variant: 'destructive' })
+      toast({ title: 'Error', ...errorToastContent(error, 'Action failed. Please try again.'), variant: 'destructive' })
     } finally { setLoading(null) }
   }
   const handleConnect = async () => { await handleAction('Connect RCON', () => rconApi.connect()) }

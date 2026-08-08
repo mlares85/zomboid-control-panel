@@ -45,7 +45,12 @@ describe("requireRcon", () => {
 
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: "RCON not connected" });
+    expect(res.json).toHaveBeenCalledWith({
+      error: "RCON not connected",
+      detail:
+        "RCON is not connected. Check your RCON host, port, and password in Settings > RCON.",
+      fixUrl: "/settings?tab=connection",
+    });
   });
 
   it("returns the caller's custom status/body when RCON is not connected", () => {
@@ -94,6 +99,9 @@ describe("requireBridge", () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
       error: "Bridge not running. Start it first.",
+      detail:
+        "PanelBridge is not running. Go to Settings > PanelBridge to start it, or install PanelBridge.lua if not yet installed.",
+      fixUrl: "/settings?tab=bridge",
     });
   });
 });
@@ -128,6 +136,8 @@ describe("requireActiveServer", () => {
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({
       error: "No active server configured",
+      detail: "No server is configured yet. Go to Servers to add one.",
+      fixUrl: "/servers",
     });
   });
 

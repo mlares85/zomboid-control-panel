@@ -9,9 +9,12 @@ import bridge from "../services/panelBridge.js";
 // POST /weather/blizzard, POST /weather/stop)
 export function requireBridge(req, res, next) {
   if (!bridge.isRunning) {
-    return res
-      .status(400)
-      .json({ error: "Bridge not running. Start it first." });
+    return res.status(400).json({
+      error: "Bridge not running. Start it first.",
+      detail:
+        "PanelBridge is not running. Go to Settings > PanelBridge to start it, or install PanelBridge.lua if not yet installed.",
+      fixUrl: "/settings?tab=bridge",
+    });
   }
   req.bridge = bridge;
   next();

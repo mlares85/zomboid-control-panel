@@ -10,7 +10,11 @@ import { getActiveServer } from "../database/init.js";
 // Pass { status, body } to match a specific handler's existing error text.
 export function requireActiveServer({
   status = 404,
-  body = { error: "No active server configured" },
+  body = {
+    error: "No active server configured",
+    detail: "No server is configured yet. Go to Servers to add one.",
+    fixUrl: "/servers",
+  },
 } = {}) {
   return async function requireActiveServerMiddleware(req, res, next) {
     const activeServer = await getActiveServer();

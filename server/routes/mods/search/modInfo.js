@@ -87,7 +87,11 @@ router.post("/inspect-workshop-item", async (req, res) => {
 
     const serverPath = await getServerPath();
     if (!serverPath) {
-      return res.status(400).json({ error: "Server path not configured" });
+      return res.status(400).json({
+        error: "Server path not configured",
+        detail: "Set the server install path in Servers > Edit.",
+        fixUrl: "/servers",
+      });
     }
 
     const mods = getModDetailsFromWorkshop(workshopId, serverPath);

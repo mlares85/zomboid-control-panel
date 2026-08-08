@@ -7,7 +7,12 @@
 // branching logic without silently changing every response body.
 export function requireRcon({
   status = 400,
-  body = { error: "RCON not connected" },
+  body = {
+    error: "RCON not connected",
+    detail:
+      "RCON is not connected. Check your RCON host, port, and password in Settings > RCON.",
+    fixUrl: "/settings?tab=connection",
+  },
 } = {}) {
   return function requireRconMiddleware(req, res, next) {
     const rconService = req.app.get("rconService");

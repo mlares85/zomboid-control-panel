@@ -35,6 +35,7 @@ async function resolveTargetServer(serverId) {
   if (!targetServer) {
     return {
       error: "No active server configured. Please configure a server first.",
+      fixUrl: "/servers",
     };
   }
   return { targetServer };
@@ -46,12 +47,17 @@ router.post("/auto-configure", async (req, res) => {
     const { serverId } = req.body;
     log.info(`POST /auto-configure (serverId=${serverId || "active"})`);
 
-    const { targetServer, error } = await resolveTargetServer(serverId);
-    if (error) return res.status(400).json({ error });
+    const { targetServer, error, fixUrl } = await resolveTargetServer(serverId);
+    if (error) return res.status(400).json({ error, fixUrl });
 
     const serverName = targetServer.serverName || targetServer.name;
     if (!serverName) {
-      return res.status(400).json({ error: "Server name not configured." });
+      return res.status(400).json({
+        error: "Server name not configured.",
+        detail:
+          "This server has no name set, so PanelBridge can't be located. Add one in Servers > Edit.",
+        fixUrl: "/servers",
+      });
     }
 
     const { foundPath, searchedLocations } = findAutoConfigurePath(
@@ -117,9 +123,13 @@ router.get("/scan-server/:serverId", async (req, res) => {
 
     const serverName = targetServer.serverName || targetServer.name;
     if (!serverName) {
-      return res
-        .status(400)
-        .json({ success: false, error: "Server name not configured." });
+      return res.status(400).json({
+        success: false,
+        error: "Server name not configured.",
+        detail:
+          "This server has no name set, so PanelBridge can't be located. Add one in Servers > Edit.",
+        fixUrl: "/servers",
+      });
     }
 
     const { possiblePaths, recommendedPath } = scanServerPreviewPaths(

@@ -78,16 +78,23 @@ router.post("/install-mod-auto", async (req, res) => {
     } else {
       targetServer = await getActiveServer();
       if (!targetServer) {
-        return res.status(400).json({ error: "No active server configured." });
+        return res.status(400).json({
+          error: "No active server configured.",
+          detail: "No server is configured yet. Go to Servers to add one.",
+          fixUrl: "/servers",
+        });
       }
     }
 
     // Use serverPath if available, otherwise extract directory from installPath
     let serverInstallDir = targetServer.serverPath || targetServer.installPath;
     if (!serverInstallDir) {
-      return res
-        .status(400)
-        .json({ error: "Server install path not configured." });
+      return res.status(400).json({
+        error: "Server install path not configured.",
+        detail:
+          "Set the install path in Servers > Edit, or PZ_SERVER_PATH in your compose file.",
+        fixUrl: "/servers",
+      });
     }
 
     // If installPath points to a file (e.g., .bat), extract the directory
