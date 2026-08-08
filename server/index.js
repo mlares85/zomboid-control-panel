@@ -223,7 +223,7 @@ import debugRoutes, { addLogToBuffer, getDiskFree } from "./routes/debug.js";
 import serverFinderRoutes from "./routes/serverFinder/index.js";
 import panelBridgeRoutes from "./routes/panelBridge.js";
 import backupRoutes from "./routes/backup.js";
-import mapProxyRoutes from "./routes/mapProxy.js";
+import mapProxyRoutes from "./routes/mapProxy/index.js";
 import panelBridge from "./services/panelBridge.js";
 
 dotenv.config();
