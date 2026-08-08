@@ -32,6 +32,8 @@ Templates are portable JSON documents containing sparse SandboxVars + INI overri
 
 At startup and on demand, `mountDiscovery.js` probes common Docker mount paths (`/pz-server`, `/zomboid`, `/serverdata/serverfiles`) and env-configured paths (`PZ_SERVER_PATH`, `PZ_SAVE_PATH`) for PZ server signatures. When mounts are found but no server profiles exist, a startup banner directs users to connect. `POST /api/servers/create-from-discovery` creates a fully-populated server profile including RCON settings read from the discovered server INI.
 
+Frontend: `MountDiscoveryBanner` (dismissal remembered per install path in localStorage) triggers `DiscoverySetup`, a dialog that re-probes the mount via the existing `POST /servers/detect` (not discover-mounts, which doesn't return per-server RCON fields) to prefill the RCON password/ports for display and `RconTestConnection` before calling create-from-discovery. First-run: `Setup.tsx` sets a `pz-just-completed-setup` sessionStorage flag on successful account creation; `Dashboard.tsx` consumes it once, and if no servers exist yet, auto-opens `DiscoverySetup` instead of landing on an empty dashboard.
+
 ## Env var fallback
 
 `PZ_SERVER_PATH` and `PZ_SAVE_PATH` env vars are consulted at two layers: creation-time (seeds empty fields in the POST body) and read-time (`normalizeServerMemory` falls back to env when db fields are empty/null). The db value always wins when present. `isRemote` is auto-detected based on whether the resolved path exists locally.

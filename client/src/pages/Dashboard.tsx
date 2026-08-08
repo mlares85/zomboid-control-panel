@@ -17,8 +17,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   serverApi, rconApi, playersApi, panelBridgeApi, backupApi, configApi, serversApi, debugApi,
-  panelUpdateApi, modsApi, schedulerApi, ServerInstance, PanelUpdateStatus,
+  panelUpdateApi, modsApi, schedulerApi, ServerInstance, PanelUpdateStatus, DiscoveredMount,
 } from '@/lib/api'
+import { DiscoverySetup } from '@/components/DiscoverySetup'
 import { formatUptime } from '@/lib/utils'
 import { useSocket } from '@/contexts/SocketContext'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -204,6 +205,11 @@ export default function Dashboard() {
   } | null>(null)
   const [wipeLoading, setWipeLoading] = useState(false)
 
+  // First-run auto-connect: right after account creation, if the panel has
+  // no servers yet and finds a PZ install at a common bind-mount, offer to
+  // connect it instead of landing on an empty dashboard.
+  const [autoDiscoveryMount, setAutoDiscoveryMount] = useState<DiscoveredMount | null>(null)
+
   const { toast } = useToast()
   const socket = useSocket()
 
@@ -214,6 +220,20 @@ export default function Dashboard() {
   useEffect(() => {
     let cancelled = false
     panelUpdateApi.getStatus().then(s => { if (!cancelled) setPanelUpdate(s) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    let justSetUp = false
+    try { justSetUp = sessionStorage.getItem('pz-just-completed-setup') === 'true' } catch { /* ignore */ }
+    if (!justSetUp) return
+    try { sessionStorage.removeItem('pz-just-completed-setup') } catch { /* ignore */ }
+
+    let cancelled = false
+    serversApi.getAll()
+      .then(({ servers }) => (servers.length === 0 ? serversApi.discoverMounts() : null))
+      .then(data => { if (!cancelled && data?.mounts?.length) setAutoDiscoveryMount(data.mounts[0]) })
+      .catch(() => { /* non-fatal — user can still use "Scan for Servers" on the Servers page */ })
     return () => { cancelled = true }
   }, [])
 
@@ -1427,6 +1447,14 @@ export default function Dashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* First-run auto-connect for a discovered mount */}
+      <DiscoverySetup
+        open={!!autoDiscoveryMount}
+        onOpenChange={(open) => !open && setAutoDiscoveryMount(null)}
+        mount={autoDiscoveryMount}
+        onCreated={() => fetchStatus()}
+      />
     </div>
   )
 }
