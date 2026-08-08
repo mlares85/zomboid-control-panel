@@ -44,6 +44,7 @@ import { BackupService } from "./services/backupService.js";
 import { UpdateChecker } from "./services/updateChecker.js";
 import { PanelUpdateChecker } from "./services/panelUpdateChecker.js";
 import { LogTailer } from "./services/logTailer.js";
+import { DiskMonitor } from "./services/diskMonitor.js";
 import authService from "./services/auth.js";
 import { requireRole } from "./services/auth.js";
 import authRoutes from "./routes/auth.js";
@@ -177,6 +178,11 @@ async function gracefulShutdown(signal) {
       panelUpdateChecker.stop();
     }
 
+    // Stop disk monitor
+    if (diskMonitor) {
+      diskMonitor.stop();
+    }
+
     // Stop PanelBridge
     if (panelBridge?.isRunning) {
       panelBridge.stop();
@@ -228,6 +234,7 @@ import panelBridgeRoutes from "./routes/panelBridge/index.js";
 import backupRoutes from "./routes/backup.js";
 import mapProxyRoutes from "./routes/mapProxy.js";
 import templatesRoutes from "./routes/templates.js";
+import systemRoutes from "./routes/system.js";
 import panelBridge from "./services/panelBridge.js";
 
 dotenv.config();
@@ -1048,6 +1055,12 @@ app.set("updateChecker", updateChecker);
 const panelUpdateChecker = new PanelUpdateChecker(io);
 app.set("panelUpdateChecker", panelUpdateChecker);
 
+// Disk-space monitor for the active server's save volume (P0: a full disk
+// during save corrupts worlds). Polls every 60s and emits disk:warning /
+// disk:critical / disk:normal over the same socket.
+const diskMonitor = new DiskMonitor(io);
+app.set("diskMonitor", diskMonitor);
+
 // Auth routes (must be before other API routes)
 app.use("/api/auth", authRoutes);
 
@@ -1072,6 +1085,7 @@ app.use("/api/panel-bridge", panelBridgeRoutes);
 app.use("/api/backup", backupRoutes);
 app.use("/api/map", mapProxyRoutes);
 app.use("/api/templates", templatesRoutes);
+app.use("/api/system", systemRoutes);
 
 // Health check + panel version
 // In exe builds, PANEL_VERSION is injected by esbuild at compile time.
@@ -2460,6 +2474,9 @@ async function start() {
 
     // Start panel self-update checker
     panelUpdateChecker.start(_pkgVersion);
+
+    // Start disk-space monitor for the active server's save volume
+    diskMonitor.start();
 
     // Read panel port from DB (saved via Settings UI), fallback to env or 3001
     const savedPort = await getSetting("panelPort");
