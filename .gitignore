@@ -52,3 +52,4 @@ release-notes-*.md
 *.ipynb
 lh-*.json
 _artifacts/
+.claude/worktrees/

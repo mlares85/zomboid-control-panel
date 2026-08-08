@@ -1042,7 +1042,7 @@ export class RconService extends EventEmitter {
   }
 
   // Player commands
-  async kickPlayer(username, reason = "") {
+  async kickPlayer(username, _reason = "") {
     const safeUser = this.sanitizeQuotedArg(username, "Username", 64);
     // PZ RCON kick syntax: kickuser "username" — no reason flag supported
     return this.execute(`kickuser "${safeUser}"`);

@@ -385,7 +385,7 @@ router.post("/detect", async (req, res) => {
 });
 
 // Get all servers
-router.get("/", async (req, res) => {
+router.get("/", async (_req, res) => {
   try {
     const servers = await getServers();
     res.json({ servers });
@@ -469,7 +469,7 @@ router.get("/status", async (req, res) => {
 });
 
 // Get active server
-router.get("/active", async (req, res) => {
+router.get("/active", async (_req, res) => {
   try {
     const server = await getActiveServer();
     if (!server) {
