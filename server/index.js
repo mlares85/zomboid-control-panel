@@ -218,7 +218,7 @@ import configRoutes from "./routes/config/index.js";
 import schedulerRoutes from "./routes/scheduler.js";
 import modsRoutes from "./routes/mods.js";
 import chunksRoutes from "./routes/chunks.js";
-import discordRoutes from "./routes/discord.js";
+import discordRoutes from "./routes/discord/index.js";
 import debugRoutes, { addLogToBuffer, getDiskFree } from "./routes/debug.js";
 import serverFinderRoutes from "./routes/serverFinder/index.js";
 import panelBridgeRoutes from "./routes/panelBridge.js";
