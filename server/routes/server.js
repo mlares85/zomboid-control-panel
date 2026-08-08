@@ -17,6 +17,7 @@ import { sanitizeError, sanitizeIniValue } from "../utils/sanitize.js";
 import { normalizeMemoryGb } from "../utils/memory.js";
 import { withFileLock, writeFileAtomic } from "../utils/fileWriteQueue.js";
 import { requireRole } from "../services/auth.js";
+import { requireRcon } from "../middleware/requireRcon.js";
 
 const router = express.Router();
 
@@ -896,46 +897,45 @@ router.post("/start", async (req, res) => {
 });
 
 // Stop server (graceful via RCON)
-router.post("/stop", async (req, res) => {
-  try {
-    const rconService = req.app.get("rconService");
-    log.info("POST /stop — graceful shutdown requested");
+router.post(
+  "/stop",
+  requireRcon({
+    body: { error: "RCON not connected. Cannot gracefully stop server." },
+  }),
+  async (req, res) => {
+    try {
+      const rconService = req.rconService;
+      log.info("POST /stop — graceful shutdown requested");
 
-    // Check if RCON is connected first
-    if (!rconService.connected) {
-      return res
-        .status(400)
-        .json({ error: "RCON not connected. Cannot gracefully stop server." });
+      // Save first — quitting after a failed save discards everything since
+      // the last one.
+      const saved = await rconService.save();
+      if (!saved?.success) {
+        return res.status(502).json({
+          error: `Save failed, so the server was left running: ${sanitizeError(saved?.error)}`,
+        });
+      }
+
+      // Then quit
+      const result = await rconService.quit();
+
+      const io = req.app.get("io");
+      if (io) io.to("server-status").emit("server:status", { running: false });
+
+      await logServerEvent("server_stop", "Server stopped via web UI");
+      req.app
+        .get("discordBot")
+        ?.sendEventNotification("serverStop", {})
+        .catch((err) =>
+          log.debug(`Discord serverStop notification failed: ${err.message}`),
+        );
+      res.json(result);
+    } catch (error) {
+      log.error(`Failed to stop server: ${error.message}`);
+      res.status(500).json({ error: sanitizeError(error.message) });
     }
-
-    // Save first — quitting after a failed save discards everything since
-    // the last one.
-    const saved = await rconService.save();
-    if (!saved?.success) {
-      return res.status(502).json({
-        error: `Save failed, so the server was left running: ${sanitizeError(saved?.error)}`,
-      });
-    }
-
-    // Then quit
-    const result = await rconService.quit();
-
-    const io = req.app.get("io");
-    if (io) io.to("server-status").emit("server:status", { running: false });
-
-    await logServerEvent("server_stop", "Server stopped via web UI");
-    req.app
-      .get("discordBot")
-      ?.sendEventNotification("serverStop", {})
-      .catch((err) =>
-        log.debug(`Discord serverStop notification failed: ${err.message}`),
-      );
-    res.json(result);
-  } catch (error) {
-    log.error(`Failed to stop server: ${error.message}`);
-    res.status(500).json({ error: sanitizeError(error.message) });
-  }
-});
+  },
+);
 
 // Force stop server
 router.post("/force-stop", async (req, res) => {

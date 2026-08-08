@@ -22,6 +22,7 @@ import {
 import { sanitizeError } from "../utils/sanitize.js";
 import { persistSandboxValues } from "./serverFiles.js";
 import { requireRole } from "../services/auth.js";
+import { requireBridge } from "../middleware/requireBridge.js";
 import {
   getEmbeddedPanelBridgeLua,
   compareModVersions,
@@ -1233,16 +1234,7 @@ router.post("/command", requireRole("admin"), async (req, res) => {
 });
 
 // Get weather info
-router.get("/weather", async (req, res) => {
-  if (!bridge.bridgePath) {
-    return res.status(400).json({ error: "Bridge not configured" });
-  }
-  if (!bridge.isRunning) {
-    return res
-      .status(400)
-      .json({ error: "Bridge not running. Start it first." });
-  }
-
+router.get("/weather", requireBridge, async (req, res) => {
   try {
     const result = await bridge.getWeather();
     res.json(result);
@@ -1252,16 +1244,7 @@ router.get("/weather", async (req, res) => {
 });
 
 // Get server info
-router.get("/server-info", async (req, res) => {
-  if (!bridge.bridgePath) {
-    return res.status(400).json({ error: "Bridge not configured" });
-  }
-  if (!bridge.isRunning) {
-    return res
-      .status(400)
-      .json({ error: "Bridge not running. Start it first." });
-  }
-
+router.get("/server-info", requireBridge, async (req, res) => {
   try {
     const result = await bridge.getServerInfo();
     // Lua JSON encodes empty tables as {} (object) instead of [] (array)
@@ -1275,12 +1258,7 @@ router.get("/server-info", async (req, res) => {
 });
 
 // Weather control endpoints
-router.post("/weather/blizzard", async (req, res) => {
-  if (!bridge.isRunning) {
-    return res
-      .status(400)
-      .json({ error: "Bridge not running. Start it first." });
-  }
+router.post("/weather/blizzard", requireBridge, async (req, res) => {
   const { duration } = req.body;
   try {
     const result = await bridge.triggerBlizzard(duration);
@@ -1331,12 +1309,7 @@ router.post("/weather/storm", async (req, res) => {
   }
 });
 
-router.post("/weather/stop", async (req, res) => {
-  if (!bridge.isRunning) {
-    return res
-      .status(400)
-      .json({ error: "Bridge not running. Start it first." });
-  }
+router.post("/weather/stop", requireBridge, async (req, res) => {
   try {
     const result = await bridge.stopWeather();
     res.json(result);
