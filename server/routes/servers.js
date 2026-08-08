@@ -16,6 +16,7 @@ import {
   getAllSettings,
 } from "../database/init.js";
 import { isRemoteConfigConfigured } from "../services/remoteConfigFiles.js";
+import { requireActiveServer } from "../middleware/requireActiveServer.js";
 
 const router = express.Router();
 
@@ -469,12 +470,9 @@ router.get("/status", async (req, res) => {
 });
 
 // Get active server
-router.get("/active", async (req, res) => {
+router.get("/active", requireActiveServer(), async (req, res) => {
   try {
-    const server = await getActiveServer();
-    if (!server) {
-      return res.status(404).json({ error: "No active server configured" });
-    }
+    const server = req.activeServer;
     // Lets the UI stop hiding file-based pages once a remote server's Server
     // folder is reachable over SFTP.
     const remoteConfigConfigured = server.isRemote

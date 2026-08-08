@@ -17,6 +17,7 @@ import {
   pushRemoteConfigFiles,
   validateRemoteConfigTransport,
 } from "../services/remoteConfigFiles.js";
+import { requireRcon } from "../middleware/requireRcon.js";
 
 const router = express.Router();
 
@@ -1578,24 +1579,24 @@ router.post("/restore/:filename", async (req, res) => {
 });
 
 // Save and reload (calls RCON reloadoptions)
-router.post("/save-and-reload", async (req, res) => {
-  try {
-    log.info("POST /save-and-reload");
-    const rconService = req.app.get("rconService");
-
-    if (!rconService || !rconService.isConnected()) {
-      return res
-        .status(400)
-        .json({ error: "RCON not connected. Changes saved but not reloaded." });
+router.post(
+  "/save-and-reload",
+  requireRcon({
+    body: {
+      error: "RCON not connected. Changes saved but not reloaded.",
+    },
+  }),
+  async (req, res) => {
+    try {
+      log.info("POST /save-and-reload");
+      const result = await req.rconService.reloadOptions();
+      res.json({ success: true, message: "Options reloaded", result });
+    } catch (error) {
+      log.error("Failed to reload options:", error);
+      res.status(500).json({ error: sanitizeError(error.message) });
     }
-
-    const result = await rconService.reloadOptions();
-    res.json({ success: true, message: "Options reloaded", result });
-  } catch (error) {
-    log.error("Failed to reload options:", error);
-    res.status(500).json({ error: sanitizeError(error.message) });
-  }
-});
+  },
+);
 
 // ===== CONFIG TEMPLATES =====
 
