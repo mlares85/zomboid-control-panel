@@ -24,11 +24,23 @@ function createResponse() {
   return response;
 }
 
+// Routes may live directly on `router` or be nested under sub-routers
+// (see server/routes/players/index.js), so this walks the stack recursively.
+function findLayer(stack, path) {
+  for (const entry of stack) {
+    if (entry.route?.path === path && entry.route.methods.post) {
+      return entry.route.stack[0].handle;
+    }
+    if (entry.name === "router" && entry.handle?.stack) {
+      const found = findLayer(entry.handle.stack, path);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function getHandler(path) {
-  const layer = router.stack.find(
-    (entry) => entry.route?.path === path && entry.route.methods.post,
-  );
-  return layer.route.stack[0].handle;
+  return findLayer(router.stack, path);
 }
 
 const addItem = vi.fn();
