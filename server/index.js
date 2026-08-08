@@ -227,6 +227,7 @@ import serverFinderRoutes from "./routes/serverFinder.js";
 import panelBridgeRoutes from "./routes/panelBridge/index.js";
 import backupRoutes from "./routes/backup.js";
 import mapProxyRoutes from "./routes/mapProxy.js";
+import templatesRoutes from "./routes/templates.js";
 import panelBridge from "./services/panelBridge.js";
 
 dotenv.config();
@@ -611,6 +612,9 @@ app.use("/api/panel/update-check", strictLimiter);
 app.use("/api/panel/update-download", strictLimiter);
 app.use("/api/panel/update-preflight", strictLimiter);
 app.use("/api/panel/restart", strictLimiter);
+// Writes server.ini and SandboxVars.lua directly — same risk class as
+// server-files/save-and-reload above.
+app.use("/api/templates/:id/apply", strictLimiter);
 // Browser cookie extraction spawns PowerShell for DPAPI unwrap — expensive
 // and platform-sensitive, so keep it under the destructive limiter too.
 app.use("/api/mods/collection/extract-cookies", strictLimiter);
@@ -1066,6 +1070,7 @@ app.use("/api/server-finder", serverFinderRoutes);
 app.use("/api/panel-bridge", panelBridgeRoutes);
 app.use("/api/backup", backupRoutes);
 app.use("/api/map", mapProxyRoutes);
+app.use("/api/templates", templatesRoutes);
 
 // Health check + panel version
 // In exe builds, PANEL_VERSION is injected by esbuild at compile time.
