@@ -18,6 +18,7 @@ import {
   invalidateCandidatePathsCache,
   inspectZomboidPath,
 } from "../utils/zomboidPaths.js";
+import { isLocalFileAccess } from "../utils/serverProvider.js";
 
 // Re-export for tests / other modules that still pull these from chunks.js.
 export { normalizeUserPath, getCandidateZomboidPaths };
@@ -170,7 +171,7 @@ async function cleanupEmptyCellFiles(
 router.use(async (req, res, next) => {
   try {
     const activeServer = await getActiveServer();
-    if (activeServer?.isRemote) {
+    if (!isLocalFileAccess(activeServer)) {
       return res
         .status(400)
         .json({

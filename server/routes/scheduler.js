@@ -13,6 +13,7 @@ import {
   getActiveServer,
   getServer
 } from '../database/init.js';
+import { isRemoteProvider } from '../utils/serverProvider.js';
 
 const router = express.Router();
 
@@ -308,7 +309,7 @@ router.post('/tasks/:id/run', async (req, res) => {
 router.post('/restart-now', async (req, res) => {
   try {
     const activeServer = await getActiveServer();
-    if (activeServer?.isRemote) {
+    if (isRemoteProvider(activeServer)) {
       return res.status(400).json({ error: 'Cannot restart a remote server. The process is not managed by this panel.' });
     }
 

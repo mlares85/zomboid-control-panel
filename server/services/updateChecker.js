@@ -4,6 +4,7 @@ import fs from "fs";
 import { createLogger } from "../utils/logger.js";
 const log = createLogger("Updates");
 import { getSetting, setSetting, getActiveServer } from "../database/init.js";
+import { isLocalFileAccess } from "../utils/serverProvider.js";
 
 async function getSteamLoginArgs() {
   const account = String((await getSetting("steamUpdateAccount")) || "").trim();
@@ -453,7 +454,7 @@ export class UpdateChecker {
       ? Math.min(60, Math.max(0, Math.floor(rawWarning)))
       : 15;
     const activeServer = await getActiveServer();
-    if (!activeServer?.installPath || activeServer.isRemote) {
+    if (!activeServer?.installPath || !isLocalFileAccess(activeServer)) {
       log.warn("Auto-update skipped: the active server is remote or has no local install path");
       return;
     }

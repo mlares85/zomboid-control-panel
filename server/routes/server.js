@@ -17,6 +17,7 @@ import { sanitizeError, sanitizeIniValue } from "../utils/sanitize.js";
 import { normalizeMemoryGb } from "../utils/memory.js";
 import { withFileLock, writeFileAtomic } from "../utils/fileWriteQueue.js";
 import { requireRole } from "../services/auth.js";
+import { isRemoteProvider } from "../utils/serverProvider.js";
 
 const router = express.Router();
 
@@ -662,9 +663,9 @@ router.post("/start", async (req, res) => {
   try {
     const activeServer = await getActiveServer();
     log.info(
-      `POST /start (server=${activeServer?.name || "unknown"}, remote=${activeServer?.isRemote || false})`,
+      `POST /start (server=${activeServer?.name || "unknown"}, remote=${isRemoteProvider(activeServer)})`,
     );
-    if (activeServer?.isRemote) {
+    if (isRemoteProvider(activeServer)) {
       return res.status(400).json({
         error:
           "Cannot start a remote server. Remote servers are managed externally — use RCON to interact.",
@@ -942,7 +943,7 @@ router.post("/force-stop", async (req, res) => {
   try {
     log.info("POST /force-stop — force kill requested");
     const activeServer = await getActiveServer();
-    if (activeServer?.isRemote) {
+    if (isRemoteProvider(activeServer)) {
       return res.status(400).json({
         error:
           "Cannot force-stop a remote server. The process is not managed by this panel.",
@@ -966,7 +967,7 @@ router.post("/force-stop", async (req, res) => {
 router.post("/restart", async (req, res) => {
   try {
     const activeServer = await getActiveServer();
-    if (activeServer?.isRemote) {
+    if (isRemoteProvider(activeServer)) {
       return res.status(400).json({
         error:
           "Cannot restart a remote server. The process is not managed by this panel.",

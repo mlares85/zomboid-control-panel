@@ -6,6 +6,11 @@ import { randomUUID } from "crypto";
 import { getDataPaths } from "../utils/paths.js";
 import { createLogger } from "../utils/logger.js";
 import { normalizeMemoryGb } from "../utils/memory.js";
+import {
+  detectProvider,
+  isRemoteProvider,
+  isValidProvider,
+} from "../utils/serverProvider.js";
 const log = createLogger("DB");
 
 // ============================================
@@ -1263,10 +1268,34 @@ export async function getAllSettings() {
 // Server Configurations (Multi-server)
 // ============================================
 
-function normalizeServerMemory(server) {
+// Resolves `provider` (native | docker-local | docker-managed | remote-sftp)
+// and derives `isRemote` from it, so every existing `.isRemote` read stays
+// correct without callers having to know about providers. A stored, valid
+// `provider` always wins; otherwise it's auto-detected from the legacy
+// isRemote flag plus whether the configured paths exist on this host — this
+// is what lets servers created before `provider` existed keep working
+// unchanged (see server/utils/serverProvider.js).
+export function normalizeServerMemory(server) {
   if (!server) return server;
+  const installPath = server.installPath || "";
+  const zomboidDataPath = server.zomboidDataPath || null;
+  const pathsConfigured = Boolean(installPath || zomboidDataPath);
+  const pathsExistLocally =
+    Boolean(installPath && fs.existsSync(installPath)) ||
+    Boolean(zomboidDataPath && fs.existsSync(zomboidDataPath));
+
+  const provider = isValidProvider(server.provider)
+    ? server.provider
+    : detectProvider({
+        isRemote: server.isRemote,
+        pathsConfigured,
+        pathsExistLocally,
+      });
+
   return {
     ...server,
+    provider,
+    isRemote: isRemoteProvider({ provider }),
     minMemory: normalizeMemoryGb(server.minMemory, 4),
     maxMemory: normalizeMemoryGb(server.maxMemory, 8),
   };
@@ -1314,6 +1343,9 @@ export async function createServer(serverConfig) {
     useNoSteam: serverConfig.useNoSteam || false,
     useDebug: serverConfig.useDebug || false,
     isRemote: serverConfig.isRemote || false,
+    ...(isValidProvider(serverConfig.provider)
+      ? { provider: serverConfig.provider }
+      : {}),
     startCommand: serverConfig.startCommand || "",
     isActive: isFirst,
     createdAt: new Date().toISOString(),

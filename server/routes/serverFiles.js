@@ -17,6 +17,7 @@ import {
   pushRemoteConfigFiles,
   validateRemoteConfigTransport,
 } from "../services/remoteConfigFiles.js";
+import { isLocalFileAccess } from "../utils/serverProvider.js";
 
 const router = express.Router();
 
@@ -47,7 +48,7 @@ router.use(async (req, res, next) => {
   } catch (err) {
     return next(err);
   }
-  if (!activeServer?.isRemote) return next();
+  if (isLocalFileAccess(activeServer)) return next();
 
   if (LOCAL_ONLY_PATHS.has(req.path)) {
     return res.status(400).json({
@@ -162,7 +163,7 @@ async function getServerConfigPath() {
 
   // A remote server's Server/ folder lives on the host; the handlers below
   // work against its local SFTP mirror instead.
-  if (activeServer?.isRemote) {
+  if (!isLocalFileAccess(activeServer)) {
     const transport = await resolveRemoteConfigTransport();
     if (transport) {
       return getMirrorPath(transport, await getServerName());
@@ -1132,7 +1133,7 @@ export async function persistSandboxValues(values) {
   const activeServer = await getActiveServer();
   // Called from the PanelBridge routes, outside the mirror middleware, so a
   // remote server has to pull and push around its own write.
-  if (activeServer?.isRemote) {
+  if (!isLocalFileAccess(activeServer)) {
     const transport = await resolveRemoteConfigTransport();
     if (!transport) {
       return { persisted: false, reason: "remote server filesystem" };

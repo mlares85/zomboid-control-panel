@@ -55,6 +55,7 @@ import {
   writeLuaAtomic,
 } from "./utils/embeddedLua.js";
 import { isServerObservedRunning } from "./utils/serverStatus.js";
+import { isRemoteProvider } from "./utils/serverProvider.js";
 
 // === Supervisor bootstrap ===
 // If the .exe was double-clicked directly (no PANEL_SUPERVISOR_V env var) and
@@ -937,7 +938,7 @@ rconService.on("disconnected", async () => {
   setTimeout(async () => {
     try {
       const activeServer = await getActiveServer();
-      const processRunning = activeServer?.isRemote
+      const processRunning = isRemoteProvider(activeServer)
         ? false
         : await serverManager.checkServerRunning();
       const running = isServerObservedRunning({
@@ -1964,7 +1965,7 @@ let lastKnownRunning = null;
 
 async function getObservedServerRunning() {
   const activeServer = await getActiveServer();
-  const processRunning = activeServer?.isRemote
+  const processRunning = isRemoteProvider(activeServer)
     ? false
     : await serverManager.checkServerRunning();
 
@@ -2239,7 +2240,7 @@ async function start() {
         const timeoutMs = 15000;
         const activeServer = await getActiveServer();
         const isRunning = await Promise.race([
-          activeServer?.isRemote
+          isRemoteProvider(activeServer)
             ? Promise.resolve(rconService.connected || panelBridge.isModConnected())
             : serverManager.checkServerRunning(),
           new Promise((_, reject) =>

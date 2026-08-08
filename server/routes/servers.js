@@ -16,6 +16,7 @@ import {
   getAllSettings,
 } from "../database/init.js";
 import { isRemoteConfigConfigured } from "../services/remoteConfigFiles.js";
+import { isRemoteProvider, isValidProvider } from "../utils/serverProvider.js";
 
 const router = express.Router();
 
@@ -477,7 +478,7 @@ router.get("/active", async (req, res) => {
     }
     // Lets the UI stop hiding file-based pages once a remote server's Server
     // folder is reachable over SFTP.
-    const remoteConfigConfigured = server.isRemote
+    const remoteConfigConfigured = isRemoteProvider(server)
       ? isRemoteConfigConfigured(await getAllSettings())
       : false;
     res.json({ server: { ...server, remoteConfigConfigured } });
@@ -518,8 +519,17 @@ router.post("/", async (req, res) => {
       `POST / — creating server: name=${config?.name}, remote=${!!config?.isRemote}`,
     );
 
+    // Optional explicit provider (native | docker-local | docker-managed |
+    // remote-sftp). When omitted, createServer/normalizeServerMemory
+    // auto-detect one from isRemote + whether the paths exist locally.
+    if (config.provider !== undefined && !isValidProvider(config.provider)) {
+      return res.status(400).json({ error: "Invalid provider" });
+    }
+
     // Validate required fields - installPath not required for remote servers
-    const isRemote = !!config.isRemote;
+    const isRemote = config.provider
+      ? isRemoteProvider({ provider: config.provider })
+      : !!config.isRemote;
     const requiredFields = isRemote
       ? ["name", "rconHost", "rconPort", "rconPassword"]
       : ["name", "installPath", "rconHost", "rconPort", "rconPassword"];
@@ -584,6 +594,7 @@ router.post("/", async (req, res) => {
       useNoSteam: !!config.useNoSteam,
       useDebug: !!config.useDebug,
       isRemote: isRemote,
+      provider: config.provider,
     });
 
     log.info(`Created new server: ${server.name} (ID: ${server.id})`);
@@ -612,6 +623,7 @@ const ALLOWED_SERVER_UPDATE_FIELDS = [
   "useNoSteam",
   "useDebug",
   "isRemote",
+  "provider",
   "startBat",
   "batFile",
   "description",
@@ -635,6 +647,10 @@ router.put("/:id", async (req, res) => {
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];
       }
+    }
+
+    if (updates.provider !== undefined && !isValidProvider(updates.provider)) {
+      return res.status(400).json({ error: "Invalid provider" });
     }
 
     if (updates.rconHost !== undefined) {

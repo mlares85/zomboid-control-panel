@@ -16,6 +16,7 @@ import {
 import { withFileLock, writeFileAtomic } from "../utils/fileWriteQueue.js";
 import { escapeRegExp } from "../utils/regex.js";
 import { getDataPaths } from "../utils/paths.js";
+import { isRemoteProvider } from "../utils/serverProvider.js";
 
 const isWindows = process.platform === "win32";
 // How long a live-looked-up public IP is trusted before re-checking.
@@ -1003,7 +1004,7 @@ export class ServerManager {
   async _isOnlyLocalServer() {
     try {
       const servers = await getServers();
-      return (servers || []).filter((entry) => !entry.isRemote).length <= 1;
+      return (servers || []).filter((entry) => !isRemoteProvider(entry)).length <= 1;
     } catch (error) {
       log.debug(`Could not count configured servers: ${error.message}`);
       return false;

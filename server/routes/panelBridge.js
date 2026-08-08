@@ -41,6 +41,7 @@ import {
   resetRemoteConfigSession,
   validateRemoteConfigTransport,
 } from "../services/remoteConfigFiles.js";
+import { isRemoteProvider } from "../utils/serverProvider.js";
 const log = createLogger("API:PanelBridge");
 
 // ES Module __dirname equivalent
@@ -1057,7 +1058,7 @@ router.get("/ping", async (req, res) => {
 // the route safe if a lower-privilege role is ever introduced.
 router.post("/command", requireRole("admin"), async (req, res) => {
   const activeServer = await getActiveServer();
-  if (activeServer?.isRemote && !bridge.isSftpRunning() && !bridge.isRunning) {
+  if (isRemoteProvider(activeServer) && !bridge.isSftpRunning() && !bridge.isRunning) {
     return res.status(400).json({
       error:
         "PanelBridge requires a configured mapped drive or a running SFTP bridge transport for remote servers.",
