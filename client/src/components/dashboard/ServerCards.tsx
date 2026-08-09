@@ -49,17 +49,21 @@ export function ServerCards({ onDrillIn }: ServerCardsProps) {
   const fetchAll = useCallback(async () => {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
     try {
-      const [{ servers: list }, statusData, statsMap] = await Promise.all([
-        serversApi.getAll(),
-        serversApi.getStatus(),
+      // Phase 1: server list (fast, renders cards immediately)
+      const { servers: list } = await serversApi.getAll()
+      setServers(list)
+
+      // Phase 2: status + stats (fills in pills and resource usage)
+      const [statusData, statsMap] = await Promise.all([
+        serversApi.getStatus().catch(() => ({ servers: [] })),
         dockerApi.getAllStats().catch(() => ({})),
       ])
-      setServers(list)
       setContainerStats(statsMap)
       const next: HostStatuses = {}
       for (const s of statusData.servers) next[String(s.id)] = { running: !!s.running }
       setHostStatuses(next)
 
+      // Phase 3: active server detail (heaviest, non-blocking)
       const active = list.find(s => s.isActive)
       if (!active) { setActiveStatus(null); setActiveStats(null); return }
       const [composed, stats] = await Promise.all([
