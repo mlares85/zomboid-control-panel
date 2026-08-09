@@ -45,7 +45,7 @@ import { PanelUpdateChecker } from "./services/panelUpdateChecker.js";
 import { LogTailer } from "./services/logTailer.js";
 import authService from "./services/auth.js";
 import { requireRole } from "./services/auth.js";
-import authRoutes from "./routes/auth/index.js";
+import authRoutes from "./routes/auth.js";
 import { loadOrCreateCerts } from "./utils/certs.js";
 import { sanitizeError } from "./utils/sanitize.js";
 import { getSftpCachePath } from "./services/panelBridgeSftp.js";
@@ -210,29 +210,21 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 // Routes
 import serverRoutes from "./routes/server.js";
-import serversRoutes from "./routes/servers/index.js";
+import serversRoutes from "./routes/servers.js";
+import serverStatusRoutes from "./routes/serverStatus.js";
 import serverFilesRoutes from "./routes/serverFiles.js";
-import playerRoutes from "./routes/players/index.js";
+import playerRoutes from "./routes/players.js";
 import rconRoutes from "./routes/rcon.js";
-import configRoutes from "./routes/config/index.js";
-import schedulerRoutes from "./routes/scheduler/index.js";
+import configRoutes from "./routes/config.js";
+import schedulerRoutes from "./routes/scheduler.js";
 import modsRoutes from "./routes/mods.js";
-import modsSafeUpdateRoutes from "./routes/mods/safeUpdate.js";
 import chunksRoutes from "./routes/chunks.js";
-import discordRoutes from "./routes/discord/index.js";
+import discordRoutes from "./routes/discord.js";
 import debugRoutes, { addLogToBuffer, getDiskFree } from "./routes/debug.js";
-import serverFinderRoutes from "./routes/serverFinder/index.js";
+import serverFinderRoutes from "./routes/serverFinder.js";
 import panelBridgeRoutes from "./routes/panelBridge.js";
 import backupRoutes from "./routes/backup.js";
-<<<<<<< HEAD
-import mapProxyRoutes from "./routes/mapProxy/index.js";
-import templatesRoutes from "./routes/templates.js";
-import systemRoutes from "./routes/system.js";
-import discoveryRoutes from "./routes/discovery.js";
-=======
 import mapProxyRoutes from "./routes/mapProxy.js";
-import environmentRoutes from "./routes/environment.js";
->>>>>>> worktree-agent-a9775f51e61877487
 import panelBridge from "./services/panelBridge.js";
 
 dotenv.config();
@@ -620,8 +612,6 @@ app.use("/api/panel/restart", strictLimiter);
 // Browser cookie extraction spawns PowerShell for DPAPI unwrap — expensive
 // and platform-sensitive, so keep it under the destructive limiter too.
 app.use("/api/mods/collection/extract-cookies", strictLimiter);
-// Composed backup+restart action — same blast radius as /api/server/restart.
-app.use("/api/mods/safe-update", strictLimiter);
 
 // Per-item collection mutations are cheap to the panel, but each one writes
 // to Steam. Do not share their bucket with cookie extraction: a normal sync
@@ -1057,13 +1047,13 @@ app.use("/api/auth", authRoutes);
 // API Routes
 app.use("/api/server", serverRoutes);
 app.use("/api/servers", serversRoutes);
+app.use("/api/servers", serverStatusRoutes);
 app.use("/api/server-files", serverFilesRoutes);
 app.use("/api/players", playerRoutes);
 app.use("/api/rcon", rconRoutes);
 app.use("/api/config", configRoutes);
 app.use("/api/scheduler", schedulerRoutes);
 app.use("/api/mods", modsRoutes);
-app.use("/api/mods", modsSafeUpdateRoutes);
 app.use("/api/chunks", chunksRoutes);
 app.use("/api/discord", discordRoutes);
 app.use("/api/debug", debugRoutes);
@@ -1071,15 +1061,6 @@ app.use("/api/server-finder", serverFinderRoutes);
 app.use("/api/panel-bridge", panelBridgeRoutes);
 app.use("/api/backup", backupRoutes);
 app.use("/api/map", mapProxyRoutes);
-<<<<<<< HEAD
-app.use("/api/templates", templatesRoutes);
-app.use("/api/system", systemRoutes);
-// Discovery routes mounted before servers routes (literal paths like
-// /discover-mounts must not be swallowed by servers' GET /:id wildcard)
-app.use("/api/servers", discoveryRoutes);
-=======
-app.use("/api/system/environment", environmentRoutes);
->>>>>>> worktree-agent-a9775f51e61877487
 
 // Health check + panel version
 // In exe builds, PANEL_VERSION is injected by esbuild at compile time.

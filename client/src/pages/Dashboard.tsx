@@ -1244,6 +1244,12 @@ export default function Dashboard() {
           <section>
             <WorkList items={workItems} />
             <div className="mt-2 border-t border-border/25 px-1 pt-1">
+              {/* Host/process state shown separately from RCON so a running
+                  container with RCON trouble never reads as just "stopped". */}
+              <ConnLine
+                label={activeServer?.isRemote ? 'Host' : 'Process'}
+                state={online ? 'on' : 'off'}
+              />
               <ConnLine
                 label="RCON"
                 state={status?.rcon?.connected ? 'on' : 'off'}
