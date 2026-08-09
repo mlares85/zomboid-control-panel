@@ -6,9 +6,12 @@ import { Badge } from '@/components/ui/badge'
 import { serversApi, type ServerInstance } from '@/lib/api'
 import { copyText } from '@/lib/utils'
 import { useToast } from '@/components/ui/use-toast'
+import { WindowsFirewallGuide } from './WindowsFirewallGuide'
 
 interface CompleteStepProps {
   serverId: string | number
+  /** Shows the Windows Firewall port reminder when set to 'win32'. */
+  platform?: string
   onGoToDashboard: () => void
 }
 
@@ -18,7 +21,7 @@ const NEXT_ACTIONS = [
   { to: '/backups', icon: Archive, label: 'Set up backups', description: 'Schedule automatic world backups.' },
 ]
 
-export function CompleteStep({ serverId, onGoToDashboard }: CompleteStepProps) {
+export function CompleteStep({ serverId, platform, onGoToDashboard }: CompleteStepProps) {
   const [server, setServer] = useState<ServerInstance | null>(null)
   const { toast } = useToast()
 
@@ -72,6 +75,8 @@ export function CompleteStep({ serverId, onGoToDashboard }: CompleteStepProps) {
           </Link>
         ))}
       </div>
+
+      {platform === 'win32' && <WindowsFirewallGuide />}
 
       <Button className="w-full onboarding-cta" onClick={onGoToDashboard}>
         <LayoutDashboard className="mr-2 h-4 w-4" /> Go to Dashboard

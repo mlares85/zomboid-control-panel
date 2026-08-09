@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getServers = vi.fn();
 const isContainerized = vi.fn();
 const getContainerInfo = vi.fn();
+const detectDockerRuntime = vi.fn();
 const discoverEnvironmentMounts = vi.fn();
 
 vi.mock("../database/init.js", () => ({ getServers }));
 vi.mock("../utils/dockerDetect.js", () => ({
   isContainerized,
   getContainerInfo,
+  detectDockerRuntime,
 }));
 vi.mock("../services/mountDiscovery.js", () => ({ discoverEnvironmentMounts }));
 
@@ -35,6 +37,7 @@ describe("GET /api/system/environment", () => {
       containerized: true,
       hasDockerSocket: false,
     });
+    detectDockerRuntime.mockReset().mockReturnValue(null);
     discoverEnvironmentMounts.mockReset().mockReturnValue([
       { path: "/pz-server", type: "install" },
     ]);
@@ -66,7 +69,39 @@ describe("GET /api/system/environment", () => {
       },
       discoveredMounts: [{ path: "/pz-server", type: "install" }],
       serverCount: 2,
+      platformGuidance: {
+        platform: process.platform,
+        canRunNative: process.platform !== "darwin",
+        canRunDocker: false,
+        dockerRuntime: null,
+        recommendations: process.platform === "darwin" ? expect.any(Array) : [],
+      },
     });
+  });
+
+  it("treats a mounted Docker socket as a native runtime without shelling out", async () => {
+    getContainerInfo.mockReturnValue({ containerized: true, hasDockerSocket: true });
+    const response = createResponse();
+
+    await getHandler()({}, response);
+
+    expect(detectDockerRuntime).not.toHaveBeenCalled();
+    const body = response.json.mock.calls[0][0];
+    expect(body.platformGuidance.dockerRuntime).toBe("native");
+    expect(body.platformGuidance.canRunDocker).toBe(true);
+  });
+
+  it("falls back to detectDockerRuntime when no Docker socket is mounted", async () => {
+    getContainerInfo.mockReturnValue({ containerized: false, hasDockerSocket: false });
+    detectDockerRuntime.mockReturnValue("orbstack");
+    const response = createResponse();
+
+    await getHandler()({}, response);
+
+    expect(detectDockerRuntime).toHaveBeenCalled();
+    const body = response.json.mock.calls[0][0];
+    expect(body.platformGuidance.dockerRuntime).toBe("orbstack");
+    expect(body.platformGuidance.canRunDocker).toBe(true);
   });
 
   it("returns a 500 with a sanitized error when the snapshot fails to build", async () => {

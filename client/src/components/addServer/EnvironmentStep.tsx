@@ -126,6 +126,13 @@ export function EnvironmentStep({ onComplete }: EnvironmentStepProps) {
               envPaths: { PZ_SERVER_PATH: null, PZ_SAVE_PATH: null },
               discoveredMounts: [],
               serverCount: 0,
+              platformGuidance: {
+                platform: 'unknown',
+                canRunNative: true,
+                canRunDocker: false,
+                dockerRuntime: null,
+                recommendations: [],
+              },
             })
           }
         >

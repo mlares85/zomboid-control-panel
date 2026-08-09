@@ -2788,6 +2788,21 @@ export interface EnvironmentMount {
   hasSavesDir?: boolean;
 }
 
+export interface PlatformRecommendation {
+  type: string;
+  label: string;
+  url: string;
+  description: string;
+}
+
+export interface PlatformGuidance {
+  platform: string;
+  canRunNative: boolean;
+  canRunDocker: boolean;
+  dockerRuntime: string | null;
+  recommendations: PlatformRecommendation[];
+}
+
 export interface EnvironmentSnapshot {
   platform: string;
   containerized: boolean;
@@ -2798,6 +2813,7 @@ export interface EnvironmentSnapshot {
   };
   discoveredMounts: EnvironmentMount[];
   serverCount: number;
+  platformGuidance: PlatformGuidance;
 }
 
 export const environmentApi = {

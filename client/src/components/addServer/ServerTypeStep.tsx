@@ -1,6 +1,8 @@
-import { ArrowRight, Download, HardDrive, SkipForward, Wifi } from 'lucide-react'
-import type { EnvironmentSnapshot, EnvironmentMount } from '@/lib/api'
+import { ArrowRight, Download, HardDrive, Info, SkipForward, Wifi } from 'lucide-react'
+import type { EnvironmentSnapshot, EnvironmentMount, PlatformGuidance } from '@/lib/api'
 import type { WizardSelection } from './types'
+import { MacDockerGuide } from './MacDockerGuide'
+import { PlatformGuidanceCard } from './PlatformGuidanceCard'
 
 interface ServerTypeStepProps {
   environment: EnvironmentSnapshot
@@ -53,12 +55,44 @@ function detectedCardCopy(mount: EnvironmentMount) {
   return `Server files found at ${mount.path}. We can connect to it in one click.`
 }
 
+/** "Create a new server" card copy varies by what "new" actually means on this platform. */
+function newServerCopy(guidance: PlatformGuidance) {
+  if (guidance.platform === 'darwin') {
+    return { title: 'Create Docker Server', description: 'Install a fresh PZ dedicated server in a Linux container.' }
+  }
+  if (guidance.platform === 'win32') {
+    return { title: 'Install PZ Server', description: 'SteamCMD will download the dedicated server for you.' }
+  }
+  return { title: 'Create a new server', description: 'Install a fresh Project Zomboid dedicated server on this machine.' }
+}
+
+function WindowsFirewallTip() {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-border/50 bg-muted/15 px-3 py-2.5 text-xs text-muted-foreground">
+      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+      <span>
+        <strong className="font-medium text-foreground">Tip:</strong> Allow PZ through Windows Firewall for players
+        to connect — UDP 16261 (game) + TCP 27015 (RCON).
+      </span>
+    </div>
+  )
+}
+
 /**
- * "What do you want to do?" — the Unraid happy path is account -> this
- * screen -> Verify in two clicks when a server was already detected.
+ * "What do you want to do?" — the happy path is account -> this screen ->
+ * Verify in two clicks when a server was already detected. macOS without
+ * Docker is a dead end for local hosting, so it gets a different screen
+ * entirely (MacDockerGuide) instead of options that can't work.
  */
 export function ServerTypeStep({ environment, onSelect }: ServerTypeStepProps) {
   const primaryMount = environment.discoveredMounts[0]
+  const guidance = environment.platformGuidance
+
+  if (guidance.platform === 'darwin' && !guidance.canRunDocker) {
+    return <MacDockerGuide onSelect={onSelect} />
+  }
+
+  const newServer = newServerCopy(guidance)
 
   return (
     <div className="space-y-3">
@@ -66,6 +100,9 @@ export function ServerTypeStep({ environment, onSelect }: ServerTypeStepProps) {
         <h2 className="text-lg font-semibold text-foreground">What do you want to do?</h2>
         <p className="mt-1 text-sm text-muted-foreground">Choose how to bring a server into the panel.</p>
       </div>
+
+      <PlatformGuidanceCard guidance={guidance} />
+      {guidance.platform === 'win32' && <WindowsFirewallTip />}
 
       {primaryMount && (
         <OptionCard
@@ -79,8 +116,8 @@ export function ServerTypeStep({ environment, onSelect }: ServerTypeStepProps) {
 
       <OptionCard
         icon={<Download className="h-5 w-5" />}
-        title="Create a new server"
-        description="Install a fresh Project Zomboid dedicated server on this machine."
+        title={newServer.title}
+        description={newServer.description}
         onClick={() => onSelect({ intent: 'new' })}
       />
 

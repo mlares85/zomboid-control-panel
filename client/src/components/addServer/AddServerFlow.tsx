@@ -90,11 +90,18 @@ export function AddServerFlow({ mode, onComplete, open = true, onClose }: AddSer
   } else if (step === 'server-type' && environment) {
     content = <ServerTypeStep environment={environment} onSelect={handleSelect} />
   } else if (step === 'configure' && selection) {
-    content = <ConfigureStep selection={selection} onCreated={handleCreated} onBack={() => setStep('server-type')} />
+    content = (
+      <ConfigureStep
+        selection={selection}
+        platform={environment?.platform}
+        onCreated={handleCreated}
+        onBack={() => setStep('server-type')}
+      />
+    )
   } else if (step === 'verify' && serverId != null) {
     content = <VerifyStep serverId={serverId} onVerified={() => setStep('complete')} />
   } else if (step === 'complete' && serverId != null) {
-    content = <CompleteStep serverId={serverId} onGoToDashboard={() => onComplete(serverId)} />
+    content = <CompleteStep serverId={serverId} platform={environment?.platform} onGoToDashboard={() => onComplete(serverId)} />
   }
 
   if (mode === 'dialog') {

@@ -34,6 +34,10 @@ At startup and on demand, `mountDiscovery.js` probes common Docker mount paths (
 
 Frontend: `MountDiscoveryBanner` (dismissal remembered per install path in localStorage) triggers `DiscoverySetup`, a dialog that re-probes the mount via the existing `POST /servers/detect` (not discover-mounts, which doesn't return per-server RCON fields) to prefill the RCON password/ports for display and `RconTestConnection` before calling create-from-discovery. First-run: `Setup.tsx` sets a `pz-just-completed-setup` sessionStorage flag on successful account creation; `Dashboard.tsx` consumes it once, and if no servers exist yet, auto-opens `DiscoverySetup` instead of landing on an empty dashboard.
 
+## Platform-specific onboarding guidance
+
+`GET /api/system/environment` composes a `platformGuidance` block (`server/services/platformGuidance.js`, pure function) on top of the platform/Docker detection: `canRunNative` (false only on macOS — PZ's dedicated server is Linux-only), `canRunDocker`, `dockerRuntime`, and install `recommendations` (OrbStack/Docker Desktop links, macOS-without-Docker only). Docker runtime detection (`detectDockerRuntime()` in `dockerDetect.js`) shells out cheapest-first — OrbStack CLI, then `docker info` (checked for a "Docker Desktop" marker), then `colima status`, falling back to `native` — and is only invoked when no Docker socket is already bind-mounted (`hasDockerSocket` short-circuits to `"native"`, since shelling out inside a Linux container is pointless). The onboarding wizard's `ServerTypeStep` swaps in a dedicated `MacDockerGuide` screen (install links + remote-server escape hatch) instead of the normal option list when macOS has no Docker; `ConfigureStep`/`CompleteStep` take an optional `platform` prop for Docker-vs-SteamCMD copy and a Windows Firewall port reminder, respectively.
+
 ## Env var fallback
 
 `PZ_SERVER_PATH` and `PZ_SAVE_PATH` env vars are consulted at two layers: creation-time (seeds empty fields in the POST body) and read-time (`normalizeServerMemory` falls back to env when db fields are empty/null). The db value always wins when present. `isRemote` is auto-detected based on whether the resolved path exists locally.
@@ -61,6 +65,10 @@ JWT-authenticated in handshake middleware. Room-based pub/sub: `server-status`, 
 ## Frontend decomposition
 
 Pages are decomposed into `components/{page}/` directories. The main page file becomes a thin shell (tab management + component composition). Shared state extracted into hooks. Target: no file over 300 lines.
+
+## Test environment: localStorage under Node's built-in Storage
+
+On Node versions that ship a built-in global `localStorage` (22+), that global shadows jsdom's Storage implementation in Vitest and every call throws `TypeError: ... is not a function` unless `--localstorage-file` is set. `client/src/test-setup.ts` overrides `globalThis.localStorage` with a minimal in-memory `Storage` for the test environment only — needed by any component test exercising a dismiss-to-localStorage pattern (`MountDiscoveryBanner`, `PlatformGuidanceCard`, etc.).
 
 ## Deferred decisions
 

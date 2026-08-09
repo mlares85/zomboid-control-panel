@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Download, Loader2 } from 'lucide-react'
+import { ArrowLeft, Container, Download, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,8 +12,33 @@ import type { WizardSelection } from './types'
 
 interface ConfigureStepProps {
   selection: WizardSelection
+  /** Drives the "install a new server" copy — Docker on macOS, SteamCMD on Windows. */
+  platform?: string
   onCreated: (serverId: string | number) => void
   onBack: () => void
+}
+
+/** New-install copy for the "new" intent — what actually happens differs per platform. */
+function newInstallCopy(platform?: string) {
+  if (platform === 'darwin') {
+    return {
+      icon: Container,
+      title: 'Set up a Docker container',
+      description: 'The installer will configure a PZ dedicated server running in a Linux container.',
+    }
+  }
+  if (platform === 'win32') {
+    return {
+      icon: Download,
+      title: 'Install a new server',
+      description: 'SteamCMD downloads the dedicated server files to a folder on this machine, then the installer walks you through paths, ports, and startup.',
+    }
+  }
+  return {
+    icon: Download,
+    title: 'Install a new server',
+    description: 'Fresh installs use the full installer — paths, ports, memory, and startup all in one guided flow.',
+  }
 }
 
 interface FormState {
@@ -76,7 +101,7 @@ function useAutoDetect(selection: WizardSelection, setForm: (fn: (f: FormState) 
   return detecting
 }
 
-export function ConfigureStep({ selection, onCreated, onBack }: ConfigureStepProps) {
+export function ConfigureStep({ selection, platform, onCreated, onBack }: ConfigureStepProps) {
   const [form, setForm] = useState<FormState>(() => initialForm(selection))
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
@@ -84,15 +109,14 @@ export function ConfigureStep({ selection, onCreated, onBack }: ConfigureStepPro
   const detecting = useAutoDetect(selection, setForm)
 
   if (selection.intent === 'new') {
+    const { icon: Icon, title, description } = newInstallCopy(platform)
     return (
       <div className="space-y-4 text-center">
         <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
-          <Download className="h-5 w-5" />
+          <Icon className="h-5 w-5" />
         </div>
-        <h2 className="text-lg font-semibold text-foreground">Install a new server</h2>
-        <p className="text-sm text-muted-foreground">
-          Fresh installs use the full installer — paths, ports, memory, and startup all in one guided flow.
-        </p>
+        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <p className="text-sm text-muted-foreground">{description}</p>
         <Button className="w-full onboarding-cta" onClick={() => navigate('/server-setup')}>
           <Download className="mr-2 h-4 w-4" /> Open the installer
         </Button>
