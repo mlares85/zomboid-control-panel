@@ -29,6 +29,7 @@ import { errorToastContent } from '@/lib/errorToast'
 import { VerdictBand, WorkList } from '@/components/dashboard/DashboardVerdict'
 import type { Verdict, WorkItem } from '@/components/dashboard/DashboardVerdict'
 import { SetupChecklist } from '@/components/SetupChecklist'
+import { ServerCards } from '@/components/dashboard/ServerCards'
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -742,6 +743,9 @@ export default function Dashboard() {
   /* ====================================================================== */
   return (
     <div className="page-transition pb-12">
+      {/* ─── SERVER CARDS ─────────────────────────────────────────── */}
+      <ServerCards />
+
       {/* ─── TOP STATUS BAR ───────────────────────────────────────── */}
       <header
         aria-label="Server status"

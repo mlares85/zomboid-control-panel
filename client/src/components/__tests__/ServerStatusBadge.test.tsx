@@ -20,9 +20,10 @@ describe('ServerStatusBadge', () => {
     expect(screen.getByText('RCON: Disconnected')).toBeInTheDocument()
   })
 
-  it('renders a compact dot row with short-form summary text', () => {
+  it('renders each signal as its own compact pill with short-form summary text', () => {
     render(<ServerStatusBadge host={host} server={server} compact />)
-    expect(screen.getByText('Container Up · RCON Down')).toBeInTheDocument()
+    expect(screen.getByText('Container Up')).toBeInTheDocument()
+    expect(screen.getByText('RCON Down')).toBeInTheDocument()
   })
 
   it('omits signals that were not passed in', () => {
