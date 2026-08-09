@@ -13,16 +13,26 @@
  * that data actually existing.
  */
 
-const HOST_LABELS = { native: "Process", "remote-sftp": "Host" };
+const HOST_LABELS = {
+  native: "Process",
+  "docker-local": "Container",
+  "docker-managed": "Container",
+  "remote-sftp": "Host",
+};
 
 export function resolveProvider(server) {
   if (server?.provider) return server.provider;
+  // Infer from Docker fields if present
+  if (server?.dockerContainerId || server?.dockerContainerName) return "docker-local";
   return server?.isRemote ? "remote-sftp" : "native";
 }
 
 export function buildHostSignal(provider, isRunning) {
   if (provider === "native") {
     return { status: isRunning ? "running" : "stopped", label: "Process", detail: null };
+  }
+  if (provider === "docker-local" || provider === "docker-managed") {
+    return { status: isRunning ? "running" : "stopped", label: "Container", detail: null };
   }
   if (provider === "remote-sftp") {
     return {
