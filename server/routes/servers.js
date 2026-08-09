@@ -868,6 +868,13 @@ router.post("/:id/activate", async (req, res) => {
       io.emit("activeServerChanged", { server });
     }
 
+    // Refresh container stats immediately rather than waiting up to 5s for
+    // the poller's next tick — best-effort, never blocks activation.
+    const containerStatsPoller = req.app.get("containerStatsPoller");
+    if (containerStatsPoller) {
+      containerStatsPoller.checkNow().catch(() => {});
+    }
+
     log.info(`Activated server: ${server.name} (ID: ${server.id})`);
     res.json({
       server: sanitizeServerResponse(server),

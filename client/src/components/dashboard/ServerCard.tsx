@@ -8,7 +8,7 @@ import { ServerStatusBadge } from '@/components/ServerStatusBadge'
 import { useToast } from '@/components/ui/use-toast'
 import { errorToastContent } from '@/lib/errorToast'
 import { cn, formatUptime } from '@/lib/utils'
-import { serversApi, serverApi, backupApi, ServerInstance, ComposedServerStatus } from '@/lib/api'
+import { serversApi, serverApi, backupApi, ServerInstance, ComposedServerStatus, ContainerStats } from '@/lib/api'
 
 export interface ServerCardStats {
   players: number
@@ -23,6 +23,8 @@ interface ServerCardProps {
   activeStatus: ComposedServerStatus | null
   /** Live stats — only known for the currently active server. */
   stats: ServerCardStats | null
+  /** Docker CPU/RAM/disk snapshot — only present for docker-backed servers with a running container. */
+  containerStats?: ContainerStats | null
   /** Called after activation/actions so the parent can refresh sooner than the next poll. */
   onChanged: () => void
   /** Called once this card's server is the active one — lets the parent drill into a detail view. */
@@ -35,6 +37,14 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+function formatContainerStats(cs: ContainerStats): string {
+  const toGB = (bytes: number) => (bytes / (1024 * 1024 * 1024)).toFixed(1)
+  const cpu = Math.round(cs.cpu.usagePercent)
+  const ram = `${toGB(cs.memory.used)}/${toGB(cs.memory.limit)}GB`
+  const disk = formatBytes(cs.disk.read + cs.disk.write)
+  return `CPU ${cpu}% · RAM ${ram} · Disk ${disk}`
 }
 
 function providerBadge(server: ServerInstance, activeStatus: ComposedServerStatus | null) {
@@ -70,7 +80,7 @@ function ActionButton({
   )
 }
 
-export function ServerCard({ server, isRunning, activeStatus, stats, onChanged, onDrillIn }: ServerCardProps) {
+export function ServerCard({ server, isRunning, activeStatus, stats, containerStats, onChanged, onDrillIn }: ServerCardProps) {
   const [pending, setPending] = useState<string | null>(null)
   const { toast } = useToast()
   const navigate = useNavigate()
@@ -172,6 +182,12 @@ export function ServerCard({ server, isRunning, activeStatus, stats, onChanged, 
           <span>{stats && isRunning ? formatUptime(stats.uptimeSeconds) : '—'}</span>
           <span>{stats?.lastBackupSize != null ? formatBytes(stats.lastBackupSize) : '—'}</span>
         </div>
+
+        {containerStats && (
+          <div className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
+            {formatContainerStats(containerStats)}
+          </div>
+        )}
 
         <div className="flex items-center gap-1 border-t border-border/30 pt-1.5">
           <ActionButton label="Start" icon={Play} onClick={handleStart} disabled={pending !== null || isRunning} pending={pending === 'start'} />

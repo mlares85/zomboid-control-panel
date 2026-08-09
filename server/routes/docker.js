@@ -98,4 +98,54 @@ router.get("/containers/:id/logs", async (req, res) => {
   }
 });
 
+router.get("/containers/:id/stats", async (req, res) => {
+  try {
+    const dockerClient = getDockerClient(req);
+    if (!dockerClient?.available) {
+      return res.status(503).json({ error: "Docker socket unavailable" });
+    }
+    const stats = await dockerClient.getContainerStats(req.params.id);
+    if (!stats) {
+      return res.status(502).json({ error: "Failed to fetch container stats" });
+    }
+    res.json(stats);
+  } catch (error) {
+    log.error(`Failed to fetch container stats: ${error.message}`);
+    res.status(500).json({ error: sanitizeError(error.message) });
+  }
+});
+
+// Keyed by both container id and bare name so callers can look a container
+// up by whatever ref their server profile stored (dockerContainerId vs
+// dockerContainerName).
+function keyStatsByIdAndName(container, stats, map) {
+  map[container.Id] = stats;
+  const name = (container.Names || [])[0]?.replace(/^\//, "");
+  if (name) map[name] = stats;
+}
+
+// Snapshot for every running PZ container — powers the dashboard cards
+// without one round trip per card.
+router.get("/stats", async (req, res) => {
+  try {
+    const dockerClient = getDockerClient(req);
+    if (!dockerClient?.available) {
+      return res.json({});
+    }
+    const containers = await dockerClient.findPZContainers();
+    const running = containers.filter((container) => container.State === "running");
+    const results = await Promise.all(
+      running.map(async (container) => [container, await dockerClient.getContainerStats(container.Id)]),
+    );
+    const map = {};
+    for (const [container, stats] of results) {
+      if (stats) keyStatsByIdAndName(container, stats, map);
+    }
+    res.json(map);
+  } catch (error) {
+    log.error(`Failed to fetch batch container stats: ${error.message}`);
+    res.status(500).json({ error: sanitizeError(error.message) });
+  }
+});
+
 export default router;

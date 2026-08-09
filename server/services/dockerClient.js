@@ -47,6 +47,69 @@ function demuxLogFrames(buffer) {
   return Buffer.concat(chunks).toString("utf-8");
 }
 
+// Docker's official CPU % formula: usage delta relative to system-wide CPU
+// time delta, scaled by core count so multi-core hosts don't cap at 100%.
+export function calculateCpuPercent(stats) {
+  const cpuStats = stats?.cpu_stats;
+  const preCpuStats = stats?.precpu_stats;
+  if (!cpuStats || !preCpuStats) return 0;
+  const cpuDelta =
+    (cpuStats.cpu_usage?.total_usage || 0) - (preCpuStats.cpu_usage?.total_usage || 0);
+  const systemDelta = (cpuStats.system_cpu_usage || 0) - (preCpuStats.system_cpu_usage || 0);
+  const cpuCount = onlineCpuCount(cpuStats);
+  if (systemDelta > 0 && cpuDelta > 0) {
+    return (cpuDelta / systemDelta) * cpuCount * 100;
+  }
+  return 0;
+}
+
+function onlineCpuCount(cpuStats) {
+  return cpuStats.online_cpus || cpuStats.cpu_usage?.percpu_usage?.length || 1;
+}
+
+// blkio_stats.io_service_bytes_recursive is a flat list of per-device
+// entries; "op" capitalization varies by kernel/cgroup driver ("Read" vs
+// "read"), so compare case-insensitively.
+function sumBlkioBytes(blkioStats, op) {
+  const entries = blkioStats?.io_service_bytes_recursive || [];
+  return entries
+    .filter((entry) => entry.op?.toLowerCase() === op)
+    .reduce((sum, entry) => sum + (entry.value || 0), 0);
+}
+
+// stats.networks is keyed by interface name (eth0, ...) — sum across all of
+// them rather than assuming a single interface.
+function sumNetworkField(networks, field) {
+  return Object.values(networks || {}).reduce((sum, net) => sum + (net[field] || 0), 0);
+}
+
+// Turn a raw `/containers/{id}/stats?stream=false` snapshot into the shape
+// the frontend and Socket.IO consumers use. Never throws — missing fields
+// (stopped container, older API version) just read as zero.
+export function parseContainerStats(stats) {
+  const memUsage = stats?.memory_stats?.usage || 0;
+  const memLimit = stats?.memory_stats?.limit || 0;
+  return {
+    cpu: {
+      usagePercent: Math.round(calculateCpuPercent(stats) * 10) / 10,
+      cores: onlineCpuCount(stats?.cpu_stats || {}),
+    },
+    memory: {
+      used: memUsage,
+      limit: memLimit,
+      usagePercent: memLimit > 0 ? Math.round((memUsage / memLimit) * 1000) / 10 : 0,
+    },
+    disk: {
+      read: sumBlkioBytes(stats?.blkio_stats, "read"),
+      write: sumBlkioBytes(stats?.blkio_stats, "write"),
+    },
+    network: {
+      rxBytes: sumNetworkField(stats?.networks, "rx_bytes"),
+      txBytes: sumNetworkField(stats?.networks, "tx_bytes"),
+    },
+  };
+}
+
 export class DockerClient {
   constructor(socketPath = "/var/run/docker.sock") {
     this.socketPath = socketPath;
@@ -177,5 +240,14 @@ export class DockerClient {
   async isContainerRunning(id) {
     const info = await this.inspectContainer(id);
     return Boolean(info?.State?.Running);
+  }
+
+  // One-shot resource snapshot (stream=false — a streaming connection would
+  // never resolve and would leak a socket per call).
+  async getContainerStats(id) {
+    if (!id || !this.available) return null;
+    const result = await this._requestJson("GET", `/containers/${encodeURIComponent(id)}/stats?stream=false`);
+    if (!result.success || !result.data) return null;
+    return parseContainerStats(result.data);
   }
 }

@@ -4,7 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { DockerClient } from '../services/dockerClient.js';
+import { DockerClient, calculateCpuPercent, parseContainerStats } from '../services/dockerClient.js';
 
 // Encode a docker log frame: [streamType, 0, 0, 0, sizeBE(4 bytes)] + payload.
 function frameLogLine(text, streamType = 1) {
@@ -198,5 +198,115 @@ describe('DockerClient — against a mock Docker API over a Unix socket', () => 
     await client.getContainerLogs('c1', 'not-a-number');
 
     expect(requests[0].url).toContain('tail=100');
+  });
+
+  it('fetches and parses container stats with stream=false', async () => {
+    await startMockServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(rawStatsFixture()));
+    });
+    const client = new DockerClient(socketPath);
+
+    const stats = await client.getContainerStats('c1');
+
+    expect(requests[0]).toEqual({ method: 'GET', url: '/containers/c1/stats?stream=false' });
+    expect(stats).toEqual({
+      cpu: { usagePercent: 20, cores: 2 },
+      memory: { used: 536870912, limit: 2147483648, usagePercent: 25 },
+      disk: { read: 1536, write: 2048 },
+      network: { rxBytes: 1500, txBytes: 2700 },
+    });
+  });
+
+  it('returns null for stats when the Docker API errors', async () => {
+    await startMockServer((req, res) => {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ message: 'no such container' }));
+    });
+    const client = new DockerClient(socketPath);
+
+    expect(await client.getContainerStats('missing')).toBeNull();
+  });
+});
+
+describe('DockerClient — getContainerStats guard clauses', () => {
+  it('returns null without a container id', async () => {
+    const client = new DockerClient('/nonexistent/docker-test.sock');
+    expect(await client.getContainerStats()).toBeNull();
+  });
+
+  it('returns null when the socket is unavailable', async () => {
+    const client = new DockerClient('/nonexistent/docker-test.sock');
+    expect(await client.getContainerStats('c1')).toBeNull();
+  });
+});
+
+// Realistic single-snapshot payload from GET /containers/{id}/stats?stream=false.
+function rawStatsFixture() {
+  return {
+    cpu_stats: {
+      cpu_usage: { total_usage: 2_000_000_000, percpu_usage: [1_000_000_000, 1_000_000_000] },
+      system_cpu_usage: 20_000_000_000,
+      online_cpus: 2,
+    },
+    precpu_stats: {
+      cpu_usage: { total_usage: 1_000_000_000 },
+      system_cpu_usage: 10_000_000_000,
+    },
+    memory_stats: { usage: 512 * 1024 * 1024, limit: 2 * 1024 * 1024 * 1024 },
+    blkio_stats: {
+      io_service_bytes_recursive: [
+        { major: 8, minor: 0, op: 'Read', value: 1024 },
+        { major: 8, minor: 0, op: 'Write', value: 2048 },
+        { major: 8, minor: 0, op: 'read', value: 512 },
+      ],
+    },
+    networks: {
+      eth0: { rx_bytes: 1000, tx_bytes: 2000 },
+      eth1: { rx_bytes: 500, tx_bytes: 700 },
+    },
+  };
+}
+
+describe('calculateCpuPercent', () => {
+  it('applies Docker’s CPU% formula scaled by core count', () => {
+    expect(calculateCpuPercent(rawStatsFixture())).toBe(20);
+  });
+
+  it('returns 0 when cpu_stats/precpu_stats are missing', () => {
+    expect(calculateCpuPercent({})).toBe(0);
+    expect(calculateCpuPercent(null)).toBe(0);
+  });
+
+  it('returns 0 when the system delta is zero or negative (stats read too close together)', () => {
+    const stats = rawStatsFixture();
+    stats.cpu_stats.system_cpu_usage = stats.precpu_stats.system_cpu_usage;
+    expect(calculateCpuPercent(stats)).toBe(0);
+  });
+
+  it('falls back to percpu_usage length when online_cpus is absent', () => {
+    const stats = rawStatsFixture();
+    delete stats.cpu_stats.online_cpus;
+    expect(calculateCpuPercent(stats)).toBe(20);
+  });
+});
+
+describe('parseContainerStats', () => {
+  it('parses a full snapshot into the clean stats shape', () => {
+    expect(parseContainerStats(rawStatsFixture())).toEqual({
+      cpu: { usagePercent: 20, cores: 2 },
+      memory: { used: 536870912, limit: 2147483648, usagePercent: 25 },
+      disk: { read: 1536, write: 2048 },
+      network: { rxBytes: 1500, txBytes: 2700 },
+    });
+  });
+
+  it('reads zeros for every field when given an empty snapshot', () => {
+    expect(parseContainerStats({})).toEqual({
+      cpu: { usagePercent: 0, cores: 1 },
+      memory: { used: 0, limit: 0, usagePercent: 0 },
+      disk: { read: 0, write: 0 },
+      network: { rxBytes: 0, txBytes: 0 },
+    });
   });
 });

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { serversApi, serverApi, playersApi, backupApi, ServerInstance, ComposedServerStatus } from '@/lib/api'
+import { serversApi, serverApi, playersApi, backupApi, dockerApi, ServerInstance, ComposedServerStatus, ContainerStats } from '@/lib/api'
 import { reportClientWarning } from '@/lib/client-errors'
 import { ServerCard, ServerCardStats } from './ServerCard'
 
 type HostStatuses = Record<string, { running: boolean }>
+type ContainerStatsMap = Record<string, ContainerStats>
 
 // Live stats (players/uptime/last backup size) only exist for the currently
 // active server — the other cards only carry the host-status pill, matching
@@ -24,6 +25,15 @@ async function fetchActiveStats(active: ServerInstance): Promise<ServerCardStats
   }
 }
 
+// GET /api/docker/stats keys its map by both container id and bare name (see
+// server/routes/docker.js) — a server profile may have stored either, so
+// check both before giving up.
+function lookupContainerStats(server: ServerInstance, map: ContainerStatsMap): ContainerStats | null {
+  if (server.dockerContainerId && map[server.dockerContainerId]) return map[server.dockerContainerId]
+  if (server.dockerContainerName && map[server.dockerContainerName]) return map[server.dockerContainerName]
+  return null
+}
+
 interface ServerCardsProps {
   /** Called once a card's server has been activated — the parent can use this to drill into a detail view. */
   onDrillIn?: (serverId: string | number) => void
@@ -34,12 +44,18 @@ export function ServerCards({ onDrillIn }: ServerCardsProps) {
   const [hostStatuses, setHostStatuses] = useState<HostStatuses>({})
   const [activeStatus, setActiveStatus] = useState<ComposedServerStatus | null>(null)
   const [activeStats, setActiveStats] = useState<ServerCardStats | null>(null)
+  const [containerStats, setContainerStats] = useState<ContainerStatsMap>({})
 
   const fetchAll = useCallback(async () => {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
     try {
-      const [{ servers: list }, statusData] = await Promise.all([serversApi.getAll(), serversApi.getStatus()])
+      const [{ servers: list }, statusData, statsMap] = await Promise.all([
+        serversApi.getAll(),
+        serversApi.getStatus(),
+        dockerApi.getAllStats().catch(() => ({})),
+      ])
       setServers(list)
+      setContainerStats(statsMap)
       const next: HostStatuses = {}
       for (const s of statusData.servers) next[String(s.id)] = { running: !!s.running }
       setHostStatuses(next)
@@ -74,6 +90,7 @@ export function ServerCards({ onDrillIn }: ServerCardsProps) {
           isRunning={hostStatuses[String(server.id)]?.running ?? false}
           activeStatus={server.isActive ? activeStatus : null}
           stats={server.isActive ? activeStats : null}
+          containerStats={lookupContainerStats(server, containerStats)}
           onChanged={fetchAll}
           onDrillIn={onDrillIn}
         />

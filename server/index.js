@@ -42,6 +42,7 @@ import { DiscordBot } from "./services/discordBot.js";
 import { BackupService } from "./services/backupService.js";
 import { UpdateChecker } from "./services/updateChecker.js";
 import { PanelUpdateChecker } from "./services/panelUpdateChecker.js";
+import { ContainerStatsPoller } from "./services/containerStatsPoller.js";
 import { LogTailer } from "./services/logTailer.js";
 import authService from "./services/auth.js";
 import { requireRole } from "./services/auth.js";
@@ -173,6 +174,11 @@ async function gracefulShutdown(signal) {
     // Stop panel update checker
     if (panelUpdateChecker) {
       panelUpdateChecker.stop();
+    }
+
+    // Stop container stats poller
+    if (containerStatsPoller) {
+      containerStatsPoller.stop();
     }
 
     // Stop PanelBridge
@@ -656,10 +662,15 @@ app.use("/api/panel-bridge/command", panelBridgeCommandLimiter);
 const rconService = new RconService();
 const serverManager = new ServerManager();
 
-// Wire Docker socket if available — enables container lifecycle for docker-local/docker-managed servers
+// Wire Docker socket if available — enables container lifecycle for docker-local/docker-managed servers.
+// Declared outside the try block (and app.set below) so routes/docker.js
+// can reach it via req.app.get("dockerClient") — it was previously only
+// handed to serverManager, leaving every /api/docker/* route permanently
+// reading undefined and reporting "unavailable" regardless of real state.
+let dockerClient = null;
 try {
   const { DockerClient } = await import("./services/dockerClient.js");
-  const dockerClient = new DockerClient();
+  dockerClient = new DockerClient();
   if (dockerClient.available) {
     serverManager.setDockerClient(dockerClient);
     log.info("Docker socket connected — container lifecycle enabled");
@@ -668,6 +679,7 @@ try {
   }
 } catch (e) {
   log.debug(`Docker client init skipped: ${e.message}`);
+  dockerClient = null;
 }
 
 const modChecker = new ModChecker();
@@ -1053,6 +1065,15 @@ app.set("io", io);
 app.set("refreshCorsConfig", refreshCorsConfig);
 app.set("getCorsDebugSnapshot", getCorsDebugSnapshot);
 app.set("clearCorsBlockedOrigins", clearCorsBlockedOrigins);
+app.set("dockerClient", dockerClient);
+
+// Per-container resource stats (CPU/RAM/disk/net) for the active server's
+// Docker container. Re-resolves the active server every tick, so it's a
+// no-op when the active server isn't Docker-backed rather than needing
+// explicit start/stop calls wired into the activation route.
+const containerStatsPoller = new ContainerStatsPoller(io, dockerClient);
+containerStatsPoller.start();
+app.set("containerStatsPoller", containerStatsPoller);
 
 // Initialize update checker (needs io for socket events)
 const updateChecker = new UpdateChecker(io, { rconService, serverManager });

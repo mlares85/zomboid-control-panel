@@ -1484,6 +1484,9 @@ export interface ServerInstance {
   startCommand: string;
   adminPassword: string;
   createdAt: string;
+  // Set for docker-local/docker-managed servers — see server/routes/docker.js.
+  dockerContainerId?: string | null;
+  dockerContainerName?: string | null;
 }
 
 // One signal (host / server / bridge) from GET /servers/active/status — see
@@ -3071,6 +3074,15 @@ export interface DockerContainerSummary {
   labels: Record<string, string>;
 }
 
+// One-shot resource snapshot — see server/services/dockerClient.js
+// (getContainerStats/parseContainerStats).
+export interface ContainerStats {
+  cpu: { usagePercent: number; cores: number };
+  memory: { used: number; limit: number; usagePercent: number };
+  disk: { read: number; write: number };
+  network: { rxBytes: number; txBytes: number };
+}
+
 export const dockerApi = {
   getStatus: () =>
     apiGet("/docker/status") as Promise<{
@@ -3100,6 +3112,9 @@ export const dockerApi = {
     apiGet(
       `/docker/containers/${encodeURIComponent(id)}/logs${tail ? `?tail=${tail}` : ""}`,
     ) as Promise<{ success: boolean; lines: string[]; error?: string }>,
+  getContainerStats: (id: string) =>
+    apiGet(`/docker/containers/${encodeURIComponent(id)}/stats`) as Promise<ContainerStats>,
+  getAllStats: () => apiGet("/docker/stats") as Promise<Record<string, ContainerStats>>,
 };
 
 // System storage health — see server/routes/system.js. Polled by
