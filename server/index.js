@@ -211,6 +211,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 // Routes
 import serverRoutes from "./routes/server.js";
 import serversRoutes from "./routes/servers.js";
+import serverStatusRoutes from "./routes/serverStatus.js";
 import serverFilesRoutes from "./routes/serverFiles.js";
 import playerRoutes from "./routes/players.js";
 import rconRoutes from "./routes/rcon.js";
@@ -1046,6 +1047,7 @@ app.use("/api/auth", authRoutes);
 // API Routes
 app.use("/api/server", serverRoutes);
 app.use("/api/servers", serversRoutes);
+app.use("/api/servers", serverStatusRoutes);
 app.use("/api/server-files", serverFilesRoutes);
 app.use("/api/players", playerRoutes);
 app.use("/api/rcon", rconRoutes);
