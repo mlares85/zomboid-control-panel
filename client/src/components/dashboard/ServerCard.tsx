@@ -48,9 +48,10 @@ function formatContainerStats(cs: ContainerStats): string {
 }
 
 function providerBadge(server: ServerInstance, activeStatus: ComposedServerStatus | null) {
-  const provider = server.isActive ? activeStatus?.provider : undefined
-  if (provider === 'docker') return { label: 'Docker', icon: Container }
-  if (server.isRemote) return { label: 'Remote', icon: Globe }
+  const provider = server.isActive ? activeStatus?.provider : (server as any).provider
+  if (provider === 'docker-local' || provider === 'docker-managed') return { label: 'Docker', icon: Container }
+  if (provider === 'remote-sftp' || server.isRemote) return { label: 'Remote', icon: Globe }
+  if (server.dockerContainerId || server.dockerContainerName) return { label: 'Docker', icon: Container }
   return { label: 'Native', icon: ServerIcon }
 }
 
