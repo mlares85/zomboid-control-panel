@@ -584,6 +584,8 @@ router.post("/", async (req, res) => {
       useNoSteam: !!config.useNoSteam,
       useDebug: !!config.useDebug,
       isRemote: isRemote,
+      dockerContainerId: config.dockerContainerId || null,
+      dockerContainerName: config.dockerContainerName || null,
     });
 
     log.info(`Created new server: ${server.name} (ID: ${server.id})`);
@@ -616,6 +618,8 @@ const ALLOWED_SERVER_UPDATE_FIELDS = [
   "batFile",
   "description",
   "adminPassword",
+  "dockerContainerId",
+  "dockerContainerName",
 ];
 
 // Update a server

@@ -1314,6 +1314,11 @@ export async function createServer(serverConfig) {
     useNoSteam: serverConfig.useNoSteam || false,
     useDebug: serverConfig.useDebug || false,
     isRemote: serverConfig.isRemote || false,
+    // Set when this server runs inside a Docker container the panel can
+    // manage via the Docker socket, instead of (or in addition to) a native
+    // process. Either id or name is enough to look the container up.
+    dockerContainerId: serverConfig.dockerContainerId || null,
+    dockerContainerName: serverConfig.dockerContainerName || null,
     startCommand: serverConfig.startCommand || "",
     isActive: isFirst,
     createdAt: new Date().toISOString(),

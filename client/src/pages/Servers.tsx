@@ -80,6 +80,7 @@ import { serversApi, serversDetectApi, ServerInstance, configApi, serverApi, upd
 import { SocketContext } from '@/contexts/SocketContext'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
+import { DockerContainerStatus } from '@/components/DockerContainerStatus'
 
 interface DetectedServerConfig {
   dataPath: string
@@ -163,6 +164,9 @@ const defaultNewServer: NewServerForm = {
   useDebug: false,
   isRemote: false
 }
+
+const dockerRefOf = (server: ServerInstance): string | null =>
+  server.dockerContainerId || server.dockerContainerName || null
 
 export default function Servers() {
   const [servers, setServers] = useState<ServerInstance[]>([])
@@ -1090,6 +1094,10 @@ export default function Servers() {
                         </Badge>
                       )}
                       {(() => {
+                        // Docker-backed servers show their own state badge via
+                        // DockerContainerStatus below — pgrep-derived status
+                        // is meaningless (and usually wrong) for a container.
+                        if (dockerRefOf(server)) return null
                         const status = serverStatuses[String(server.id)]
                         if (!status) return null
                         return status.running ? (
@@ -1215,6 +1223,12 @@ export default function Servers() {
                   )}
                 </div>
 
+                {/* Docker container status — replaces native process status/controls
+                    when this server is configured to run in a container */}
+                {!server.isRemote && dockerRefOf(server) && (
+                  <DockerContainerStatus containerRef={dockerRefOf(server)!} />
+                )}
+
                 {/* Branch & Build Info (if update info available for active server) */}
                 {server.isActive && (updateInfo || gameVersion) && (
                   <div className="p-2.5 rounded-md bg-muted/50 border border-border/50">
@@ -1262,7 +1276,10 @@ export default function Servers() {
                     const isRunning = status?.running ?? false
                     const startPending = serverActionPending === `start-${server.id}`
                     const stopPending = serverActionPending === `stop-${server.id}`
-                    if (server.isRemote) return null
+                    // Docker-backed servers use DockerContainerStatus's own
+                    // start/stop/restart controls instead of these, which
+                    // operate on a native process that doesn't exist for them.
+                    if (server.isRemote || dockerRefOf(server)) return null
                     return isRunning ? (
                       <Button
                         size="sm"
@@ -1847,6 +1864,37 @@ export default function Servers() {
                 {editingServer.startCommand && /[&|;<>`${}()!\[\]]/.test(editingServer.startCommand) && (
                   <p className="text-xs text-destructive">Command contains disallowed shell characters</p>
                 )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    Docker Container ID
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[280px]">
+                        <p className="text-xs">Set this if PZ runs inside a Docker container on this host. The panel will manage the container instead of launching a native process.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Input
+                    value={editingServer.dockerContainerId || ''}
+                    onChange={e => setEditingServer({ ...editingServer, dockerContainerId: e.target.value })}
+                    className="font-mono text-sm"
+                    placeholder="Container ID (optional)"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Docker Container Name</Label>
+                  <Input
+                    value={editingServer.dockerContainerName || ''}
+                    onChange={e => setEditingServer({ ...editingServer, dockerContainerName: e.target.value })}
+                    className="font-mono text-sm"
+                    placeholder="Container name (optional)"
+                  />
+                </div>
               </div>
               </>
               )}
