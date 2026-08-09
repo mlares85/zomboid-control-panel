@@ -223,6 +223,10 @@ import debugRoutes, { addLogToBuffer, getDiskFree } from "./routes/debug.js";
 import serverFinderRoutes from "./routes/serverFinder.js";
 import panelBridgeRoutes from "./routes/panelBridge.js";
 import backupRoutes from "./routes/backup.js";
+import backupFormatsRoutes from "./routes/backupFormats.js";
+import backupDestinationsRoutes from "./routes/backupDestinationsRoute.js";
+import backupCompactionRoutes from "./routes/backupCompactionRoute.js";
+import backupRecordsRoutes from "./routes/backupRecordsRoute.js";
 import mapProxyRoutes from "./routes/mapProxy.js";
 import panelBridge from "./services/panelBridge.js";
 
@@ -596,6 +600,7 @@ app.use("/api/backup/restore", strictLimiter);
 app.use("/api/backup/delete-older-than", strictLimiter);
 app.use("/api/backup/upload", strictLimiter);
 app.delete("/api/backup/:name", strictLimiter);
+app.use("/api/backup/compact/apply", strictLimiter);
 app.use("/api/chunks/delete-chunks", strictLimiter);
 app.use("/api/chunks/delete-region", strictLimiter);
 app.use("/api/server-files/raw", strictLimiter);
@@ -1058,6 +1063,10 @@ app.use("/api/debug", debugRoutes);
 app.use("/api/server-finder", serverFinderRoutes);
 app.use("/api/panel-bridge", panelBridgeRoutes);
 app.use("/api/backup", backupRoutes);
+app.use("/api/backup", backupFormatsRoutes);
+app.use("/api/backup", backupDestinationsRoutes);
+app.use("/api/backup", backupCompactionRoutes);
+app.use("/api/backup", backupRecordsRoutes);
 app.use("/api/map", mapProxyRoutes);
 
 // Health check + panel version

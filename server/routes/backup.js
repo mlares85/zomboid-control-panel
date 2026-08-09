@@ -5,6 +5,7 @@ import { createLogger } from "../utils/logger.js";
 import { sanitizeError } from "../utils/sanitize.js";
 import { getActiveServer } from "../database/init.js";
 import { requireRole } from "../services/auth.js";
+import { handleCreateBackup } from "./backupCreateHandler.js";
 const log = createLogger("API:Backup");
 
 const router = express.Router();
@@ -80,35 +81,7 @@ router.post("/settings", async (req, res) => {
 });
 
 // Create a manual backup
-router.post("/create", async (req, res) => {
-  try {
-    log.info("POST /create — creating manual backup");
-    const activeServer = await getActiveServer();
-    if (activeServer?.isRemote) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Backups are not available for remote servers. The server filesystem is not accessible from this panel.",
-        });
-    }
-
-    const backupService = req.app.get("backupService");
-    const io = req.app.get("io");
-
-    // Pass io for progress updates
-    const result = await backupService.createBackup({ ...req.body, io });
-
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(400).json(result);
-    }
-  } catch (error) {
-    log.error(`Failed to create backup: ${error.message}`);
-    res.status(500).json({ error: sanitizeError(error.message) });
-  }
-});
+router.post("/create", handleCreateBackup);
 
 // Delete a backup
 router.delete("/:name", requireRole("admin"), async (req, res) => {

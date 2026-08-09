@@ -1331,9 +1331,11 @@ export default function Settings() {
     try {
       const result = await backupApi.createBackup();
       if (result.success && result.backup) {
+        const backupName =
+          "name" in result.backup ? result.backup.name : result.backup.fileName;
         toast({
           title: "Backup Created",
-          description: `Created ${result.backup.name} in ${result.duration?.toFixed(1)}s`,
+          description: `Created ${backupName} in ${result.duration?.toFixed(1)}s`,
           variant: "success" as const,
         });
         await fetchBackups();
