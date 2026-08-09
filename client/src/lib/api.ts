@@ -1473,6 +1473,10 @@ export interface ServerInstance {
   useNoSteam: boolean;
   useDebug: boolean;
   isRemote: boolean;
+  // When set, this server runs inside a Docker container the panel manages
+  // via the Docker socket instead of (or alongside) a native process.
+  dockerContainerId?: string | null;
+  dockerContainerName?: string | null;
   // Only set on /servers/active: the remote Server folder is reachable over SFTP.
   remoteConfigConfigured?: boolean;
   isActive: boolean;
@@ -1580,6 +1584,47 @@ export const serversApi = {
     apiPost("/servers/create-from-discovery", data) as Promise<{
       server: ServerInstance;
       message: string;
+    }>,
+};
+
+// Docker API (container status/lifecycle for PZ-in-Docker deployments)
+export interface DockerContainerSummary {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+  labels: Record<string, string>;
+}
+
+export const dockerApi = {
+  getStatus: () =>
+    apiGet("/docker/status") as Promise<{
+      available: boolean;
+      containers: DockerContainerSummary[];
+    }>,
+  getContainers: () =>
+    apiGet("/docker/containers") as Promise<{ containers: DockerContainerSummary[] }>,
+  start: (id: string) =>
+    apiPost(`/docker/containers/${encodeURIComponent(id)}/start`) as Promise<{
+      success: boolean;
+      error?: string;
+    }>,
+  stop: (id: string) =>
+    apiPost(`/docker/containers/${encodeURIComponent(id)}/stop`) as Promise<{
+      success: boolean;
+      error?: string;
+    }>,
+  restart: (id: string) =>
+    apiPost(`/docker/containers/${encodeURIComponent(id)}/restart`) as Promise<{
+      success: boolean;
+      error?: string;
+    }>,
+  getLogs: (id: string, tail = 100) =>
+    apiGet(`/docker/containers/${encodeURIComponent(id)}/logs?tail=${tail}`) as Promise<{
+      success: boolean;
+      lines: string[];
+      error?: string;
     }>,
 };
 

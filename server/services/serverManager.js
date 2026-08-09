@@ -199,6 +199,13 @@ export class ServerManager {
     this.isRunning = false;
     this.startTime = null;
     this.configLoaded = false;
+    // Docker socket client + which container (id or name) the active server
+    // runs in, when PZ is deployed as a Docker container instead of a native
+    // process. Injected via setDockerClient() so this class stays testable
+    // with a fake, matching how RconService is wired to this class elsewhere.
+    this.dockerClient = null;
+    this.dockerContainerId = null;
+    this.dockerContainerName = null;
     // Which server this instance's currently-loaded config belongs to (null
     // = "the active server", the shared-singleton default). Recorded so
     // internal reload points (e.g. startServer()'s "settings may have
@@ -220,8 +227,31 @@ export class ServerManager {
     this.startCommand = "";
     this.rconHost = null;
     this.rconPort = null;
+    this.dockerContainerId = null;
+    this.dockerContainerName = null;
     this.configLoaded = false;
     await this.loadConfig(serverId);
+  }
+
+  // Wires in the shared DockerClient instance so Docker-backed servers can be
+  // detected/started/stopped via the socket instead of pgrep. Optional — a
+  // panel with no Docker socket mounted simply never calls this, and every
+  // Docker-aware code path below falls through to native process handling.
+  setDockerClient(dockerClient) {
+    this.dockerClient = dockerClient;
+  }
+
+  // Whether the server this instance is scoped to is configured to run in a
+  // Docker container the panel can manage via the socket.
+  _isDockerBacked() {
+    return Boolean(
+      this.dockerClient?.available &&
+        (this.dockerContainerId || this.dockerContainerName),
+    );
+  }
+
+  _dockerRef() {
+    return this.dockerContainerId || this.dockerContainerName || null;
   }
 
   // Load settings from a specific server (serverId), the active server, or
@@ -303,6 +333,8 @@ export class ServerManager {
         // check THIS server's port instead of the global default.
         this.rconHost = activeServer.rconHost || this.rconHost;
         this.rconPort = activeServer.rconPort || this.rconPort;
+        this.dockerContainerId = activeServer.dockerContainerId || null;
+        this.dockerContainerName = activeServer.dockerContainerName || null;
         this.configLoaded = true;
         log.debug(`Loaded config from active server: ${activeServer.name}`);
         return;
@@ -374,6 +406,9 @@ export class ServerManager {
    */
   async getServerProcessDetails() {
     await this.loadConfig(this._serverId);
+    if (this._isDockerBacked()) {
+      return this._getDockerContainerDetails();
+    }
     const scan = await this._scanDedicatedServerProcesses();
     const descriptor = this._getOwnershipDescriptor();
 
@@ -405,6 +440,31 @@ export class ServerManager {
       })),
       owned: resolved,
       scanFailed: Boolean(scan.scanFailed),
+    };
+  }
+
+  // Docker-backed equivalent of getServerProcessDetails(): asks the socket
+  // whether the configured container is running instead of scanning `ps`.
+  // Shaped identically ({running, matched, owned, scanFailed}) so every
+  // caller (chunk cleanup, the status watchdog, force-stop) works unchanged.
+  async _getDockerContainerDetails() {
+    const ref = this._dockerRef();
+    const info = await this.dockerClient.inspectContainer(ref);
+    if (!info) {
+      // Could mean "not found" or "socket call failed" — either way we can't
+      // positively confirm it's running, so report not-running rather than
+      // stuck. scanFailed lets callers avoid destructive fallback logic.
+      this.isRunning = false;
+      return { running: false, matched: [], owned: [], scanFailed: true };
+    }
+    const running = Boolean(info.State?.Running);
+    const entry = { cmd: `docker container ${info.Name || ref}`, container: ref };
+    this.isRunning = running;
+    return {
+      running,
+      matched: running ? [entry] : [],
+      owned: running ? [entry] : [],
+      scanFailed: false,
     };
   }
 
@@ -612,6 +672,10 @@ export class ServerManager {
       // active, which would break a throwaway instance mid-restart.
       this.configLoaded = false;
       await this.loadConfig(this._serverId);
+
+      if (this._isDockerBacked()) {
+        return await this._startDockerContainer(skipRunningCheck);
+      }
 
       if (!this.startCommand && !this.serverPath) {
         throw new Error("Server path not configured");
@@ -853,6 +917,27 @@ export class ServerManager {
     }
   }
 
+  // Docker-backed equivalent of the bottom half of startServer(): starts the
+  // configured container instead of spawning a native process. This is what
+  // stops the panel from launching a duplicate native PZ process (and
+  // crashing on the RCON port already being bound by the container) when the
+  // active server is Docker-managed.
+  async _startDockerContainer(skipRunningCheck) {
+    const ref = this._dockerRef();
+    if (!skipRunningCheck && (await this.dockerClient.isContainerRunning(ref))) {
+      throw new Error("Server is already running");
+    }
+    const result = await this.dockerClient.startContainer(ref);
+    if (!result.success) {
+      throw new Error(result.error || "Failed to start Docker container");
+    }
+    this.isRunning = true;
+    this.startTime = new Date();
+    await logServerEvent("server_start", `Server started via Docker container ${ref}`);
+    log.info(`Docker container start executed (ref=${ref})`);
+    return { success: true, message: "Docker container start command executed" };
+  }
+
   // Open a fresh launch log file and stash its fd on `this._launchLogFd` for
   // use as spawn() stdio. Returns the log file path (or null if it couldn't
   // be opened, in which case stdio falls back to "ignore" via the fd value).
@@ -941,6 +1026,11 @@ export class ServerManager {
     // Block overlapping starts while kill/state-clear is pending.
     this._stopping = true;
     try {
+      await this.loadConfig(this._serverId);
+      if (this._isDockerBacked()) {
+        return await this._stopDockerContainer();
+      }
+
       // Only PIDs this server owns: a host can run several dedicated servers
       // and killing every PZ process would take the others down with it.
       const details = await this.getServerProcessDetails();
@@ -1033,6 +1123,23 @@ export class ServerManager {
         resolve();
       });
     });
+  }
+
+  // Force-stops the configured Docker container directly. There is no PID
+  // list to attribute on a containerized process (that's the whole reason
+  // pgrep-based detection misses it), so this stops the container itself
+  // rather than anything on the host.
+  async _stopDockerContainer() {
+    const ref = this._dockerRef();
+    const result = await this.dockerClient.stopContainer(ref);
+    this._clearRunState();
+    if (!result.success) {
+      throw new Error(result.error || "Failed to stop Docker container");
+    }
+    await logServerEvent("server_stop", `Server stopped via Docker container ${ref}`).catch(
+      (e) => log.warn(`Failed to log event: ${e.message}`),
+    );
+    return { success: true, message: "Docker container stopped" };
   }
 
   _genericForceStop() {
