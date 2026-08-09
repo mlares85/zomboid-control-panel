@@ -1298,41 +1298,19 @@ export async function getAllSettings() {
 // Server Configurations (Multi-server)
 // ============================================
 
-<<<<<<< HEAD
-// Falls back to the docker-compose PZ_SERVER_PATH / PZ_SAVE_PATH env vars when
-// a stored server profile has no path configured, and auto-detects isRemote
-// from whether the resolved paths exist on this host.
+// Falls back to docker-compose PZ_SERVER_PATH / PZ_SAVE_PATH env vars when
+// a stored server profile has no path configured, resolves provider, and
+// derives isRemote from it.
 export function normalizeServerMemory(server) {
   if (!server) return server;
   const installPath = server.installPath || process.env.PZ_SERVER_PATH || "";
   const zomboidDataPath =
     server.zomboidDataPath || process.env.PZ_SAVE_PATH || null;
-
-=======
-// Resolves `provider` (native | docker-local | docker-managed | remote-sftp)
-// and derives `isRemote` from it, so every existing `.isRemote` read stays
-// correct without callers having to know about providers. A stored, valid
-// `provider` always wins; otherwise it's auto-detected from the legacy
-// isRemote flag plus whether the configured paths exist on this host — this
-// is what lets servers created before `provider` existed keep working
-// unchanged (see server/utils/serverProvider.js).
-export function normalizeServerMemory(server) {
-  if (!server) return server;
-  const installPath = server.installPath || "";
-  const zomboidDataPath = server.zomboidDataPath || null;
->>>>>>> worktree-agent-aedebab33f8dc8a5b
   const pathsConfigured = Boolean(installPath || zomboidDataPath);
   const pathsExistLocally =
     Boolean(installPath && fs.existsSync(installPath)) ||
     Boolean(zomboidDataPath && fs.existsSync(zomboidDataPath));
 
-<<<<<<< HEAD
-  return {
-    ...server,
-    installPath,
-    zomboidDataPath,
-    isRemote: pathsConfigured ? !pathsExistLocally : server.isRemote || false,
-=======
   const provider = isValidProvider(server.provider)
     ? server.provider
     : detectProvider({
@@ -1343,9 +1321,10 @@ export function normalizeServerMemory(server) {
 
   return {
     ...server,
+    installPath,
+    zomboidDataPath,
     provider,
     isRemote: isRemoteProvider({ provider }),
->>>>>>> worktree-agent-aedebab33f8dc8a5b
     minMemory: normalizeMemoryGb(server.minMemory, 4),
     maxMemory: normalizeMemoryGb(server.maxMemory, 8),
   };
