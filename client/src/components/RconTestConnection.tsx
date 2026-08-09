@@ -9,12 +9,14 @@ interface RconTestConnectionProps {
   port: number
   password: string
   className?: string
+  /** Extra condition (beyond host/port being set) that disables the button. */
+  disabled?: boolean
 }
 
 // Lets a user verify RCON host/port/password before saving — distinguishes
 // "can't reach the host at all" from "reached it but the password is wrong",
 // which a bare connect failure can't tell apart.
-export function RconTestConnection({ host, port, password, className }: RconTestConnectionProps) {
+export function RconTestConnection({ host, port, password, className, disabled }: RconTestConnectionProps) {
   const [testing, setTesting] = useState(false)
   const [result, setResult] = useState<RconTestResult | null>(null)
 
@@ -39,7 +41,7 @@ export function RconTestConnection({ host, port, password, className }: RconTest
         variant="outline"
         size="sm"
         onClick={runTest}
-        disabled={testing || !host.trim() || !port}
+        disabled={testing || !host.trim() || !port || disabled}
       >
         {testing ? (
           <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Testing...</>

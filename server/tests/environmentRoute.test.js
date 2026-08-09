@@ -3,14 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getServers = vi.fn();
 const isContainerized = vi.fn();
 const getContainerInfo = vi.fn();
-const discoverMounts = vi.fn();
+const discoverEnvironmentMounts = vi.fn();
 
 vi.mock("../database/init.js", () => ({ getServers }));
 vi.mock("../utils/dockerDetect.js", () => ({
   isContainerized,
   getContainerInfo,
 }));
-vi.mock("../services/mountDiscovery.js", () => ({ discoverMounts }));
+vi.mock("../services/mountDiscovery.js", () => ({ discoverEnvironmentMounts }));
 
 const { default: router } = await import("../routes/environment.js");
 
@@ -35,7 +35,7 @@ describe("GET /api/system/environment", () => {
       containerized: true,
       hasDockerSocket: false,
     });
-    discoverMounts.mockReset().mockReturnValue([
+    discoverEnvironmentMounts.mockReset().mockReturnValue([
       { path: "/pz-server", type: "install" },
     ]);
   });

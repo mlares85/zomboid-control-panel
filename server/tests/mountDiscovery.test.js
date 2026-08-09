@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
 import os from "os";
@@ -9,8 +8,9 @@ import {
   findDataPath,
   discoverMounts,
   readServerIniSettings,
+  probeMount,
+  discoverEnvironmentMounts,
 } from "../services/mountDiscovery.js";
-import { isContainerized } from "../utils/dockerDetect.js";
 
 let tmpRoot;
 
@@ -176,31 +176,7 @@ describe("discoverMounts", () => {
   });
 });
 
-describe("isContainerized", () => {
-  it("returns true when /.dockerenv exists", () => {
-    vi.spyOn(fs, "existsSync").mockImplementation((p) => p === "/.dockerenv");
-    expect(isContainerized()).toBe(true);
-  });
-
-  it("returns false with no dockerenv marker and no docker cgroup entry", () => {
-    vi.spyOn(fs, "existsSync").mockReturnValue(false);
-    vi.spyOn(fs, "readFileSync").mockReturnValue("0::/\n");
-    expect(isContainerized()).toBe(false);
-  });
-
-  it("falls back to a cgroup scan for docker/containerd markers", () => {
-    vi.spyOn(fs, "existsSync").mockReturnValue(false);
-    vi.spyOn(fs, "readFileSync").mockReturnValue("0::/docker/abc123\n");
-    expect(isContainerized()).toBe(true);
-=======
-import { describe, expect, it, afterEach } from "vitest";
-import fs from "fs";
-import os from "os";
-import path from "path";
-
-import { probeMount, discoverMounts } from "../services/mountDiscovery.js";
-
-describe("mountDiscovery", () => {
+describe("mountDiscovery (environment snapshot probes)", () => {
   const tmpDirs = [];
 
   afterEach(() => {
@@ -246,26 +222,25 @@ describe("mountDiscovery", () => {
     expect(probeMount(dir)).toBeNull();
   });
 
-  it("discoverMounts picks up a server referenced by PZ_SERVER_PATH", () => {
+  it("discoverEnvironmentMounts picks up a server referenced by PZ_SERVER_PATH", () => {
     const dir = makeTmpDir();
     fs.writeFileSync(path.join(dir, "steam_appid.txt"), "108600");
     process.env.PZ_SERVER_PATH = dir;
 
-    const results = discoverMounts();
+    const results = discoverEnvironmentMounts();
 
     expect(results).toContainEqual({ path: path.resolve(dir), type: "install" });
   });
 
-  it("discoverMounts de-duplicates candidates that resolve to the same path", () => {
+  it("discoverEnvironmentMounts de-duplicates candidates that resolve to the same path", () => {
     const dir = makeTmpDir();
     fs.mkdirSync(path.join(dir, "Multiplayer"));
     process.env.PZ_SERVER_PATH = dir;
     process.env.PZ_SAVE_PATH = dir;
 
-    const results = discoverMounts();
+    const results = discoverEnvironmentMounts();
 
     const matches = results.filter((r) => r.path === path.resolve(dir));
     expect(matches).toHaveLength(1);
->>>>>>> worktree-agent-a9775f51e61877487
   });
 });

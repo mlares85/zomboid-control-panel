@@ -1,4 +1,4 @@
-import type { DiscoveredMount, EnvironmentSnapshot } from '@/lib/api'
+import type { EnvironmentMount, EnvironmentSnapshot } from '@/lib/api'
 
 export type WizardStepId = 'environment' | 'server-type' | 'configure' | 'verify' | 'complete'
 
@@ -7,7 +7,7 @@ export type WizardIntent = 'detected' | 'new' | 'existing' | 'skip'
 
 export interface WizardSelection {
   intent: WizardIntent
-  mount?: DiscoveredMount
+  mount?: EnvironmentMount
 }
 
-export type { DiscoveredMount, EnvironmentSnapshot }
+export type { EnvironmentMount, EnvironmentSnapshot }

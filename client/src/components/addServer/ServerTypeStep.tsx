@@ -1,5 +1,5 @@
 import { ArrowRight, Download, HardDrive, SkipForward, Wifi } from 'lucide-react'
-import type { EnvironmentSnapshot, DiscoveredMount } from '@/lib/api'
+import type { EnvironmentSnapshot, EnvironmentMount } from '@/lib/api'
 import type { WizardSelection } from './types'
 
 interface ServerTypeStepProps {
@@ -46,7 +46,7 @@ function OptionCard({
   )
 }
 
-function detectedCardCopy(mount: DiscoveredMount) {
+function detectedCardCopy(mount: EnvironmentMount) {
   if (mount.type === 'data') {
     return `Save data found at ${mount.path}. We can connect to it in one click.`
   }

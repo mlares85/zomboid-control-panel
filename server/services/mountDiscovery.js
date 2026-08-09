@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // Detect PZ server files at common Docker mount points and env-configured
 // paths. The most common panel deployment is Docker with the PZ install and
 // save data bind-mounted in — this lets the panel offer a pre-populated
@@ -9,6 +8,10 @@
 // handful of sync stat calls is cheap even on a slow bind mount.
 import fs from "fs";
 import path from "path";
+import {
+  getCandidateZomboidPaths,
+  inspectZomboidPath,
+} from "../utils/zomboidPaths.js";
 
 const INI_SUFFIX_BLOCKLIST = [
   "_SandboxVars.ini",
@@ -120,7 +123,8 @@ function envCandidates() {
 }
 
 // Probe env-configured and common Docker bind-mount locations for PZ server
-// files, returning one entry per valid install found.
+// files, returning one entry per valid install found. Used by the
+// discover-mounts / create-from-discovery settings flow (routes/discovery.js).
 export function discoverMounts() {
   const candidates = [];
   const seen = new Set();
@@ -183,21 +187,16 @@ export function readServerIniSettings(dataPath, serverName) {
     serverPort: parseInt(settings.DefaultPort, 10) || 16261,
     publicName: settings.PublicName || serverName,
   };
-=======
-// Cheap filesystem probes for an already-present Project Zomboid server —
-// used by the first-run onboarding wizard so it can offer "connect to the
-// server we found" instead of asking the user to type paths blind.
-//
-// Reuses the signature checks zomboidPaths.js already has for the manual
-// "detect from this path" flow; this just widens the candidate list to
-// common container bind-mount points (ich777/steamcmd, linuxserver, Unraid
-// appdata layouts) that a host-account-based search would never find.
-import fs from "fs";
-import path from "path";
-import {
-  getCandidateZomboidPaths,
-  inspectZomboidPath,
-} from "../utils/zomboidPaths.js";
+}
+
+// ---------------------------------------------------------------------------
+// Lighter-weight single-directory probe used by the first-run onboarding
+// wizard's environment snapshot (routes/environment.js). Reuses the
+// signature checks zomboidPaths.js already has for the manual "detect from
+// this path" flow; this just widens the candidate list to common container
+// bind-mount points (ich777/steamcmd, linuxserver, Unraid appdata layouts)
+// that a host-account-based search would never find.
+// ---------------------------------------------------------------------------
 
 const CONTAINER_MOUNT_CANDIDATES = [
   "/pz-server",
@@ -243,7 +242,7 @@ export function probeMount(dir) {
 // OS-account candidates zomboidPaths.js already knows about. All checks are
 // existsSync-cheap, so this is safe to call on every environment snapshot
 // request during onboarding.
-export function discoverMounts() {
+export function discoverEnvironmentMounts() {
   const candidates = [
     ...envPathCandidates(),
     ...CONTAINER_MOUNT_CANDIDATES,
@@ -260,5 +259,4 @@ export function discoverMounts() {
     if (found) results.push(found);
   }
   return results;
->>>>>>> worktree-agent-a9775f51e61877487
 }

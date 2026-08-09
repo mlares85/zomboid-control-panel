@@ -717,6 +717,15 @@ export const playersApi = {
     ),
 };
 
+// Result of a one-off RCON credential check — see server/services/rcon.js's
+// testRconConnection(). Distinguishes "host:port unreachable" from "reached
+// it but authentication failed" so the UI can guide the user accordingly.
+export interface RconTestResult {
+  success: boolean;
+  error?: string;
+  detail: string;
+}
+
 // RCON API
 export const rconApi = {
   execute: (command: string) => apiPost("/rcon/execute", { command }),
@@ -726,6 +735,10 @@ export const rconApi = {
   disconnect: () => apiPost("/rcon/disconnect"),
   getHistory: (limit?: number) => apiGet(`/rcon/history?limit=${limit || 100}`),
   getCommands: () => apiGet("/rcon/commands"),
+  // Tests arbitrary host/port/password without touching the shared
+  // RconService singleton's connection state (server/routes/rcon.js POST /test).
+  testConnection: (host: string, port: number, password: string) =>
+    apiPost("/rcon/test", { host, port, password }) as Promise<RconTestResult>,
 };
 
 // Scheduler API
@@ -1222,6 +1235,18 @@ export const modsApi = {
         })
       | null
     >("/mods/conflicts/cached"),
+
+  // Safe Update All — orchestrated backup + check + warn + restart + verify
+  // flow (server/routes/mods/safeUpdate.js). Runs in the background; the
+  // client follows progress via the `modUpdate:step` socket event.
+  getSafeUpdateStatus: () =>
+    apiGet("/mods/safe-update/status") as Promise<{ inProgress: boolean }>,
+  safeUpdate: (warningSeconds?: number) =>
+    apiPost("/mods/safe-update", { warningSeconds }) as Promise<{
+      success: boolean;
+      message: string;
+      warningSeconds: number;
+    }>,
 };
 
 // Chunks API (Chunk Cleaner)
@@ -1553,6 +1578,20 @@ export const serversApi = {
       branch,
       validateFiles: true,
     }) as Promise<{ success: boolean; message: string }>,
+
+  // Docker mount auto-discovery — see server/routes/discovery.js.
+  discoverMounts: () =>
+    apiGet("/servers/discover-mounts") as Promise<{ mounts: DiscoveredMount[] }>,
+  createFromDiscovery: (params: {
+    installPath: string;
+    dataPath: string;
+    serverName?: string;
+    name?: string;
+  }) =>
+    apiPost("/servers/create-from-discovery", params) as Promise<{
+      server: ServerInstance;
+      message: string;
+    }>,
 };
 
 // Server Files API (INI, Sandbox, Spawn Points)
@@ -2739,8 +2778,11 @@ export const panelUpdateApi = {
     apiGet("/panel/update-apply-log"),
 };
 
-// Composed first-run environment snapshot — see server/routes/environment.js
-export interface DiscoveredMount {
+// Composed first-run environment snapshot — see server/routes/environment.js.
+// This is the lightweight single-directory probe (discoverEnvironmentMounts
+// in services/mountDiscovery.js) — distinct from the richer install+data
+// pair `DiscoveredMount` below that serversApi.discoverMounts() returns.
+export interface EnvironmentMount {
   path: string;
   type: "data" | "install";
   hasSavesDir?: boolean;
@@ -2754,10 +2796,215 @@ export interface EnvironmentSnapshot {
     PZ_SERVER_PATH: string | null;
     PZ_SAVE_PATH: string | null;
   };
-  discoveredMounts: DiscoveredMount[];
+  discoveredMounts: EnvironmentMount[];
   serverCount: number;
 }
 
 export const environmentApi = {
   get: (): Promise<EnvironmentSnapshot> => apiGet("/system/environment"),
+};
+
+// Docker mount auto-discovery — see server/routes/discovery.js and
+// server/services/mountDiscovery.js's discoverMounts(). Used by the
+// dashboard's mount-discovery banner (MountDiscoveryBanner/DiscoverySetup)
+// to offer "connect this" for a PZ install found at a common bind-mount
+// path, pre-filled with per-server RCON settings read off its own INI.
+export interface DiscoveredMount {
+  installPath: string;
+  dataPath: string | null;
+  source: string;
+  serverNames: string[];
+  hasStartScript: boolean;
+  hasPanelBridge: boolean;
+}
+
+// Docker container status — see server/routes/docker.js. Renders nothing
+// when the Docker socket isn't mounted/available.
+export interface DockerContainerSummary {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+  labels: Record<string, string>;
+}
+
+export const dockerApi = {
+  getStatus: () =>
+    apiGet("/docker/status") as Promise<{
+      available: boolean;
+      containers: DockerContainerSummary[];
+    }>,
+  getContainers: () =>
+    apiGet("/docker/containers") as Promise<{
+      containers: DockerContainerSummary[];
+    }>,
+  start: (id: string) =>
+    apiPost(`/docker/containers/${encodeURIComponent(id)}/start`) as Promise<{
+      success: boolean;
+      error?: string;
+    }>,
+  stop: (id: string) =>
+    apiPost(`/docker/containers/${encodeURIComponent(id)}/stop`) as Promise<{
+      success: boolean;
+      error?: string;
+    }>,
+  restart: (id: string) =>
+    apiPost(`/docker/containers/${encodeURIComponent(id)}/restart`) as Promise<{
+      success: boolean;
+      error?: string;
+    }>,
+  getLogs: (id: string, tail?: number) =>
+    apiGet(
+      `/docker/containers/${encodeURIComponent(id)}/logs${tail ? `?tail=${tail}` : ""}`,
+    ) as Promise<{ success: boolean; lines: string[]; error?: string }>,
+};
+
+// System storage health — see server/routes/system.js. Polled by
+// SystemHealthBanner and refreshed on disk:warning/critical/normal sockets.
+export interface DiskStatus {
+  path: string | null;
+  totalBytes: number;
+  freeBytes: number;
+  usedPercent: number;
+  warning: boolean;
+  critical: boolean;
+}
+
+export interface CircuitBreakerStatus {
+  open: boolean;
+  lastError: string | null;
+  failCount: number;
+  cooldownEndsAt: string | null;
+}
+
+export interface StorageHealth {
+  diskSpace: {
+    saveVolume: DiskStatus | null;
+    panelData: DiskStatus;
+  };
+  circuitBreaker: CircuitBreakerStatus;
+}
+
+export const systemApi = {
+  getDiskSpace: () =>
+    apiGet("/system/disk-space") as Promise<StorageHealth["diskSpace"]>,
+  getStorageHealth: () => apiGet("/system/storage-health") as Promise<StorageHealth>,
+};
+
+// Simulation template library — see server/routes/templates.js and
+// server/utils/templateSchema.js (the canonical shape this mirrors).
+export interface SimTemplateMeta {
+  id: string;
+  name: string;
+  description: string;
+  tags: string[];
+  pzBuild: string;
+  createdAt: string;
+}
+
+export interface SimTemplateModRef {
+  workshopId: string;
+  modId?: string;
+  name?: string;
+}
+
+export interface SimTemplate {
+  schemaVersion: number;
+  meta: SimTemplateMeta;
+  sandboxVars: Record<string, Record<string, string | number | boolean>>;
+  serverIni: Record<string, string | number | boolean>;
+  iniExclusions: string[];
+  mods: SimTemplateModRef[];
+  map: { mapId: string; [key: string]: unknown };
+  difficulty: { level?: string; [key: string]: unknown };
+  isBuiltin: boolean;
+}
+
+export interface SimTemplateIniChange {
+  key: string;
+  from: unknown;
+  to: unknown;
+}
+
+export interface SimTemplateSandboxChange {
+  section: string;
+  key: string;
+  from: unknown;
+  to: unknown;
+}
+
+export interface SimTemplateDiff {
+  serverIni: SimTemplateIniChange[];
+  sandboxVars: SimTemplateSandboxChange[];
+  summary: {
+    iniChanges: number;
+    sandboxChanges: number;
+    totalChanges: number;
+  };
+}
+
+export interface SimTemplateApplyResult {
+  success: boolean;
+  ini: { appliedKeys: string[] } | null;
+  sandbox: { applied: string[]; skipped: string[] } | { skipped: true; reason: string } | null;
+  backups: string[];
+  error?: string;
+}
+
+export const templatesApi = {
+  list: () => apiGet("/templates") as Promise<{ templates: SimTemplate[] }>,
+  get: (id: string) => apiGet(`/templates/${id}`) as Promise<{ template: SimTemplate }>,
+  create: (input: {
+    name: string;
+    description?: string;
+    tags?: string[];
+    serverIni?: Record<string, string | number | boolean>;
+    sandboxVars?: Record<string, Record<string, string | number | boolean>>;
+  }) =>
+    apiPost("/templates", input) as Promise<{
+      success: boolean;
+      template?: SimTemplate;
+      error?: string;
+    }>,
+  import: (template: unknown) =>
+    apiPost("/templates/import", { template }) as Promise<{
+      success: boolean;
+      template?: SimTemplate;
+      error?: string;
+    }>,
+  preview: (id: string, serverId: string | number) =>
+    apiPost(`/templates/${id}/preview`, { serverId }) as Promise<{
+      success: boolean;
+      diff?: SimTemplateDiff;
+      error?: string;
+    }>,
+  apply: (
+    id: string,
+    serverId: string | number,
+    options?: { applyIni?: boolean; applySandbox?: boolean; backup?: boolean },
+  ) =>
+    apiPost(`/templates/${id}/apply`, { serverId, options }) as Promise<
+      SimTemplateApplyResult
+    >,
+  delete: (id: string) =>
+    apiDelete(`/templates/${id}`) as Promise<{ success: boolean; error?: string }>,
+  // Triggers a browser download of the exported template JSON (GET
+  // /templates/:id/export streams Content-Disposition: attachment).
+  downloadExport: async (id: string, filename: string): Promise<void> => {
+    const response = await apiFetch(`/templates/${id}/export`);
+    if (!response.ok) {
+      const payload = await parseResponseBody(response);
+      throw buildResponseError(response, payload);
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${filename}.pztemplate.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
 };

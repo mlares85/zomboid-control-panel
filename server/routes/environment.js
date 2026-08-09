@@ -10,7 +10,7 @@ import express from "express";
 import { createLogger } from "../utils/logger.js";
 const log = createLogger("API:Environment");
 import { isContainerized, getContainerInfo } from "../utils/dockerDetect.js";
-import { discoverMounts } from "../services/mountDiscovery.js";
+import { discoverEnvironmentMounts } from "../services/mountDiscovery.js";
 import { getServers } from "../database/init.js";
 import { sanitizeError } from "../utils/sanitize.js";
 
@@ -27,7 +27,7 @@ router.get("/", async (req, res) => {
         PZ_SERVER_PATH: process.env.PZ_SERVER_PATH || null,
         PZ_SAVE_PATH: process.env.PZ_SAVE_PATH || null,
       },
-      discoveredMounts: discoverMounts(),
+      discoveredMounts: discoverEnvironmentMounts(),
       serverCount: servers.length,
     });
   } catch (error) {

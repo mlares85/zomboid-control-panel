@@ -225,6 +225,7 @@ import serverFinderRoutes from "./routes/serverFinder.js";
 import panelBridgeRoutes from "./routes/panelBridge.js";
 import backupRoutes from "./routes/backup.js";
 import mapProxyRoutes from "./routes/mapProxy.js";
+import dockerRoutes from "./routes/docker.js";
 import panelBridge from "./services/panelBridge.js";
 
 dotenv.config();
@@ -1076,6 +1077,7 @@ app.use("/api/server-finder", serverFinderRoutes);
 app.use("/api/panel-bridge", panelBridgeRoutes);
 app.use("/api/backup", backupRoutes);
 app.use("/api/map", mapProxyRoutes);
+app.use("/api/docker", dockerRoutes);
 
 // Health check + panel version
 // In exe builds, PANEL_VERSION is injected by esbuild at compile time.
