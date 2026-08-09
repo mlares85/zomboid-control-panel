@@ -33,6 +33,13 @@ const ROUTE_LOADERS: Record<string, RouteLoaderMeta> = {
     variant: 'dashboard',
     metrics: ['status', 'players', 'rcon'],
   },
+  '/welcome': {
+    title: 'Bring in your server',
+    description: 'Detecting environment, Docker, and any existing server.',
+    eyebrow: '// SETUP · WELCOME',
+    variant: 'form',
+    metrics: ['detect', 'connect', 'verify'],
+  },
   '/players': {
     title: 'Online Players',
     description: 'Preparing player rows, admin actions, notes, and session details.',
@@ -183,6 +190,7 @@ const Backups = lazy(() => import('./pages/Backups'))
 const WorldMap = lazy(() => import('./pages/WorldMap'))
 const Login = lazy(() => import('./pages/Login'))
 const Setup = lazy(() => import('./pages/Setup'))
+const Welcome = lazy(() => import('./pages/Welcome'))
 
 // Loading fallback — shows a skeleton layout instead of a plain spinner
 function PageLoader() {
@@ -555,6 +563,7 @@ function AppContent() {
             <Routes>
               <Route path="/" element={<FeatureErrorBoundary featureName="Dashboard"><Dashboard /></FeatureErrorBoundary>} />
               <Route path="/dashboard" element={<Navigate to="/" replace />} />
+              <Route path="/welcome" element={<FeatureErrorBoundary featureName="Welcome"><Welcome /></FeatureErrorBoundary>} />
               <Route path="/players" element={<FeatureErrorBoundary featureName="Player Management"><Players /></FeatureErrorBoundary>} />
               <Route path="/console" element={<FeatureErrorBoundary featureName="Console"><Console /></FeatureErrorBoundary>} />
               <Route path="/scheduler" element={<FeatureErrorBoundary featureName="Scheduler"><Scheduler /></FeatureErrorBoundary>} />

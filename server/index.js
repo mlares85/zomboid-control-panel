@@ -224,10 +224,15 @@ import debugRoutes, { addLogToBuffer, getDiskFree } from "./routes/debug.js";
 import serverFinderRoutes from "./routes/serverFinder/index.js";
 import panelBridgeRoutes from "./routes/panelBridge.js";
 import backupRoutes from "./routes/backup.js";
+<<<<<<< HEAD
 import mapProxyRoutes from "./routes/mapProxy/index.js";
 import templatesRoutes from "./routes/templates.js";
 import systemRoutes from "./routes/system.js";
 import discoveryRoutes from "./routes/discovery.js";
+=======
+import mapProxyRoutes from "./routes/mapProxy.js";
+import environmentRoutes from "./routes/environment.js";
+>>>>>>> worktree-agent-a9775f51e61877487
 import panelBridge from "./services/panelBridge.js";
 
 dotenv.config();
@@ -1066,11 +1071,15 @@ app.use("/api/server-finder", serverFinderRoutes);
 app.use("/api/panel-bridge", panelBridgeRoutes);
 app.use("/api/backup", backupRoutes);
 app.use("/api/map", mapProxyRoutes);
+<<<<<<< HEAD
 app.use("/api/templates", templatesRoutes);
 app.use("/api/system", systemRoutes);
 // Discovery routes mounted before servers routes (literal paths like
 // /discover-mounts must not be swallowed by servers' GET /:id wildcard)
 app.use("/api/servers", discoveryRoutes);
+=======
+app.use("/api/system/environment", environmentRoutes);
+>>>>>>> worktree-agent-a9775f51e61877487
 
 // Health check + panel version
 // In exe builds, PANEL_VERSION is injected by esbuild at compile time.

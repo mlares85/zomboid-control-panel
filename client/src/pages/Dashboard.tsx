@@ -28,6 +28,7 @@ import { cn, copyText } from '@/lib/utils'
 import { errorToastContent } from '@/lib/errorToast'
 import { VerdictBand, WorkList } from '@/components/dashboard/DashboardVerdict'
 import type { Verdict, WorkItem } from '@/components/dashboard/DashboardVerdict'
+import { SetupChecklist } from '@/components/SetupChecklist'
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -1076,6 +1077,11 @@ export default function Dashboard() {
           <span className="ml-auto text-xs font-medium text-warning/85">open setup →</span>
         </Link>
       )}
+
+      {/* ─── Setup checklist (persists until account/server/RCON/bridge/backup all done) ── */}
+      <div className="mt-3">
+        <SetupChecklist />
+      </div>
 
       {/* ─── Quick-start onboarding ──────────────────────────────────────── */}
       {!hasServer && showQuickStart && (
