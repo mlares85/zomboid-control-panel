@@ -21,6 +21,8 @@ import {
 import { getDestinationInstanceById } from "./backupDestinations/index.js";
 import { addRecord } from "./backupRecords.js";
 import { getActiveServer } from "../database/init.js";
+import { captureServerSnapshot } from "../utils/serverSnapshot.js";
+import bridge from "./panelBridge.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("Backup:Orchestrator");
@@ -28,6 +30,33 @@ const DEFAULT_FULL_EVERY_N = 7;
 
 function slugTimestamp() {
   return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+}
+
+// Best-effort connected-player count via RCON. Not every caller (scheduled
+// backups, tests) has an rconService handy, and the server may be stopped,
+// so any failure just means the snapshot omits playerCount.
+async function resolvePlayerCount(rconService) {
+  if (!rconService?.connected) return null;
+  try {
+    const result = await rconService.getPlayers();
+    return result?.success ? result.players.length : null;
+  } catch (error) {
+    log.debug(`Could not resolve player count for snapshot: ${error.message}`);
+    return null;
+  }
+}
+
+// Best-effort world age via the PanelBridge mod. Only available while the PZ
+// server is running with the mod loaded — otherwise this quietly omits it.
+async function resolveWorldAge() {
+  try {
+    const result = await bridge.getGameTime();
+    const hours = result?.data?.worldAgeHours;
+    return Number.isFinite(hours) ? `Day ${Math.floor(hours / 24)}` : null;
+  } catch (error) {
+    log.debug(`Could not resolve world age for snapshot: ${error.message}`);
+    return null;
+  }
 }
 
 async function uploadToDestinations(destPath, fileName, destinationIds, defaultLocalPath) {
@@ -130,6 +159,17 @@ export async function createEnhancedBackup(backupService, options = {}) {
   const nextManifest = recordManifestAfterBackup(manifest, { backupId, type, currentFiles });
   saveManifest(manifestPath, nextManifest);
 
+  const [playerCount, worldAge] = await Promise.all([
+    resolvePlayerCount(options.rconService),
+    resolveWorldAge(),
+  ]);
+  const serverSnapshot = await captureServerSnapshot({
+    activeServer,
+    playerCount,
+    worldAge,
+    saveSize: originalSize,
+  });
+
   const record = await addRecord({
     id: backupId,
     ...metadata,
@@ -141,6 +181,7 @@ export async function createEnhancedBackup(backupService, options = {}) {
     incrementalBase: runFull ? null : manifest.lastFullBackupId,
     changedFiles: runFull ? null : fileList.length,
     fileName,
+    serverSnapshot,
   });
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);

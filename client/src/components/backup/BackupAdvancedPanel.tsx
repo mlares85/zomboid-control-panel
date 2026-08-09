@@ -8,7 +8,6 @@ import { backupApi, BackupDestination } from '@/lib/api'
 import { BackupFormatComparison } from './BackupFormatComparison'
 import { BackupDestinationCard } from './BackupDestinationCard'
 import { AddDestinationDialog } from './AddDestinationDialog'
-import { BackupHistoryTable } from './BackupHistoryTable'
 import { SaveCompactionCard } from './SaveCompactionCard'
 
 function DestinationsTab() {
@@ -70,8 +69,9 @@ function DestinationsTab() {
 }
 
 // Thin composing wrapper for the enhanced backup features (formats,
-// destinations, history, compaction). Kept out of Backups.tsx to stay
-// under the 300-line-per-file limit there.
+// destinations, compaction). Kept out of Backups.tsx to stay under the
+// 300-line-per-file limit there. History moved out to its own prominent
+// section on the page instead of living behind a tab here — see Backups.tsx.
 export function BackupAdvancedPanel() {
   return (
     <Card>
@@ -83,7 +83,6 @@ export function BackupAdvancedPanel() {
               Formats
             </TabsTrigger>
             <TabsTrigger value="destinations">Destinations</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="compaction">Compaction</TabsTrigger>
           </TabsList>
           <TabsContent value="formats">
@@ -91,9 +90,6 @@ export function BackupAdvancedPanel() {
           </TabsContent>
           <TabsContent value="destinations">
             <DestinationsTab />
-          </TabsContent>
-          <TabsContent value="history">
-            <BackupHistoryTable />
           </TabsContent>
           <TabsContent value="compaction">
             <SaveCompactionCard />

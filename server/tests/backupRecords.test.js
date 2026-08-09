@@ -9,9 +9,8 @@ vi.mock("../database/init.js", () => ({
   }),
 }));
 
-const { addRecord, listRecords, getRecord, updateRecord, deleteRecord } = await import(
-  "../services/backupRecords.js"
-);
+const { addRecord, listRecords, getRecord, updateRecord, deleteRecord, listBackupServers } =
+  await import("../services/backupRecords.js");
 
 beforeEach(() => {
   settingsStore = {};
@@ -44,6 +43,13 @@ describe("addRecord", () => {
     expect(record.changedFiles).toBeNull();
     expect(record.retainUntil).toBeNull();
     expect(record.sizeBytes).toBe(400);
+    expect(record.serverSnapshot).toBeNull();
+  });
+
+  it("stores an explicit serverSnapshot", async () => {
+    const snapshot = { serverId: "srv-1", serverName: "servertest", mods: [] };
+    const record = await addRecord(fields({ serverSnapshot: snapshot }));
+    expect(record.serverSnapshot).toEqual(snapshot);
   });
 
   it("honors an explicit id (used to keep manifest linkage consistent)", async () => {
@@ -66,7 +72,48 @@ describe("listRecords", () => {
     await addRecord(fields({ id: "a" }));
     await addRecord(fields({ id: "b" }));
     await addRecord(fields({ id: "c" }));
-    expect(await listRecords(2)).toHaveLength(2);
+    expect(await listRecords({ limit: 2 })).toHaveLength(2);
+  });
+
+  it("filters by serverSnapshot.serverId", async () => {
+    await addRecord(fields({ id: "a", serverSnapshot: { serverId: "srv-1" } }));
+    await addRecord(fields({ id: "b", serverSnapshot: { serverId: "srv-2" } }));
+
+    const records = await listRecords({ serverId: "srv-1" });
+    expect(records.map((r) => r.id)).toEqual(["a"]);
+  });
+
+  it("filters by serverName for records without a serverSnapshot", async () => {
+    await addRecord(fields({ id: "a", serverName: "alpha" }));
+    await addRecord(fields({ id: "b", serverName: "beta" }));
+
+    const records = await listRecords({ serverName: "beta" });
+    expect(records.map((r) => r.id)).toEqual(["b"]);
+  });
+});
+
+describe("listBackupServers", () => {
+  it("groups records by server, counting backups and tracking the latest timestamp", async () => {
+    await addRecord(fields({ id: "a", serverName: "alpha", serverSnapshot: { serverId: "srv-1" } }));
+    await new Promise((r) => setTimeout(r, 2));
+    const latest = await addRecord(
+      fields({ id: "b", serverName: "alpha", serverSnapshot: { serverId: "srv-1" } }),
+    );
+    await addRecord(fields({ id: "c", serverName: "beta", serverSnapshot: { serverId: "srv-2" } }));
+
+    const servers = await listBackupServers();
+    expect(servers).toHaveLength(2);
+    const alpha = servers.find((s) => s.serverId === "srv-1");
+    expect(alpha).toMatchObject({ serverName: "alpha", backupCount: 2, lastBackupAt: latest.timestamp });
+  });
+
+  it("falls back to grouping by serverName for legacy records with no snapshot", async () => {
+    await addRecord(fields({ id: "a", serverName: "legacy-server" }));
+
+    const servers = await listBackupServers();
+    expect(servers).toEqual([
+      expect.objectContaining({ serverId: null, serverName: "legacy-server", backupCount: 1 }),
+    ]);
   });
 });
 

@@ -80,3 +80,7 @@ The scheduler already proves concurrent RCON connections work (temporary instanc
 
 ### Community template registry
 Git repo of templates fetched as a static index. PRs as moderation. Import from URL/gist. Out of scope until the template UI ships.
+
+## Backup server snapshots
+
+`createEnhancedBackup` (backupOrchestrator.js) embeds a `serverSnapshot` in every backup record via `server/utils/serverSnapshot.js` — server identity, a curated non-secret allowlist of INI/SandboxVars keys (there's no "PZ defaults" table in this codebase to diff a true non-default set against, so this mirrors the debug support bundle's curated-keys approach), the tracked mods list, and best-effort `playerCount`/`worldAge` (via `rconService`/PanelBridge — both optional, never block the backup). Passwords are excluded by allowlist plus a defense-in-depth `/password|secret|token/i` filter. Backup records are filterable by `serverId`/`serverName` (`GET /api/backup/records`), and `GET /api/backup/servers` lists distinct servers for the History table's filter dropdown. `templateActions.js` records `lastAppliedTemplateId`/`lastAppliedTemplateName` on the server profile when a template is applied, so the snapshot can report which template a config came from.

@@ -3,11 +3,21 @@ import { CheckCircle2, History, Loader2, RefreshCw, XCircle } from 'lucide-react
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { EmptyState } from '@/components/EmptyState'
 import { useToast } from '@/components/ui/use-toast'
-import { backupApi, BackupRecord } from '@/lib/api'
+import { backupApi, BackupRecord, BackupServerSummary } from '@/lib/api'
 import { formatBytes, formatDate, truncateChecksum } from './formatUtils'
+import { BackupDetailPanel } from './BackupDetailPanel'
 import { cn } from '@/lib/utils'
+
+const ALL_SERVERS = '__all__'
 
 function VerifiedBadge({ verified }: { verified: boolean | null }) {
   if (verified === null) return <Badge variant="secondary">Not verified</Badge>
@@ -15,20 +25,57 @@ function VerifiedBadge({ verified }: { verified: boolean | null }) {
   return <Badge variant="destructive" className="gap-1"><XCircle className="w-3 h-3" />Failed</Badge>
 }
 
+function ServerFilter({ servers, value, onChange }: {
+  servers: BackupServerSummary[]
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="w-full sm:w-56" aria-label="Filter by server">
+        <SelectValue placeholder="All Servers" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ALL_SERVERS}>All Servers</SelectItem>
+        {servers.map((server) => (
+          <SelectItem key={server.serverId || server.serverName} value={server.serverName}>
+            {server.serverName} ({server.backupCount})
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
 export function BackupHistoryTable() {
   const { toast } = useToast()
   const [records, setRecords] = useState<BackupRecord[]>([])
+  const [servers, setServers] = useState<BackupServerSummary[]>([])
+  const [serverFilter, setServerFilter] = useState(ALL_SERVERS)
   const [loading, setLoading] = useState(true)
   const [verifyingId, setVerifyingId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [restoringId, setRestoringId] = useState<string | null>(null)
   // Tracks optimistic/confirmed verification results per record id, separate
   // from BackupRecord.verified so a re-run before the initial fetch settles
   // doesn't get clobbered.
   const [verifiedOverride, setVerifiedOverride] = useState<Record<string, boolean>>({})
 
+  const fetchServers = async () => {
+    try {
+      const data = await backupApi.listBackupServers()
+      setServers(data.servers || [])
+    } catch {
+      setServers([])
+    }
+  }
+
   const fetchRecords = async () => {
     setLoading(true)
     try {
-      const data = await backupApi.listRecords()
+      const data = await backupApi.listRecords(
+        serverFilter === ALL_SERVERS ? undefined : { serverName: serverFilter },
+      )
       setRecords(data.records || [])
     } catch {
       setRecords([])
@@ -38,8 +85,13 @@ export function BackupHistoryTable() {
   }
 
   useEffect(() => {
-    fetchRecords()
+    fetchServers()
   }, [])
+
+  useEffect(() => {
+    fetchRecords()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverFilter])
 
   const handleVerify = async (id: string) => {
     setVerifyingId(id)
@@ -58,6 +110,20 @@ export function BackupHistoryTable() {
     }
   }
 
+  const handleRestore = async (fileName: string) => {
+    setRestoringId(fileName)
+    try {
+      const result = await backupApi.restoreBackup(fileName, { createPreRestoreBackup: true })
+      if (!result.success) throw new Error(result.message || 'Failed to restore backup')
+      toast({ title: 'Backup Restored', description: `Rolled back to ${fileName}`, variant: 'success' as const })
+      setSelectedId(null)
+    } catch (error) {
+      toast({ title: 'Restore Failed', description: error instanceof Error ? error.message : 'Failed to restore backup', variant: 'destructive' })
+    } finally {
+      setRestoringId(null)
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -68,14 +134,15 @@ export function BackupHistoryTable() {
               Backup History
             </CardTitle>
             <CardDescription>
-              New-format backups tracked with checksums and destinations. This is separate from the legacy backup
-              list above, which does not carry this metadata.
+              New-format backups tracked with checksums, destinations, and a server config snapshot.
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={fetchRecords} disabled={loading} className="gap-2 self-start sm:self-auto">
-            <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <ServerFilter servers={servers} value={serverFilter} onChange={setServerFilter} />
+            <Button variant="outline" size="sm" onClick={fetchRecords} disabled={loading} className="gap-2 shrink-0" aria-label="Refresh backup history">
+              <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -88,13 +155,14 @@ export function BackupHistoryTable() {
             type="noData"
             compact
             title="No metadata-tracked backups yet"
-            description="Backups created with the enhanced format (checksums, verification, destinations) will show up here. See the backup list above for existing legacy backups."
+            description="Backups created with the enhanced format (checksums, verification, destinations) will show up here."
           />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground border-b border-border/50">
+                  <th className="py-2 pr-3 font-medium">Server</th>
                   <th className="py-2 pr-3 font-medium">Timestamp</th>
                   <th className="py-2 pr-3 font-medium">Type</th>
                   <th className="py-2 pr-3 font-medium">Format</th>
@@ -102,7 +170,6 @@ export function BackupHistoryTable() {
                   <th className="py-2 pr-3 font-medium">Ratio</th>
                   <th className="py-2 pr-3 font-medium">Checksum</th>
                   <th className="py-2 pr-3 font-medium">Verified</th>
-                  <th className="py-2 pr-3 font-medium">Destination</th>
                   <th className="py-2 pr-3 font-medium" />
                 </tr>
               </thead>
@@ -110,7 +177,16 @@ export function BackupHistoryTable() {
                 {records.map((record) => {
                   const verified = verifiedOverride[record.id] ?? (record.verified || null)
                   return (
-                    <tr key={record.id} className="border-b border-border/30 last:border-0">
+                    <tr
+                      key={record.id}
+                      className="border-b border-border/30 last:border-0 cursor-pointer hover:bg-muted/30"
+                      onClick={() => setSelectedId(record.id)}
+                    >
+                      <td className="py-2 pr-3">
+                        <Badge variant="outline" className="font-normal">
+                          {record.serverSnapshot?.serverName || record.serverName}
+                        </Badge>
+                      </td>
                       <td className="py-2 pr-3 whitespace-nowrap">{formatDate(record.timestamp)}</td>
                       <td className="py-2 pr-3">
                         <Badge variant={record.type === 'full' ? 'default' : 'secondary'}>{record.type}</Badge>
@@ -122,12 +198,11 @@ export function BackupHistoryTable() {
                       <td className="py-2 pr-3 tabular-nums">{record.compressionRatio}</td>
                       <td className="py-2 pr-3 font-mono text-xs" title={record.checksum}>{truncateChecksum(record.checksum)}</td>
                       <td className="py-2 pr-3"><VerifiedBadge verified={verified} /></td>
-                      <td className="py-2 pr-3 truncate max-w-[10rem]" title={record.destination}>{record.destination}</td>
                       <td className="py-2 pr-3 text-right">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleVerify(record.id)}
+                          onClick={(e) => { e.stopPropagation(); handleVerify(record.id) }}
                           disabled={verifyingId === record.id}
                           className="h-8 gap-1.5"
                         >
@@ -143,6 +218,13 @@ export function BackupHistoryTable() {
           </div>
         )}
       </CardContent>
+
+      <BackupDetailPanel
+        backupId={selectedId}
+        onOpenChange={(open) => !open && setSelectedId(null)}
+        onRestore={handleRestore}
+        restoring={restoringId !== null}
+      />
     </Card>
   )
 }

@@ -25,9 +25,10 @@ export async function handleCreateBackup(req, res) {
 
     const backupService = req.app.get("backupService");
     const io = req.app.get("io");
+    const rconService = req.app.get("rconService");
 
     const result = usesEnhancedOptions(req.body)
-      ? await createEnhancedBackup(backupService, { ...req.body, io })
+      ? await createEnhancedBackup(backupService, { ...req.body, io, rconService })
       : await backupService.createBackup({ ...req.body, io });
 
     if (result.success) {

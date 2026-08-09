@@ -4,11 +4,42 @@ import { getSetting, setSetting } from "../database/init.js";
 const SETTINGS_KEY = "backupRecordsV2";
 const MAX_RECORDS = 500; // matches the retention cap other history arrays use in database/init.js
 
-export async function listRecords(limit) {
+export async function listRecords({ limit, serverId, serverName } = {}) {
   const stored = await getSetting(SETTINGS_KEY);
-  const records = Array.isArray(stored) ? stored : [];
+  let records = Array.isArray(stored) ? stored : [];
+  if (serverId) {
+    records = records.filter((r) => r.serverSnapshot?.serverId === serverId);
+  }
+  if (serverName) {
+    records = records.filter((r) => r.serverName === serverName);
+  }
   const sorted = [...records].sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
   return limit ? sorted.slice(0, limit) : sorted;
+}
+
+// Distinct servers referenced by stored backup records, for the History
+// table's server filter dropdown. Grouped by serverId when the snapshot has
+// one (post-this-feature backups), falling back to serverName for older
+// records that predate serverSnapshot.
+export async function listBackupServers() {
+  const records = await listRecords();
+  const byKey = new Map();
+  for (const record of records) {
+    const key = record.serverSnapshot?.serverId || record.serverName || "unknown";
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.backupCount++;
+      if (record.timestamp > existing.lastBackupAt) existing.lastBackupAt = record.timestamp;
+      continue;
+    }
+    byKey.set(key, {
+      serverId: record.serverSnapshot?.serverId || null,
+      serverName: record.serverName || "Unknown",
+      backupCount: 1,
+      lastBackupAt: record.timestamp,
+    });
+  }
+  return Array.from(byKey.values());
 }
 
 async function saveRecords(records) {
@@ -46,6 +77,7 @@ export async function addRecord(fields) {
     retainUntil: fields.retainUntil ?? null,
     fileName: fields.fileName ?? null,
     sizeBytes: fields.compressedSize,
+    serverSnapshot: fields.serverSnapshot ?? null,
   };
   const records = await listRecords();
   records.unshift(record);

@@ -6,6 +6,7 @@ const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, createBackup } from "./context.js";
 import { getTemplatesPath } from "./templates.js";
+import { getActiveServer, updateServer } from "../../database/init.js";
 
 const router = express.Router();
 
@@ -67,6 +68,17 @@ router.post("/templates/:id/apply", async (req, res) => {
       return res
         .status(400)
         .json({ error: "No settings to apply from this template" });
+    }
+
+    // Records which template a server's current config was last built from,
+    // so a backup snapshot can later report "was this applied from a
+    // template, and which one" (server/utils/serverSnapshot.js).
+    const activeServer = await getActiveServer();
+    if (activeServer) {
+      await updateServer(activeServer.id, {
+        lastAppliedTemplateId: safeId,
+        lastAppliedTemplateName: template.name,
+      });
     }
 
     res.json({

@@ -41,12 +41,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/components/ui/use-toast'
 import { useSocket } from '@/contexts/SocketContext'
-import { backupApi, serversApi, BackupStatus, BackupFile } from '@/lib/api'
+import { backupApi, serversApi, BackupStatus, BackupFile, BackupFormatId } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { BackupAdvancedPanel } from '@/components/backup/BackupAdvancedPanel'
+import { BackupHistoryTable } from '@/components/backup/BackupHistoryTable'
 
 interface BackupProgress {
   phase: 'preparing' | 'archiving' | 'finalizing' | 'complete' | 'error'
@@ -75,6 +76,7 @@ export default function Backups() {
   const [backupProgress, setBackupProgress] = useState<BackupProgress | null>(null)
   const [uploadingBackup, setUploadingBackup] = useState(false)
   const [uploadPercent, setUploadPercent] = useState(0)
+  const [backupFormat, setBackupFormat] = useState<BackupFormatId>('zip')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Active server context — backups don't apply to remote servers because
@@ -200,7 +202,7 @@ export default function Backups() {
     setCreatingBackup(true)
     setBackupProgress({ phase: 'preparing', percent: 0, message: 'Starting backup...' })
     try {
-      const result = await backupApi.createBackup()
+      const result = await backupApi.createBackup({ format: backupFormat })
       if (result.success && result.backup) {
         // createBackup can return either the legacy BackupFile (name) or the
         // new metadata BackupRecord (fileName) shape depending on options.
@@ -493,6 +495,16 @@ export default function Backups() {
         icon={<Archive className="w-5 h-5 text-primary" />}
         actions={
           <div className="flex items-center gap-2">
+            <Select value={backupFormat} onValueChange={(v) => setBackupFormat(v as BackupFormatId)}>
+              <SelectTrigger className="w-28" aria-label="Backup format" disabled={creatingBackup}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="zip">.zip</SelectItem>
+                <SelectItem value="tar.gz">.tar.gz</SelectItem>
+                <SelectItem value="tar.zst">.tar.zst</SelectItem>
+              </SelectContent>
+            </Select>
             <Button
               onClick={handleCreateBackup}
               disabled={creatingBackup || restoringBackup !== null || !backupStatus?.savesExists || activeServerRemote}
@@ -764,7 +776,10 @@ export default function Backups() {
         </Card>
       )}
 
-      {/* Enhanced backup features: formats, destinations, history, compaction */}
+      {/* Backup history: server filter + snapshot detail — prominent, not tabbed */}
+      <BackupHistoryTable />
+
+      {/* Enhanced backup features: formats, destinations, compaction */}
       <BackupAdvancedPanel />
 
       {/* Main Backup Card */}

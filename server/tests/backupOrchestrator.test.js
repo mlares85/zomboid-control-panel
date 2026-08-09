@@ -7,6 +7,7 @@ let settingsStore;
 
 vi.mock("../database/init.js", () => ({
   getActiveServer: vi.fn(async () => ({ serverName: "servertest" })),
+  getTrackedMods: vi.fn(async () => []),
   getSetting: vi.fn(async (key) => settingsStore[key] ?? null),
   setSetting: vi.fn(async (key, value) => {
     settingsStore[key] = value;
@@ -99,5 +100,17 @@ describe("createEnhancedBackup", () => {
     await expect(
       createEnhancedBackup(backupService, { format: "not-a-real-format" }),
     ).rejects.toThrow(/not available/);
+  });
+
+  it("embeds a serverSnapshot in the resulting record", async () => {
+    const result = await createEnhancedBackup(backupService, { format: "zip" });
+
+    expect(result.backup.serverSnapshot).toMatchObject({
+      serverName: "servertest",
+      mods: [],
+      playerCount: null,
+      worldAge: null,
+    });
+    expect(result.backup.serverSnapshot.saveSize).toBeGreaterThan(0);
   });
 });

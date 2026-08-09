@@ -2477,6 +2477,30 @@ export interface BackupDestination {
   implemented: boolean;
 }
 
+export interface BackupModSnapshot {
+  workshopId: string;
+  modId: string | null;
+  name: string | null;
+}
+
+// Point-in-time snapshot of the server's configuration embedded in a backup
+// record, so the History detail panel can show what the server looked like
+// when the backup was taken. Never contains passwords/secrets.
+export interface BackupServerSnapshot {
+  serverName: string;
+  serverId: string | null;
+  provider: string | null;
+  installPath: string | null;
+  zomboidDataPath: string | null;
+  template: string | null;
+  sandboxVars: Record<string, unknown>;
+  serverIni: Record<string, unknown>;
+  mods: BackupModSnapshot[];
+  playerCount: number | null;
+  worldAge: string | null;
+  saveSize: number | null;
+}
+
 export interface BackupRecord {
   id: string;
   timestamp: string;
@@ -2496,6 +2520,15 @@ export interface BackupRecord {
   retainUntil: string | null;
   fileName: string | null;
   sizeBytes: number;
+  serverSnapshot: BackupServerSnapshot | null;
+}
+
+// Entry in the History table's server filter dropdown (GET /backup/servers).
+export interface BackupServerSummary {
+  serverId: string | null;
+  serverName: string;
+  backupCount: number;
+  lastBackupAt: string;
 }
 
 export interface CompactionPreview {
@@ -2663,9 +2696,29 @@ export const backupApi = {
     message?: string;
   }> => apiGet("/backup/compare-formats"),
 
-  // Enhanced backup metadata (format/compression/destination/verification)
-  listRecords: (limit?: number): Promise<{ records: BackupRecord[] }> =>
-    apiGet(`/backup/records${limit ? `?limit=${limit}` : ""}`),
+  // Enhanced backup metadata (format/compression/destination/verification).
+  // `serverId`/`serverName` filter to a single server's backups (History
+  // table's server filter dropdown).
+  listRecords: (options?: {
+    limit?: number;
+    serverId?: string;
+    serverName?: string;
+  }): Promise<{ records: BackupRecord[] }> => {
+    const params = new URLSearchParams();
+    if (options?.limit) params.set("limit", String(options.limit));
+    if (options?.serverId) params.set("serverId", options.serverId);
+    if (options?.serverName) params.set("serverName", options.serverName);
+    const query = params.toString();
+    return apiGet(`/backup/records${query ? `?${query}` : ""}`);
+  },
+
+  // Full record (including serverSnapshot) for the backup detail panel.
+  getRecord: (id: string): Promise<{ record: BackupRecord }> =>
+    apiGet(`/backup/records/${encodeURIComponent(id)}`),
+
+  // Servers that have at least one backup, for the History filter dropdown.
+  listBackupServers: (): Promise<{ servers: BackupServerSummary[] }> =>
+    apiGet("/backup/servers"),
 
   // Re-verify a backup's archive integrity and checksum
   verifyBackup: (
