@@ -649,6 +649,21 @@ app.use("/api/panel-bridge/command", panelBridgeCommandLimiter);
 // Initialize services
 const rconService = new RconService();
 const serverManager = new ServerManager();
+
+// Wire Docker socket if available — enables container lifecycle for docker-local/docker-managed servers
+try {
+  const { DockerClient } = await import("./services/dockerClient.js");
+  const dockerClient = new DockerClient();
+  if (dockerClient.available) {
+    serverManager.setDockerClient(dockerClient);
+    log.info("Docker socket connected — container lifecycle enabled");
+  } else {
+    log.debug("Docker socket not available — container controls disabled");
+  }
+} catch (e) {
+  log.debug(`Docker client init skipped: ${e.message}`);
+}
+
 const modChecker = new ModChecker();
 const logTailer = new LogTailer();
 const scheduler = new Scheduler(rconService, serverManager);
