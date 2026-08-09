@@ -5,6 +5,7 @@ import {
   Play, Square, RotateCcw, Save, Server, Wifi, Loader2, AlertTriangle, RefreshCw, AlertCircle,
   LogIn, LogOut, Activity, Archive, Skull, Sword, ShieldAlert, Copy, Gamepad2, Globe, FolderOpen,
   X, MoreHorizontal, Zap, Trash2, Download, Sparkles, CalendarClock, Monitor, ScrollText,
+  LayoutGrid, ChevronLeft,
 } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
@@ -62,6 +63,8 @@ interface PerformancePoint {
 
 const DashboardPerformanceCharts = lazy(() => import('@/components/DashboardPerformanceCharts'))
 const DASHBOARD_ONBOARDING_DISMISSED_KEY = 'pz-dashboard-onboarding-dismissed-v1'
+const DASHBOARD_VIEW_KEY = 'pz-dashboard-view-v1'
+type DashboardView = 'cards' | 'classic'
 
 /* -------------------------------------------------------------------------- */
 /*  Small helpers                                                             */
@@ -170,6 +173,14 @@ export default function Dashboard() {
   const [panelInfo, setPanelInfo] = useState<{ localIp: string; port: number; url: string } | null>(null)
   const [activeServer, setActiveServer] = useState<ServerInstance | null>(null)
   const [showPerformanceCharts, setShowPerformanceCharts] = useState(false)
+  const [serverCount, setServerCount] = useState<number | null>(null)
+  const [view, setView] = useState<DashboardView>(() => {
+    try {
+      const stored = localStorage.getItem(DASHBOARD_VIEW_KEY)
+      if (stored === 'cards' || stored === 'classic') return stored
+    } catch { /* ignore storage failures */ }
+    return 'classic'
+  })
   const [showQuickStart, setShowQuickStart] = useState<boolean>(() => {
     try { return localStorage.getItem(DASHBOARD_ONBOARDING_DISMISSED_KEY) !== 'true' } catch { return true }
   })
@@ -225,6 +236,22 @@ export default function Dashboard() {
     return () => { cancelled = true }
   }, [])
 
+  // Default to Cards View once we know there's more than one server, unless
+  // the user already picked a view explicitly (stored preference wins).
+  useEffect(() => {
+    let cancelled = false
+    let hasStoredPref = false
+    try { hasStoredPref = localStorage.getItem(DASHBOARD_VIEW_KEY) !== null } catch { /* ignore */ }
+    serversApi.getAll()
+      .then(({ servers }) => {
+        if (cancelled) return
+        setServerCount(servers.length)
+        if (!hasStoredPref && servers.length > 1) setView('cards')
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
   useEffect(() => {
     let justSetUp = false
     try { justSetUp = sessionStorage.getItem('pz-just-completed-setup') === 'true' } catch { /* ignore */ }
@@ -276,6 +303,15 @@ export default function Dashboard() {
     setShowQuickStart(false)
     try { localStorage.setItem(DASHBOARD_ONBOARDING_DISMISSED_KEY, 'true') } catch { /* ignore storage failures */ }
   }
+
+  const changeView = (next: DashboardView) => {
+    setView(next)
+    try { localStorage.setItem(DASHBOARD_VIEW_KEY, next) } catch { /* ignore storage failures */ }
+  }
+
+  // The card already activated the server (see ServerCard.onDrillIn) — the
+  // socket's activeServerChanged listener refreshes status/players/etc.
+  const handleDrillIn = () => changeView('classic')
 
   /* ---------------------------- fetchers ---------------------------------- */
   const fetchStatus = useCallback(async () => {
@@ -743,9 +779,51 @@ export default function Dashboard() {
   /* ====================================================================== */
   return (
     <div className="page-transition pb-12">
-      {/* ─── SERVER CARDS ─────────────────────────────────────────── */}
-      <ServerCards />
+      {/* ─── VIEW TOGGLE ──────────────────────────────────────────── */}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        {view === 'classic' && serverCount != null && serverCount > 1 ? (
+          <button
+            type="button"
+            onClick={() => changeView('cards')}
+            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 rounded-sm"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" /> All servers
+          </button>
+        ) : <span aria-hidden="true" />}
+        <div className="ml-auto flex items-center gap-1 rounded-lg border border-border/50 p-0.5">
+          <button
+            type="button"
+            onClick={() => changeView('cards')}
+            aria-label="Cards view"
+            aria-pressed={view === 'cards'}
+            title="Cards view"
+            className={cn(
+              'rounded p-1.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70',
+              view === 'cards' && 'bg-muted text-foreground',
+            )}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => changeView('classic')}
+            aria-label="Classic view"
+            aria-pressed={view === 'classic'}
+            title="Classic view"
+            className={cn(
+              'rounded p-1.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70',
+              view === 'classic' && 'bg-muted text-foreground',
+            )}
+          >
+            <Monitor className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
 
+      {view === 'cards' ? (
+        <ServerCards onDrillIn={handleDrillIn} />
+      ) : (
+      <>
       {/* ─── TOP STATUS BAR ───────────────────────────────────────── */}
       <header
         aria-label="Server status"
@@ -1335,6 +1413,8 @@ export default function Dashboard() {
           )}
         </aside>
       </div>
+      </>
+      )}
 
       {/* ─── Confirm dialog ──────────────────────────────────────────────── */}
       <AlertDialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>

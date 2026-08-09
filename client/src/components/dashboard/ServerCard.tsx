@@ -25,6 +25,8 @@ interface ServerCardProps {
   stats: ServerCardStats | null
   /** Called after activation/actions so the parent can refresh sooner than the next poll. */
   onChanged: () => void
+  /** Called once this card's server is the active one — lets the parent drill into a detail view. */
+  onDrillIn?: (serverId: string | number) => void
 }
 
 // Duplicated in Backups.tsx — three lines isn't worth a shared util for.
@@ -68,7 +70,7 @@ function ActionButton({
   )
 }
 
-export function ServerCard({ server, isRunning, activeStatus, stats, onChanged }: ServerCardProps) {
+export function ServerCard({ server, isRunning, activeStatus, stats, onChanged, onDrillIn }: ServerCardProps) {
   const [pending, setPending] = useState<string | null>(null)
   const { toast } = useToast()
   const navigate = useNavigate()
@@ -88,7 +90,21 @@ export function ServerCard({ server, isRunning, activeStatus, stats, onChanged }
     }
   }
 
-  const handleSelect = () => runAction('select', () => Promise.resolve(), `Switched to ${server.name}`)
+  const handleSelect = async () => {
+    // Already active: nothing to activate, just let the parent drill in.
+    if (server.isActive) { onDrillIn?.(server.id); return }
+    setPending('select')
+    try {
+      await serversApi.activate(server.id)
+      onChanged()
+      if (onDrillIn) onDrillIn(server.id)
+      else toast({ title: `Switched to ${server.name}`, variant: 'success' as const })
+    } catch (error) {
+      toast({ title: 'Error', ...errorToastContent(error, 'Failed to select server.'), variant: 'destructive' })
+    } finally {
+      setPending(null)
+    }
+  }
   const handleStart = () => runAction('start', serverApi.start, 'Server starting')
   const handleStop = () => runAction('stop', serverApi.stop, 'Server stopping')
   const handleRestart = () => runAction('restart', serverApi.restartNow, 'Restart triggered')
@@ -120,8 +136,12 @@ export function ServerCard({ server, isRunning, activeStatus, stats, onChanged }
       <button
         type="button"
         onClick={handleSelect}
-        disabled={server.isActive || pending !== null}
-        aria-label={server.isActive ? `${server.name} is the active server` : `Switch to ${server.name}`}
+        disabled={(server.isActive && !onDrillIn) || pending !== null}
+        aria-label={
+          server.isActive
+            ? (onDrillIn ? `Open ${server.name}` : `${server.name} is the active server`)
+            : `Switch to ${server.name}`
+        }
         className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 disabled:cursor-default"
       />
 

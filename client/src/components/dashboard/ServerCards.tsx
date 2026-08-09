@@ -24,7 +24,12 @@ async function fetchActiveStats(active: ServerInstance): Promise<ServerCardStats
   }
 }
 
-export function ServerCards() {
+interface ServerCardsProps {
+  /** Called once a card's server has been activated — the parent can use this to drill into a detail view. */
+  onDrillIn?: (serverId: string | number) => void
+}
+
+export function ServerCards({ onDrillIn }: ServerCardsProps) {
   const [servers, setServers] = useState<ServerInstance[]>([])
   const [hostStatuses, setHostStatuses] = useState<HostStatuses>({})
   const [activeStatus, setActiveStatus] = useState<ComposedServerStatus | null>(null)
@@ -70,6 +75,7 @@ export function ServerCards() {
           activeStatus={server.isActive ? activeStatus : null}
           stats={server.isActive ? activeStats : null}
           onChanged={fetchAll}
+          onDrillIn={onDrillIn}
         />
       ))}
     </section>
