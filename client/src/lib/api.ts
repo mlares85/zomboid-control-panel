@@ -2438,6 +2438,87 @@ export interface BackupContentsInfo {
   note: string;
 }
 
+// ── Enhanced backup system: formats, destinations, incremental, compaction ──
+export type BackupFormatId = "zip" | "tar.gz" | "tar.zst";
+
+export interface BackupFormatInfo {
+  id: BackupFormatId;
+  label: string;
+  description: string;
+  available: boolean;
+}
+
+export interface FormatCompareResult {
+  format: BackupFormatId;
+  available: boolean;
+  compressedSize?: number;
+  ratio?: string;
+  timeMs?: number;
+  error?: string;
+}
+
+export type BackupDestinationType =
+  | "local"
+  | "sftp"
+  | "google-drive"
+  | "smb"
+  | "ftp"
+  | "rsync";
+
+export interface BackupDestination {
+  id: string;
+  type: BackupDestinationType;
+  name: string;
+  path: string;
+  enabled: boolean;
+  createdAt: string;
+  // Secrets (passwords, tokens) are never sent back by the server.
+  config: Record<string, unknown>;
+  implemented: boolean;
+}
+
+export interface BackupRecord {
+  id: string;
+  timestamp: string;
+  type: "full" | "incremental";
+  format: BackupFormatId;
+  originalSize: number;
+  compressedSize: number;
+  compressionRatio: string;
+  compressionTime: number;
+  checksum: string;
+  verified: boolean;
+  serverName: string;
+  destination: string;
+  remotePath: string | null;
+  incrementalBase: string | null;
+  changedFiles: number | null;
+  retainUntil: string | null;
+  fileName: string | null;
+  sizeBytes: number;
+}
+
+export interface CompactionPreview {
+  success: boolean;
+  saveName: string;
+  totalSize: number;
+  totalSizeFormatted: string;
+  staleSize: number;
+  staleSizeFormatted: string;
+  staleChunkCount: number;
+  totalChunkCount: number;
+  estimatedSavingsPercent: number;
+}
+
+export interface CompactionResult {
+  success: boolean;
+  deleted: number;
+  spaceFreed: number;
+  spaceFreedFormatted: string;
+  backupCreated: boolean;
+  message?: string;
+}
+
 export const backupApi = {
   // Get backup status and settings
   getStatus: (): Promise<BackupStatus> => apiGet("/backup/status"),
@@ -2454,12 +2535,16 @@ export const backupApi = {
   ): Promise<{ success: boolean; settings: BackupSettings }> =>
     apiPost("/backup/settings", settings),
 
-  // Create a manual backup
+  // Create a manual backup. `format`/`type`/`destinations` are optional —
+  // omitting them preserves the original zip-to-local behavior.
   createBackup: (options?: {
     includeDb?: boolean;
+    format?: BackupFormatId;
+    type?: "full" | "incremental";
+    destinations?: string[];
   }): Promise<{
     success: boolean;
-    backup?: BackupFile;
+    backup?: BackupFile | BackupRecord;
     duration?: number;
     message?: string;
   }> => apiPost("/backup/create", options || {}),
@@ -2565,6 +2650,94 @@ export const backupApi = {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   },
+
+  // Available compression formats
+  getFormats: (): Promise<{ formats: BackupFormatInfo[] }> =>
+    apiGet("/backup/formats"),
+
+  // Compress a small sample with every format and compare size/speed
+  compareFormats: (): Promise<{
+    success: boolean;
+    sampleSizeBytes: number;
+    results: FormatCompareResult[];
+    message?: string;
+  }> => apiGet("/backup/compare-formats"),
+
+  // Enhanced backup metadata (format/compression/destination/verification)
+  listRecords: (limit?: number): Promise<{ records: BackupRecord[] }> =>
+    apiGet(`/backup/records${limit ? `?limit=${limit}` : ""}`),
+
+  // Re-verify a backup's archive integrity and checksum
+  verifyBackup: (
+    id: string,
+  ): Promise<{
+    success: boolean;
+    verified: boolean;
+    readable: boolean;
+    checksumMatches: boolean;
+    message?: string;
+  }> => apiPost(`/backup/verify/${encodeURIComponent(id)}`),
+
+  // Destinations
+  listDestinations: (): Promise<{ destinations: BackupDestination[] }> =>
+    apiGet("/backup/destinations"),
+
+  addDestination: (destination: {
+    type: BackupDestinationType;
+    name: string;
+    path: string;
+    config?: Record<string, unknown>;
+  }): Promise<{ success: boolean; destination?: BackupDestination; message?: string }> =>
+    apiPost("/backup/destinations", destination),
+
+  updateDestination: (
+    id: string,
+    updates: Partial<{
+      name: string;
+      path: string;
+      enabled: boolean;
+      config: Record<string, unknown>;
+    }>,
+  ): Promise<{ success: boolean; destination?: BackupDestination; message?: string }> =>
+    apiPut(`/backup/destinations/${encodeURIComponent(id)}`, updates),
+
+  deleteDestination: (
+    id: string,
+  ): Promise<{ success: boolean; message?: string }> =>
+    apiDelete(`/backup/destinations/${encodeURIComponent(id)}`),
+
+  testDestination: (
+    id: string,
+  ): Promise<{ success: boolean; message: string; latencyMs?: number }> =>
+    apiPost(`/backup/destinations/${encodeURIComponent(id)}/test`),
+
+  // Google Drive OAuth2 — manual code-paste flow (no fixed public redirect URI)
+  gdriveAuthUrl: (config: {
+    clientId: string;
+    redirectUri: string;
+  }): Promise<{ url: string }> => apiPost("/backup/gdrive/auth-url", config),
+
+  gdriveCallback: (params: {
+    destinationId: string;
+    code: string;
+    redirectUri: string;
+    clientId: string;
+    clientSecret: string;
+  }): Promise<{ success: boolean; message?: string }> =>
+    apiPost("/backup/gdrive/callback", params),
+
+  // Save compaction (stale chunk cleanup)
+  previewCompaction: (options?: {
+    staleDays?: number;
+    saveName?: string;
+  }): Promise<CompactionPreview> => apiPost("/backup/compact", options || {}),
+
+  applyCompaction: (options?: {
+    staleDays?: number;
+    saveName?: string;
+    createBackup?: boolean;
+  }): Promise<CompactionResult> =>
+    apiPost("/backup/compact/apply", options || {}),
 };
 
 // Debug API

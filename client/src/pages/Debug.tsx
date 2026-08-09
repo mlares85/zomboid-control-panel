@@ -933,9 +933,13 @@ export default function Debug() {
           if (result?.success === false) {
             throw new Error(result?.message || "Backup failed.");
           }
-          const backupName = result?.backup?.name
-            ? ` (${result.backup.name})`
-            : "";
+          const createdBackup = result?.backup;
+          const backupNameValue = createdBackup
+            ? "name" in createdBackup
+              ? createdBackup.name
+              : createdBackup.fileName
+            : undefined;
+          const backupName = backupNameValue ? ` (${backupNameValue})` : "";
           toast({
             title: "Database backup created",
             description: `Backup completed${backupName}.`,

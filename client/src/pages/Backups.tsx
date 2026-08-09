@@ -46,6 +46,7 @@ import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { BackupAdvancedPanel } from '@/components/backup/BackupAdvancedPanel'
 
 interface BackupProgress {
   phase: 'preparing' | 'archiving' | 'finalizing' | 'complete' | 'error'
@@ -201,9 +202,12 @@ export default function Backups() {
     try {
       const result = await backupApi.createBackup()
       if (result.success && result.backup) {
+        // createBackup can return either the legacy BackupFile (name) or the
+        // new metadata BackupRecord (fileName) shape depending on options.
+        const backupLabel = 'name' in result.backup ? result.backup.name : (result.backup.fileName || result.backup.id)
         toast({
           title: 'Safehouse Snapshot Created',
-          description: `Stored ${result.backup.name} in ${result.duration?.toFixed(1)}s`,
+          description: `Stored ${backupLabel} in ${result.duration?.toFixed(1)}s`,
           variant: 'success' as const,
         })
         await fetchBackups()
@@ -759,6 +763,9 @@ export default function Backups() {
           </CardContent>
         </Card>
       )}
+
+      {/* Enhanced backup features: formats, destinations, history, compaction */}
+      <BackupAdvancedPanel />
 
       {/* Main Backup Card */}
       <Card>
