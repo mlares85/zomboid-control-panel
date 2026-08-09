@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -33,6 +34,7 @@ function scorePassword(pw: string): PasswordStrength {
 
 export default function Setup() {
   const { setup } = useAuth()
+  const navigate = useNavigate()
   const [username, setUsername] = useState('admin')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -78,6 +80,9 @@ export default function Setup() {
     setLoading(true)
     try {
       await setup(username, password, rememberMe)
+      // Land on the unified onboarding flow instead of an empty dashboard —
+      // see AddServerFlow (mode="firstRun").
+      navigate('/welcome', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Setup failed')
     } finally {

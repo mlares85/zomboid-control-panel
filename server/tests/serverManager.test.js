@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isWindowsDedicatedServerCommandLine,
+  resolveServerProvider,
   scoreServerProcessOwnership,
   ServerManager,
 } from '../services/serverManager.js';
@@ -107,5 +108,58 @@ describe('ServerManager detection with two servers on one host', () => {
     const details = await serverA.getServerProcessDetails();
     expect(details.running).toBe(true);
     expect(details.owned.map((entry) => entry.pid)).toEqual(['111']);
+  });
+});
+
+describe('resolveServerProvider', () => {
+  it('defaults to native when nothing marks the server otherwise', () => {
+    expect(resolveServerProvider({})).toBe('native');
+    expect(resolveServerProvider(null)).toBe('native');
+  });
+
+  it('treats isRemote servers as remote-sftp', () => {
+    expect(resolveServerProvider({ isRemote: true })).toBe('remote-sftp');
+  });
+
+  it('prefers an explicit provider field over isRemote', () => {
+    expect(
+      resolveServerProvider({ isRemote: true, provider: 'docker-managed' }),
+    ).toBe('docker-managed');
+  });
+});
+
+describe('ServerManager provider guard on startServer', () => {
+  it('refuses to spawn a native process for a non-native provider', async () => {
+    const manager = new ServerManager();
+    Object.assign(manager, {
+      configLoaded: true,
+      provider: 'docker-managed',
+      serverPath: 'C:\\pz\\a',
+    });
+
+    const result = await manager.startServer();
+
+    expect(result).toEqual({
+      success: false,
+      error:
+        'Server runs in Docker container — start it from Docker or mount the Docker socket',
+      fixUrl: '/servers',
+    });
+  });
+
+  it('does not block a native provider from reaching the normal start path', async () => {
+    const manager = new ServerManager();
+    Object.assign(manager, {
+      configLoaded: true,
+      provider: 'native',
+      serverPath: '',
+      startCommand: '',
+    });
+
+    // Native provider clears the guard and falls through to the existing
+    // "no path configured" failure, proving the guard didn't swallow it.
+    await expect(manager.startServer()).rejects.toThrow(
+      'Server path not configured',
+    );
   });
 });

@@ -120,6 +120,14 @@ export function isWindowsDedicatedServerCommandLine(commandLine) {
   return false;
 }
 
+// A server's `provider` isn't stored explicitly yet — only `isRemote` is.
+// Derive it so the startServer() guard (and future Docker-aware providers)
+// have one place to ask "is this a process we're allowed to spawn?".
+export function resolveServerProvider(server) {
+  if (server?.provider) return server.provider;
+  return server?.isRemote ? "remote-sftp" : "native";
+}
+
 // Pull the value of a PZ launch argument (`-servername X`, `-cachedir="Y"`)
 // out of a raw command line.
 function extractLaunchArgValue(commandLine, flag) {
@@ -195,6 +203,10 @@ export class ServerManager {
     this.startCommand = "";
     this.rconHost = null;
     this.rconPort = null;
+    // 'native' | 'remote-sftp' | future Docker providers — see
+    // resolveServerProvider(). Guards startServer() against spawning a
+    // second, untracked PZ process for a server this host doesn't own.
+    this.provider = "native";
     this.isRunning = false;
     this.startTime = null;
     this.configLoaded = false;
@@ -219,6 +231,7 @@ export class ServerManager {
     this.startCommand = "";
     this.rconHost = null;
     this.rconPort = null;
+    this.provider = "native";
     this.configLoaded = false;
     await this.loadConfig(serverId);
   }
@@ -302,6 +315,7 @@ export class ServerManager {
         // check THIS server's port instead of the global default.
         this.rconHost = activeServer.rconHost || this.rconHost;
         this.rconPort = activeServer.rconPort || this.rconPort;
+        this.provider = resolveServerProvider(activeServer);
         this.configLoaded = true;
         log.debug(`Loaded config from active server: ${activeServer.name}`);
         return;
@@ -611,6 +625,23 @@ export class ServerManager {
       // active, which would break a throwaway instance mid-restart.
       this.configLoaded = false;
       await this.loadConfig(this._serverId);
+
+      // Hard refuse to spawn a native process for a server this host
+      // doesn't own the lifecycle of (Docker-managed, remote, etc.). Without
+      // this, a scheduled restart or Discord command could spawn a second,
+      // untracked PZ process alongside the one actually running in a
+      // container — the "starts a second PZ process" corruption bug.
+      if (this.provider !== "native") {
+        log.warn(
+          `startServer refused: provider="${this.provider}" is not native`,
+        );
+        return {
+          success: false,
+          error:
+            "Server runs in Docker container — start it from Docker or mount the Docker socket",
+          fixUrl: "/servers",
+        };
+      }
 
       if (!this.startCommand && !this.serverPath) {
         throw new Error("Server path not configured");

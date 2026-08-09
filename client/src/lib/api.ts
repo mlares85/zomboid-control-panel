@@ -2716,3 +2716,26 @@ export const panelUpdateApi = {
   getApplyLog: (): Promise<{ log: string | null }> =>
     apiGet("/panel/update-apply-log"),
 };
+
+// Composed first-run environment snapshot — see server/routes/environment.js
+export interface DiscoveredMount {
+  path: string;
+  type: "data" | "install";
+  hasSavesDir?: boolean;
+}
+
+export interface EnvironmentSnapshot {
+  platform: string;
+  containerized: boolean;
+  hasDockerSocket: boolean;
+  envPaths: {
+    PZ_SERVER_PATH: string | null;
+    PZ_SAVE_PATH: string | null;
+  };
+  discoveredMounts: DiscoveredMount[];
+  serverCount: number;
+}
+
+export const environmentApi = {
+  get: (): Promise<EnvironmentSnapshot> => apiGet("/system/environment"),
+};
