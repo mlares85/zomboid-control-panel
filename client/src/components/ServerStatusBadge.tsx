@@ -74,21 +74,32 @@ function shortWord(status: string): string {
   return status === 'not-installed' ? 'Not installed' : 'Unknown'
 }
 
+const PILL_CLASS: Record<IndicatorState, string> = {
+  online: 'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30',
+  offline: 'bg-destructive/15 text-destructive border-destructive/30',
+  connecting: 'bg-warning/15 text-warning border-warning/30 animate-pulse',
+  unknown: 'bg-muted text-muted-foreground border-border',
+}
+
 function CompactBadge({ signals, className }: { signals: StatusSignal[]; className?: string }) {
-  const title = signals.map((s) => `${s.label}: ${displayWord(s.status)}`).join(' · ')
   return (
-    <div className={cn('flex items-center gap-1.5', className)} title={title}>
-      <span className="flex items-center gap-0.5" aria-hidden="true">
-        {signals.map((s, i) => (
+    <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
+      {signals.map((s, i) => {
+        const state = toIndicatorState(s.status)
+        return (
           <span
             key={i}
-            className={cn('h-1.5 w-1.5 rounded-full', DOT_CLASS[toIndicatorState(s.status)])}
-          />
-        ))}
-      </span>
-      <span className="text-xs text-muted-foreground">
-        {signals.map((s) => `${s.label} ${shortWord(s.status)}`).join(' · ')}
-      </span>
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+              PILL_CLASS[state]
+            )}
+            title={`${s.label}: ${displayWord(s.status)}`}
+          >
+            <span className={cn('h-1.5 w-1.5 rounded-full', DOT_CLASS[state])} />
+            {s.label} {shortWord(s.status)}
+          </span>
+        )
+      })}
     </div>
   )
 }
