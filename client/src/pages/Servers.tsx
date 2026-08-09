@@ -7,7 +7,6 @@ import {
   Check,
   Power,
   MoreVertical,
-  Star,
   Loader2,
   FolderOpen,
   Download,
@@ -76,7 +75,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { serversApi, serversDetectApi, ServerInstance, configApi, serverApi, updateApi, UpdateStatus } from '@/lib/api'
+import { serversApi, serversDetectApi, ServerInstance, configApi, serverApi, updateApi, UpdateStatus, ComposedServerStatus } from '@/lib/api'
+import { ServerStatusBadge } from '@/components/ServerStatusBadge'
 import { SocketContext } from '@/contexts/SocketContext'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
@@ -167,6 +167,9 @@ const defaultNewServer: NewServerForm = {
 export default function Servers() {
   const [servers, setServers] = useState<ServerInstance[]>([])
   const [serverStatuses, setServerStatuses] = useState<Record<string, { running: boolean; pid: string | null }>>({})
+  // Full 3-signal status (host/RCON/bridge) for the active server only — the
+  // other servers' cards fall back to the host-only signal in serverStatuses.
+  const [activeStatus, setActiveStatus] = useState<ComposedServerStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [editingServer, setEditingServer] = useState<ServerInstance | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
@@ -280,11 +283,26 @@ export default function Servers() {
     }
   }, [])
 
+  // Provider-aware host/RCON/bridge status for whichever server is active —
+  // shown on its card via ServerStatusBadge instead of a single Running/
+  // Stopped flag that hides RCON/bridge trouble behind a "running" container.
+  const fetchActiveStatus = useCallback(async () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+    try {
+      setActiveStatus(await serversApi.getComposedStatus())
+    } catch (error) {
+      // Non-fatal: falls back to the "—" placeholder on the card.
+      reportClientWarning('Failed to fetch active server status.', error)
+    }
+  }, [])
+
   // Load steamcmd path and servers on mount
   useEffect(() => {
     fetchServers()
     fetchServerStatuses()
+    fetchActiveStatus()
     const statusInterval = setInterval(fetchServerStatuses, 15000)
+    const activeStatusInterval = setInterval(fetchActiveStatus, 10000)
     // Load steamcmd path from settings
     configApi.getAppSettings().then(data => {
       if (data.settings?.steamcmdPath) {
@@ -300,8 +318,11 @@ export default function Servers() {
         setGameVersion(status.gameVersion)
       }
     }).catch(e => reportClientWarning('Failed to load update status.', e))
-    return () => clearInterval(statusInterval)
-  }, [fetchServers, fetchServerStatuses])
+    return () => {
+      clearInterval(statusInterval)
+      clearInterval(activeStatusInterval)
+    }
+  }, [fetchServers, fetchServerStatuses, fetchActiveStatus])
 
   // Listen for update status changes (clears banner after successful update)
   useEffect(() => {
@@ -393,13 +414,14 @@ export default function Servers() {
 
     const handleActiveServerChanged = () => {
       fetchServers()
+      fetchActiveStatus()
     }
 
     socket.on('activeServerChanged', handleActiveServerChanged)
     return () => {
       socket.off('activeServerChanged', handleActiveServerChanged)
     }
-  }, [socket, fetchServers])
+  }, [socket, fetchServers, fetchActiveStatus])
 
   // Listen for Steam update/verify events
   useEffect(() => {
@@ -1082,7 +1104,7 @@ export default function Servers() {
                       <span className="truncate">{server.name}</span>
                       {server.isActive ? (
                         <Badge variant="default" className="text-xs">
-                          <Star className="w-3 h-3 mr-1" /> Active
+                          <Check className="w-3 h-3 mr-1" /> Selected
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-xs text-muted-foreground">
@@ -1090,18 +1112,24 @@ export default function Servers() {
                         </Badge>
                       )}
                       {(() => {
+                        // The selected server has real RCON/bridge signals from the
+                        // composed status endpoint; every other card only knows
+                        // whatever the host-process scan found for it.
+                        if (server.isActive && activeStatus) {
+                          return (
+                            <ServerStatusBadge
+                              compact
+                              host={activeStatus.host}
+                              server={activeStatus.server}
+                              bridge={activeStatus.bridge}
+                            />
+                          )
+                        }
                         const status = serverStatuses[String(server.id)]
-                        if (!status) return null
-                        return status.running ? (
-                          <Badge variant="success" className="text-xs" title={status.pid ? `PID ${status.pid}` : 'Process detected'}>
-                            <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-current motion-safe:animate-pulse" />
-                            Running
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs text-muted-foreground" title="No matching PZ server process found on this host">
-                            Stopped
-                          </Badge>
-                        )
+                        const host = status
+                          ? { status: status.running ? 'running' : 'stopped', label: 'Process' }
+                          : undefined
+                        return <ServerStatusBadge compact host={host} />
                       })()}
                       {server.isRemote && (
                         <Badge variant="outline" className="text-xs">
