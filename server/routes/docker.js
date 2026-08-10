@@ -1,6 +1,10 @@
 import express from "express";
 import { createLogger } from "../utils/logger.js";
 import { sanitizeError } from "../utils/sanitize.js";
+import { getServer, getServers, createServer, deleteServer } from "../database/init.js";
+import { createDockerVolumeManager } from "../services/dockerVolumeManager.js";
+import { createDockerContainerFactory } from "../services/dockerContainerFactory.js";
+import { PROVIDERS } from "../utils/serverProvider.js";
 
 const log = createLogger("API:Docker");
 const router = express.Router();
@@ -145,6 +149,112 @@ router.get("/stats", async (req, res) => {
   } catch (error) {
     log.error(`Failed to fetch batch container stats: ${error.message}`);
     res.status(500).json({ error: sanitizeError(error.message) });
+  }
+});
+
+// ── Docker-managed server CRUD ──
+
+function getManagedDeps(req) {
+  const dockerClient = getDockerClient(req);
+  if (!dockerClient?.available) return null;
+  const volumeManager = createDockerVolumeManager(dockerClient);
+  const containerFactory = createDockerContainerFactory(dockerClient, volumeManager);
+  return { dockerClient, containerFactory, volumeManager };
+}
+
+function validateManagedServerInput(body) {
+  if (!body.serverName || typeof body.serverName !== "string") return "serverName is required";
+  if (body.gamePort !== undefined && typeof body.gamePort !== "number") return "gamePort must be a number";
+  if (body.rconPort !== undefined && typeof body.rconPort !== "number") return "rconPort must be a number";
+  if (!body.rconPassword || body.rconPassword.length < 6) return "rconPassword must be at least 6 characters";
+  return null;
+}
+
+router.get("/managed/prerequisites", async (req, res) => {
+  try {
+    const dockerClient = getDockerClient(req);
+    if (!dockerClient?.available) {
+      return res.json({ dockerAvailable: false, baseVolume: { exists: false, populated: false } });
+    }
+    const volumeManager = createDockerVolumeManager(dockerClient);
+    const baseVolume = await volumeManager.getBaseVolumeStatus();
+    res.json({ dockerAvailable: true, baseVolume });
+  } catch (error) {
+    log.error(`Failed to check managed prerequisites: ${error.message}`);
+    res.status(500).json({ error: sanitizeError(error.message) });
+  }
+});
+
+router.get("/managed/available-ports", async (req, res) => {
+  try {
+    const deps = getManagedDeps(req);
+    if (!deps) return res.status(503).json({ error: "Docker unavailable" });
+    const servers = await getServers();
+    const mapped = servers.map((s) => ({ gamePort: s.serverPort, rconPort: s.rconPort }));
+    const ports = deps.containerFactory.findAvailablePorts(mapped);
+    res.json(ports);
+  } catch (error) {
+    log.error(`Failed to find available ports: ${error.message}`);
+    res.status(500).json({ error: sanitizeError(error.message) });
+  }
+});
+
+router.post("/managed/servers", async (req, res) => {
+  try {
+    const validationError = validateManagedServerInput(req.body);
+    if (validationError) return res.status(400).json({ success: false, error: validationError });
+
+    const deps = getManagedDeps(req);
+    if (!deps) return res.status(503).json({ success: false, error: "Docker unavailable" });
+
+    const { serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb, adminPassword } = req.body;
+    const result = await deps.containerFactory.createManagedServer({
+      serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb,
+    });
+    if (!result.success) return res.status(502).json({ success: false, error: result.error });
+
+    const server = await createServer({
+      name: serverName,
+      serverName,
+      provider: PROVIDERS.DOCKER_MANAGED,
+      dockerContainerId: result.containerId,
+      dockerContainerName: result.containerName,
+      installPath: "/opt/pz-server",
+      zomboidDataPath: "/opt/pz-data",
+      rconHost: "127.0.0.1",
+      rconPort,
+      rconPassword,
+      serverPort: gamePort,
+      minMemory: minMemoryMb,
+      maxMemory: maxMemoryMb,
+      adminPassword,
+    });
+
+    await deps.dockerClient.startContainer(result.containerId);
+    res.status(201).json({ success: true, server, containerId: result.containerId });
+  } catch (error) {
+    log.error(`Failed to create managed server: ${error.message}`);
+    res.status(500).json({ success: false, error: sanitizeError(error.message) });
+  }
+});
+
+router.delete("/managed/servers/:id", async (req, res) => {
+  try {
+    const server = await getServer(req.params.id);
+    if (!server) return res.status(404).json({ success: false, error: "Server not found" });
+
+    const deps = getManagedDeps(req);
+    if (!deps) return res.status(503).json({ success: false, error: "Docker unavailable" });
+
+    const removeData = req.query.removeData === "true";
+    const removeResult = await deps.containerFactory.removeManagedServer(server.dockerContainerId, removeData);
+    if (!removeResult.success) return res.status(502).json({ success: false, error: removeResult.error });
+
+    await deleteServer(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    log.error(`Failed to remove managed server: ${error.message}`);
+    res.status(500).json({ success: false, error: sanitizeError(error.message) });
   }
 });
 

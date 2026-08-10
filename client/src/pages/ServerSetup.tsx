@@ -24,9 +24,10 @@ import {
   Check,
   Info,
   ArrowRight,
+  Container,
 } from "lucide-react";
 import { configApi, serverApi, serversApi, debugApi } from "@/lib/api";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -66,6 +67,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { FolderBrowser } from "@/components/FolderBrowser";
+import { DockerSetup } from "@/components/addServer/DockerSetup";
 
 interface InstallLog {
   type: "info" | "success" | "error" | "command" | "stdout" | "stderr";
@@ -73,7 +75,7 @@ interface InstallLog {
   timestamp: Date;
 }
 
-type SetupMode = "select" | "full" | "quick";
+type SetupMode = "select" | "full" | "quick" | "docker";
 
 function handleCardKeyDown(
   event: React.KeyboardEvent<HTMLDivElement>,
@@ -116,6 +118,9 @@ function installationErrorGuidance(message: string) {
 }
 
 export default function ServerSetup() {
+  const location = useLocation();
+  const incomingState = location.state as { branch?: string } | null;
+
   const [setupMode, setSetupMode] = useState<SetupMode>("select");
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -126,7 +131,7 @@ export default function ServerSetup() {
   // Step 2: Server Config
   const [installPath, setInstallPath] = useState("");
   const [serverName, setServerName] = useState("myserver");
-  const [branch, setBranch] = useState("public");
+  const [branch, setBranch] = useState(incomingState?.branch || "public");
   const [availableBranches, setAvailableBranches] = useState<
     Array<{ name: string; description: string; buildId?: string | null }>
   >([
@@ -784,7 +789,7 @@ export default function ServerSetup() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-3">
           {/* Full Install Card */}
           {(() => {
             const activate = () => {
@@ -905,6 +910,55 @@ export default function ServerSetup() {
               </Card>
             );
           })()}
+
+          {/* Docker Server Card */}
+          {(() => {
+            const activate = () => setSetupMode("docker");
+
+            return (
+              <Card
+                role="button"
+                tabIndex={0}
+                aria-describedby="docker-setup-description"
+                className="group relative overflow-hidden cursor-pointer border-border/60 bg-card transition-[border-color,box-shadow,transform] hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                onClick={activate}
+                onKeyDown={(event) => handleCardKeyDown(event, activate)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="grid place-items-center w-11 h-11 rounded-md border border-border/55 bg-muted/40 text-muted-foreground mb-3 transition-colors group-hover:border-primary/30 group-hover:bg-primary/[0.06] group-hover:text-primary">
+                    <Container className="w-5 h-5" />
+                  </div>
+                  <CardTitle className="text-lg">Docker Server</CardTitle>
+                  <CardDescription
+                    id="docker-setup-description"
+                    className="text-xs"
+                  >
+                    Panel creates and manages a container with shared base files
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 pb-5">
+                  <ul className="space-y-1.5 text-[13px]">
+                    <li className="flex items-start gap-2 text-muted-foreground">
+                      <CheckCircle className="w-3.5 h-3.5 mt-0.5 text-muted-foreground/70 shrink-0" />
+                      <span>Shared server files across instances</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-muted-foreground">
+                      <CheckCircle className="w-3.5 h-3.5 mt-0.5 text-muted-foreground/70 shrink-0" />
+                      <span>Auto port assignment</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-muted-foreground">
+                      <CheckCircle className="w-3.5 h-3.5 mt-0.5 text-muted-foreground/70 shrink-0" />
+                      <span>Isolated saves and mods per server</span>
+                    </li>
+                  </ul>
+                  <div className="flex items-center gap-1.5 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground transition-colors group-hover:text-primary/90">
+                    Set up container{" "}
+                    <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
         </div>
 
         {/* Quick Tips */}
@@ -927,6 +981,10 @@ export default function ServerSetup() {
         </Card>
       </div>
     );
+  }
+
+  if (setupMode === "docker") {
+    return <DockerSetup onBack={() => setSetupMode("select")} />;
   }
 
   // Step indicator

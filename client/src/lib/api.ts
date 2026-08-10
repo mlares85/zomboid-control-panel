@@ -3122,6 +3122,32 @@ export const dockerApi = {
   getContainerStats: (id: string) =>
     apiGet(`/docker/containers/${encodeURIComponent(id)}/stats`) as Promise<ContainerStats>,
   getAllStats: () => apiGet("/docker/stats") as Promise<Record<string, ContainerStats>>,
+  // Docker-managed server operations
+  getManagedPrerequisites: () =>
+    apiGet("/docker/managed/prerequisites") as Promise<{
+      dockerAvailable: boolean;
+      baseVolume: { exists: boolean; populated: boolean; mountpoint?: string };
+    }>,
+  getAvailablePorts: () =>
+    apiGet("/docker/managed/available-ports") as Promise<{
+      gamePort: number;
+      rconPort: number;
+    }>,
+  createManagedServer: (config: {
+    serverName: string;
+    gamePort: number;
+    rconPort: number;
+    rconPassword: string;
+    minMemoryMb: number;
+    maxMemoryMb: number;
+    adminPassword: string;
+  }) =>
+    apiPost("/docker/managed/servers", config) as Promise<{
+      success: boolean;
+      server?: ServerInstance;
+      containerId?: string;
+      error?: string;
+    }>,
 };
 
 // System storage health — see server/routes/system.js. Polled by

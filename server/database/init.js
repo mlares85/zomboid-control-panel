@@ -1375,6 +1375,9 @@ export async function createServer(serverConfig) {
     ...(isValidProvider(serverConfig.provider)
       ? { provider: serverConfig.provider }
       : {}),
+    dockerContainerId: serverConfig.dockerContainerId || null,
+    dockerContainerName: serverConfig.dockerContainerName || null,
+    adminPassword: serverConfig.adminPassword || null,
     startCommand: serverConfig.startCommand || "",
     isActive: isFirst,
     createdAt: new Date().toISOString(),
