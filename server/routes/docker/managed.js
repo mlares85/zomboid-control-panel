@@ -7,6 +7,7 @@ import { createDockerVolumeManager } from "../../services/dockerVolumeManager.js
 import { createDockerContainerFactory } from "../../services/dockerContainerFactory.js";
 import { PROVIDERS } from "../../utils/serverProvider.js";
 import { startBaseVolumePopulation } from "../../services/baseVolumePopulator.js";
+import { installPanelBridgeMod } from "../server/installHelpers.js";
 
 const log = createLogger("API:DockerManaged");
 const router = express.Router();
@@ -148,6 +149,12 @@ router.post("/servers", async (req, res) => {
       maxMemory: maxMemoryMb,
       adminPassword,
     });
+
+    // Auto-install PanelBridge.lua so the server is ready for advanced features.
+    // For bind-mount mode the panel can write to the host path directly;
+    // for volume mode installPath is a container-internal path — best-effort.
+    const bridgePath = basePath || server.installPath;
+    if (bridgePath) installPanelBridgeMod(bridgePath);
 
     await deps.dockerClient.startContainer(result.containerId);
     res.status(201).json({ success: true, server, containerId: result.containerId });
