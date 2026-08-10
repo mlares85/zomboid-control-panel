@@ -40,6 +40,7 @@ export interface DockerConfig {
   maxMemory: number;
   adminPassword: string;
   basePath?: string;
+  image?: string;
 }
 
 const STEPS = [
@@ -116,6 +117,7 @@ export function DockerSetup({ onBack }: DockerSetupProps) {
         minMemoryMb: config.minMemory * 1024, maxMemoryMb: config.maxMemory * 1024,
         adminPassword: config.adminPassword,
         ...(config.basePath ? { basePath: config.basePath } : {}),
+        ...(config.image ? { image: config.image } : {}),
       });
       clearInterval(phaseTimer);
       if (result.success) { setCreatePhase("done"); }

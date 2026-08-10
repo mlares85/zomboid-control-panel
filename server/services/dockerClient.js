@@ -132,7 +132,7 @@ export class DockerClient {
   // Raw HTTP request over the Docker Unix socket. Resolves to
   // { statusCode, body } where body is the raw Buffer — parsing is left to
   // callers since logs and JSON responses need different treatment.
-  _request(method, path, body) {
+  _request(method, path, body, timeoutMs = REQUEST_TIMEOUT_MS) {
     return new Promise((resolve, reject) => {
       const payload = body ? Buffer.from(JSON.stringify(body)) : null;
       const headers = payload
@@ -140,7 +140,7 @@ export class DockerClient {
         : {};
 
       const req = http.request(
-        { socketPath: this.socketPath, method, path, headers, timeout: REQUEST_TIMEOUT_MS },
+        { socketPath: this.socketPath, method, path, headers, timeout: timeoutMs },
         (res) => {
           const chunks = [];
           res.on("data", (chunk) => chunks.push(chunk));
@@ -298,11 +298,20 @@ export class DockerClient {
 
   // ── Image operations ──
 
-  async pullImage(image, tag = "latest") {
+  async pullImage(imageRef, tag) {
     if (!this.available) return { success: false, error: "Docker control is unavailable" };
-    const query = `fromImage=${encodeURIComponent(image)}&tag=${encodeURIComponent(tag)}`;
+    // Parse "image:tag" if tag not provided separately
+    let image = imageRef;
+    let resolvedTag = tag || "latest";
+    if (!tag && imageRef.includes(":")) {
+      const lastColon = imageRef.lastIndexOf(":");
+      image = imageRef.slice(0, lastColon);
+      resolvedTag = imageRef.slice(lastColon + 1);
+    }
+    const query = `fromImage=${encodeURIComponent(image)}&tag=${encodeURIComponent(resolvedTag)}`;
     try {
-      const { statusCode } = await this._request("POST", `/images/create?${query}`);
+      // Image pulls can take minutes — use a 10-minute timeout
+      const { statusCode } = await this._request("POST", `/images/create?${query}`, null, 600_000);
       return statusCode < 400 ? { success: true } : { success: false, error: `Pull failed (${statusCode})` };
     } catch (error) {
       return { success: false, error: error.message };

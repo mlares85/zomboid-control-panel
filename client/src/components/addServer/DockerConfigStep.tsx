@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Server, Shield, Cpu, Settings2, ChevronLeft, ArrowRight,
-  Eye, EyeOff, Copy, Check, RefreshCw,
+  Eye, EyeOff, Copy, Check, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -194,6 +194,14 @@ export function DockerConfigStep({ config, onChange, onBack, onNext }: DockerCon
                 {config.adminPassword.trim().length === 0 && (
                   <p className="text-xs text-destructive">Required before server can start</p>
                 )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Container Image</Label>
+              <Input value={config.image || ""} onChange={(e) => set({ image: e.target.value || undefined })} placeholder="eclipse-temurin:21-jre (default)" className="font-mono text-sm" />
+              <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0 text-amber-500" />
+                <span>Only change this if you know what you're doing. The image must be glibc-based (not Alpine) with Linux x86_64 support. PZ bundles its own Java runtime.</span>
               </div>
             </div>
           </AccordionContent>

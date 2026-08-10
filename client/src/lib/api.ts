@@ -3142,6 +3142,7 @@ export const dockerApi = {
     maxMemoryMb: number;
     adminPassword: string;
     basePath?: string;
+    image?: string;
   }) =>
     apiPost("/docker/managed/servers", config) as Promise<{
       success: boolean;

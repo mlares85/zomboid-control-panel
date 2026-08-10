@@ -127,9 +127,9 @@ router.post("/servers", async (req, res) => {
     const deps = getManagedDeps(req);
     if (!deps) return res.status(503).json({ success: false, error: "Docker unavailable" });
 
-    const { serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb, adminPassword, basePath } = req.body;
+    const { serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb, adminPassword, basePath, image } = req.body;
     const result = await deps.containerFactory.createManagedServer({
-      serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb, basePath,
+      serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb, basePath, image,
     });
     if (!result.success) return res.status(502).json({ success: false, error: result.error });
 

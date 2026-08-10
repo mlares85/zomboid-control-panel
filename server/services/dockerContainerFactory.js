@@ -7,13 +7,27 @@ const BASE_GAME_PORT = 16261;
 const BASE_RCON_PORT = 27015;
 const MANAGED_LABEL = "zomboid-panel.managed";
 const SERVER_ID_LABEL = "zomboid-panel.server-id";
+const PANEL_NETWORK = "zomboid-panel-net";
 
 export function createDockerContainerFactory(dockerClient, volumeManager) {
-  // config.basePath: when set, bind-mounts an existing host directory
-  // (e.g. /mnt/user/appdata/steamcmd/pz-server) instead of the named volume.
+  // Bind-mounts an existing host directory or the shared named volume.
   function baseMount(config) {
     if (config.basePath) return `${config.basePath}:/opt/pz-server:ro`;
     return "zomboid-panel-base:/opt/pz-server:ro";
+  }
+
+  // Ensure the panel network exists for internal RCON traffic.
+  async function ensureNetwork() {
+    try {
+      const result = await dockerClient._requestJson("GET", `/networks/${PANEL_NETWORK}`);
+      if (result.success) return true;
+    } catch { /* doesn't exist yet */ }
+    const create = await dockerClient._requestJson("POST", "/networks/create", {
+      Name: PANEL_NETWORK, Driver: "bridge",
+      Labels: { [MANAGED_LABEL]: "true" },
+    });
+    if (!create.success) log.warn(`Failed to create panel network: ${create.error}`);
+    return create.success;
   }
 
   function buildContainerSpec(config) {
@@ -22,12 +36,13 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
     const rconPort = config.rconPort || BASE_RCON_PORT;
     return {
       Image: image,
+      Cmd: ["/opt/pz-server/start-server.sh", "-servername", config.serverName],
       Env: [
+        `HOME=/opt/pz-data`,
         `RCON_PORT=${rconPort}`,
         `RCON_PASSWORD=${config.rconPassword}`,
         `GAME_PORT=${gamePort}`,
-        `MIN_MEMORY=${config.minMemoryMb || 2048}m`,
-        `MAX_MEMORY=${config.maxMemoryMb || 4096}m`,
+        `PZ_SERVER_ARGS=-Xms${config.minMemoryMb || 2048}m -Xmx${config.maxMemoryMb || 4096}m`,
       ],
       Labels: {
         [MANAGED_LABEL]: "true",
@@ -35,6 +50,7 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       },
       ExposedPorts: {
         [`${gamePort}/udp`]: {},
+        [`${gamePort + 1}/udp`]: {},
         [`${rconPort}/tcp`]: {},
       },
       HostConfig: {
@@ -44,8 +60,10 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
         ],
         PortBindings: {
           [`${gamePort}/udp`]: [{ HostPort: String(gamePort) }],
+          [`${gamePort + 1}/udp`]: [{ HostPort: String(gamePort + 1) }],
           [`${rconPort}/tcp`]: [{ HostPort: String(rconPort) }],
         },
+        NetworkMode: PANEL_NETWORK,
       },
     };
   }
@@ -55,13 +73,12 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
     const usedRcon = new Set(existingServers.map((s) => s.rconPort).filter(Boolean));
     let gamePort = BASE_GAME_PORT;
     let rconPort = BASE_RCON_PORT;
-    while (usedGame.has(gamePort)) gamePort++;
+    while (usedGame.has(gamePort) || usedGame.has(gamePort + 1)) gamePort += 2;
     while (usedRcon.has(rconPort)) rconPort++;
     return { gamePort, rconPort };
   }
 
   async function createManagedServer(config) {
-    // Skip base volume creation when using an existing host path
     if (!config.basePath) {
       const volumeResult = await volumeManager.ensureBaseVolume();
       if (!volumeResult.success) {
@@ -73,15 +90,17 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       return { success: false, error: `Failed to create server volume: ${srvResult.volumeName}` };
     }
 
-    const imageCheck = await dockerClient.inspectImage(config.image || DEFAULT_IMAGE);
+    const imageRef = config.image || DEFAULT_IMAGE;
+    const imageCheck = await dockerClient.inspectImage(imageRef);
     if (!imageCheck) {
-      log.info(`Pulling image ${config.image || DEFAULT_IMAGE}...`);
-      const pullResult = await dockerClient.pullImage(config.image || DEFAULT_IMAGE);
+      log.info(`Pulling image ${imageRef}...`);
+      const pullResult = await dockerClient.pullImage(imageRef);
       if (!pullResult.success) {
         return { success: false, error: `Image pull failed: ${pullResult.error}` };
       }
     }
 
+    await ensureNetwork();
     const spec = buildContainerSpec(config);
     const containerName = `zomboid-${config.serverName}`;
     const createResult = await dockerClient.createContainer(spec, containerName);
@@ -97,7 +116,6 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       log.warn(`Failed to remove container ${containerId}: ${removeResult.error}`);
       return { success: false, error: removeResult.error };
     }
-    // Volume cleanup is opt-in — data loss is irreversible
     if (removeData) {
       log.info(`removeData requested but server-name-to-volume mapping requires the server registry`);
     }
