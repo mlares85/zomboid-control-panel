@@ -1509,6 +1509,11 @@ export interface ComposedServerStatus {
   summary: string;
 }
 
+export interface ServerRconStatus {
+  id: string;
+  status: "connected" | "unavailable" | "unconfigured";
+}
+
 // Servers API (multi-server management)
 export const serversApi = {
   getAll: () => apiGet("/servers") as Promise<{ servers: ServerInstance[] }>,
@@ -1525,6 +1530,8 @@ export const serversApi = {
         null,
     };
   },
+  getRconStatus: () =>
+    apiGet("/servers/rcon-status") as Promise<{ servers: ServerRconStatus[] }>,
   getStatus: () =>
     apiGet("/servers/status") as Promise<{
       servers: Array<{

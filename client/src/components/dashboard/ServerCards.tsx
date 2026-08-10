@@ -45,6 +45,7 @@ export function ServerCards({ onDrillIn }: ServerCardsProps) {
   const [activeStatus, setActiveStatus] = useState<ComposedServerStatus | null>(null)
   const [activeStats, setActiveStats] = useState<ServerCardStats | null>(null)
   const [containerStats, setContainerStats] = useState<ContainerStatsMap>({})
+  const [rconStatuses, setRconStatuses] = useState<Record<string, string>>({})
 
   const fetchAll = useCallback(async () => {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
@@ -54,14 +55,18 @@ export function ServerCards({ onDrillIn }: ServerCardsProps) {
       setServers(list)
 
       // Phase 2: status + stats (fills in pills and resource usage)
-      const [statusData, statsMap] = await Promise.all([
+      const [statusData, statsMap, rconData] = await Promise.all([
         serversApi.getStatus().catch(() => ({ servers: [] })),
         dockerApi.getAllStats().catch(() => ({})),
+        serversApi.getRconStatus().catch(() => ({ servers: [] })),
       ])
       setContainerStats(statsMap)
       const next: HostStatuses = {}
       for (const s of statusData.servers) next[String(s.id)] = { running: !!s.running }
       setHostStatuses(next)
+      const rconMap: Record<string, string> = {}
+      for (const s of rconData.servers) rconMap[String(s.id)] = s.status
+      setRconStatuses(rconMap)
 
       // Phase 3: active server detail (heaviest, non-blocking)
       const active = list.find(s => s.isActive)
@@ -95,6 +100,7 @@ export function ServerCards({ onDrillIn }: ServerCardsProps) {
           activeStatus={server.isActive ? activeStatus : null}
           stats={server.isActive ? activeStats : null}
           containerStats={lookupContainerStats(server, containerStats)}
+          rconStatus={rconStatuses[String(server.id)]}
           onChanged={fetchAll}
           onDrillIn={onDrillIn}
         />

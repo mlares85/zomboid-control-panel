@@ -25,6 +25,8 @@ interface ServerCardProps {
   stats: ServerCardStats | null
   /** Docker CPU/RAM/disk snapshot — only present for docker-backed servers with a running container. */
   containerStats?: ContainerStats | null
+  /** RCON connectivity status for this server (from GET /api/servers/rcon-status). */
+  rconStatus?: string
   /** Called after activation/actions so the parent can refresh sooner than the next poll. */
   onChanged: () => void
   /** Called once this card's server is the active one — lets the parent drill into a detail view. */
@@ -81,7 +83,7 @@ function ActionButton({
   )
 }
 
-export function ServerCard({ server, isRunning, activeStatus, stats, containerStats, onChanged, onDrillIn }: ServerCardProps) {
+export function ServerCard({ server, isRunning, activeStatus, stats, containerStats, rconStatus, onChanged, onDrillIn }: ServerCardProps) {
   const [pending, setPending] = useState<string | null>(null)
   const { toast } = useToast()
   const navigate = useNavigate()
@@ -174,7 +176,11 @@ export function ServerCard({ server, isRunning, activeStatus, stats, containerSt
         <ServerStatusBadge
           compact
           host={server.isActive ? activeStatus?.host : { status: isRunning ? 'running' : 'stopped', label: 'Process', detail: null }}
-          server={server.isActive ? activeStatus?.server : undefined}
+          server={server.isActive ? activeStatus?.server : rconStatus ? {
+            status: rconStatus === 'connected' ? 'connected' : rconStatus === 'unconfigured' ? 'not-applicable' : 'disconnected',
+            label: 'RCON',
+            detail: null,
+          } : undefined}
           bridge={server.isActive ? activeStatus?.bridge : undefined}
         />
 
