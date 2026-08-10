@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PasswordInput } from '@/components/PasswordInput'
 import { RconTestConnection } from '@/components/RconTestConnection'
+import { BranchSelector } from './BranchSelector'
 import { serversApi, serversDetectApi } from '@/lib/api'
 import { useToast } from '@/components/ui/use-toast'
 import type { WizardSelection } from './types'
@@ -108,21 +109,30 @@ export function ConfigureStep({ selection, platform, onCreated, onBack }: Config
   const navigate = useNavigate()
   const detecting = useAutoDetect(selection, setForm)
 
+  const [branch, setBranch] = useState('public')
+
   if (selection.intent === 'new') {
     const { icon: Icon, title, description } = newInstallCopy(platform)
     return (
-      <div className="space-y-4 text-center">
-        <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
-          <Icon className="h-5 w-5" />
+      <div className="space-y-4">
+        <div className="text-center">
+          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+            <Icon className="h-5 w-5" />
+          </div>
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
-        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-        <p className="text-sm text-muted-foreground">{description}</p>
-        <Button className="w-full onboarding-cta" onClick={() => navigate('/server-setup')}>
-          <Download className="mr-2 h-4 w-4" /> Open the installer
-        </Button>
-        <Button variant="ghost" className="w-full" onClick={onBack}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-        </Button>
+
+        <BranchSelector value={branch} onChange={setBranch} />
+
+        <div className="flex gap-2 pt-1">
+          <Button variant="outline" onClick={onBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+          </Button>
+          <Button className="flex-1 onboarding-cta" onClick={() => navigate('/server-setup', { state: { branch } })}>
+            <Download className="mr-2 h-4 w-4" /> Continue to installer
+          </Button>
+        </div>
       </div>
     )
   }
