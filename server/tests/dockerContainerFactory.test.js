@@ -27,6 +27,12 @@ function createFakeDockerClient() {
       containers.delete(id);
       return { success: true };
     },
+    // ensureNetwork uses _requestJson internally
+    async _requestJson(method, path, body) {
+      if (method === "GET" && path.includes("/networks/")) return { success: false };
+      if (method === "POST" && path === "/networks/create") return { success: true, data: { Id: "net-1" } };
+      return { success: false };
+    },
   };
 }
 
@@ -101,20 +107,22 @@ describe("dockerContainerFactory", () => {
       expect(ports).toEqual({ gamePort: 16261, rconPort: 27015 });
     });
 
-    it("skips ports already used by existing servers", () => {
+    it("skips ports already used by existing servers (game ports step by 2)", () => {
       const existing = [
         { gamePort: 16261, rconPort: 27015 },
-        { gamePort: 16262, rconPort: 27016 },
+        { gamePort: 16263, rconPort: 27016 },
       ];
       const ports = factory.findAvailablePorts(existing);
-      expect(ports.gamePort).toBe(16263);
+      // 16261 used, 16262 is 16261+1 (also used), 16263 used → 16265
+      expect(ports.gamePort).toBe(16265);
       expect(ports.rconPort).toBe(27017);
     });
 
     it("handles gaps in port assignments", () => {
       const existing = [{ gamePort: 16261, rconPort: 27016 }];
       const ports = factory.findAvailablePorts(existing);
-      expect(ports.gamePort).toBe(16262);
+      // 16261 used, 16262 is 16261+1 (also used) → 16263
+      expect(ports.gamePort).toBe(16263);
       expect(ports.rconPort).toBe(27015);
     });
   });

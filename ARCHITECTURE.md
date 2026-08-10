@@ -100,7 +100,15 @@ Git repo of templates fetched as a static index. PRs as moderation. Import from 
 - `dockerVolumeManager.js` — manages a shared base volume (`zomboid-panel-base`, ~3GB of PZ server files) and per-server data volumes (`zomboid-srv-{name}` for config/saves/mods). `ensureBaseVolume()` creates on first use; subsequent servers share it.
 - `dockerContainerFactory.js` — builds Docker API container specs with correct volume mounts (`base→/opt/pz-server:ro`, `srv→/opt/pz-data`), port bindings (game UDP + RCON TCP), management labels (`zomboid-panel.managed`, `zomboid-panel.server-id`), and JVM memory env vars. `createManagedServer(config)` orchestrates the full flow: ensure base volume → create server volume → pull image if needed → create container. `findAvailablePorts(existingServers)` auto-assigns non-conflicting game/RCON port pairs.
 
-Default container image is `eclipse-temurin:21-jre`. The `docker-managed` provider type in `serverProvider.js` distinguishes panel-owned containers from externally-created ones (`docker-local`).
+Default container image is `eclipse-temurin:21-jre` (glibc-based — Alpine won't work because PZ's native libraries require glibc). Custom images are configurable in Advanced Options. Containers run `/opt/pz-server/start-server.sh -servername <name>` with `HOME=/opt/pz-data`. A `zomboid-panel-net` bridge network is auto-created so RCON traffic between the panel and managed servers stays internal. The `docker-managed` provider type in `serverProvider.js` distinguishes panel-owned containers from externally-created ones (`docker-local`).
+
+## Docker managed server routes
+
+Managed routes live in `server/routes/docker/managed.js`, mounted at `/api/docker/managed` via `docker.js`. Endpoints: `GET /prerequisites` (Docker socket + base volume check), `GET /available-ports` (next free game/RCON pair), `POST /servers` (full orchestration: volumes → image pull → network → container → server profile → PanelBridge install → start), `DELETE /servers/:id` (container + profile removal), `POST /populate-base` (SteamCMD-in-container download into base volume, progress via Socket.IO), `POST /validate-base-path` (checks if a host path has PZ server files). `pullImage` parses `image:tag` from a combined string and uses a 10-minute timeout for large downloads.
+
+## Base volume population
+
+`baseVolumePopulator.js` downloads PZ server files into the `zomboid-panel-base` Docker volume by running a temporary `steamcmd/steamcmd:latest` container with `+app_update 380870 validate +quit`. Progress is polled every 3 seconds from the container's logs and emitted via Socket.IO (`docker:populate-log` / `docker:populate-complete`). The temp container is auto-removed on completion. Alternative to downloading: bind-mount an existing host path containing PZ server files (e.g., `/mnt/user/appdata/steamcmd/pzserver`), validated by `POST /validate-base-path`.
 
 ## Dashboard server cards
 
