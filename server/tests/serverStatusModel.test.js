@@ -44,8 +44,21 @@ describe("buildHostSignal", () => {
     expect(signal.label).toBe("Host");
   });
 
-  it("falls back to not-applicable for an unrecognised provider", () => {
+  it("reports docker-local containers with Container label", () => {
     expect(buildHostSignal("docker-local", true)).toEqual({
+      status: "running",
+      label: "Container",
+      detail: null,
+    });
+    expect(buildHostSignal("docker-managed", false)).toEqual({
+      status: "stopped",
+      label: "Container",
+      detail: null,
+    });
+  });
+
+  it("falls back to not-applicable for an unrecognised provider", () => {
+    expect(buildHostSignal("some-future-provider", true)).toEqual({
       status: "not-applicable",
       label: "Host",
       detail: null,

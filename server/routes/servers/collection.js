@@ -28,10 +28,13 @@ router.post("/", async (req, res) => {
     );
 
     // Validate required fields - installPath not required for remote servers
+    // or when PZ_SERVER_PATH env var is set (Docker/compose topologies).
     const isRemote = !!config.isRemote;
+    const hasInstallPath = config.installPath || process.env.PZ_SERVER_PATH;
     const requiredFields = isRemote
       ? ["name", "rconHost", "rconPort", "rconPassword"]
-      : ["name", "installPath", "rconHost", "rconPort", "rconPassword"];
+      : ["name", "rconHost", "rconPort", "rconPassword"];
+    if (!isRemote && !hasInstallPath) requiredFields.push("installPath");
     for (const field of requiredFields) {
       if (!config[field]) {
         return res
@@ -76,11 +79,16 @@ router.post("/", async (req, res) => {
       }
     }
 
+    // Seed empty paths from env vars so Docker/compose setups work without
+    // the user manually typing the container-internal mount path.
+    const installPath = config.installPath || process.env.PZ_SERVER_PATH || "";
+    const zomboidDataPath = config.zomboidDataPath || process.env.PZ_SAVE_PATH || null;
+
     const server = await createServer({
       name: config.name,
       serverName: config.serverName || "servertest",
-      installPath: config.installPath || "",
-      zomboidDataPath: config.zomboidDataPath || null,
+      installPath,
+      zomboidDataPath,
       serverConfigPath: config.serverConfigPath || null,
       branch: config.branch || "stable",
       rconHost: normalizeRconHost(config.rconHost),
