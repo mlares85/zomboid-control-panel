@@ -236,6 +236,7 @@ import backupCompactionRoutes from "./routes/backupCompactionRoute.js";
 import backupRecordsRoutes from "./routes/backupRecordsRoute.js";
 import mapProxyRoutes from "./routes/mapProxy.js";
 import dockerRoutes from "./routes/docker.js";
+import templatesRoutes from "./routes/templates.js";
 import panelBridge from "./services/panelBridge.js";
 
 dotenv.config();
@@ -1108,6 +1109,7 @@ app.use("/api/backup", backupCompactionRoutes);
 app.use("/api/backup", backupRecordsRoutes);
 app.use("/api/map", mapProxyRoutes);
 app.use("/api/docker", dockerRoutes);
+app.use("/api/templates", templatesRoutes);
 
 // Health check + panel version
 // In exe builds, PANEL_VERSION is injected by esbuild at compile time.

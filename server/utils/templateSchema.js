@@ -137,6 +137,17 @@ export function validateTemplate(template) {
 
   if (template.mods !== undefined && !Array.isArray(template.mods)) {
     errors.push("mods must be an array");
+  } else if (Array.isArray(template.mods)) {
+    for (let i = 0; i < template.mods.length; i++) {
+      const mod = template.mods[i];
+      if (!isPlainObject(mod)) {
+        errors.push(`mods[${i}] must be an object with a workshopId`);
+        continue;
+      }
+      if (typeof mod.workshopId !== "string" || !/^\d{1,15}$/.test(mod.workshopId)) {
+        errors.push(`mods[${i}].workshopId must be a numeric string`);
+      }
+    }
   }
   if (template.map !== undefined && !isPlainObject(template.map)) {
     errors.push("map must be an object");

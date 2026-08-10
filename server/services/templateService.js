@@ -25,6 +25,8 @@ import {
   mergeIniValues,
   readSandboxValue,
   mergeSandboxSections,
+  captureModsFromIni,
+  applyModsToIni,
   backupFile,
   writeFile,
 } from "../utils/templateFiles.js";
@@ -201,6 +203,23 @@ function applySandboxChanges(template, paths, backup, result) {
   result.sandbox = { applied, skipped };
 }
 
+function applyModChanges(template, paths, backup, result) {
+  const mods = template.mods;
+  if (!Array.isArray(mods) || mods.length === 0) return;
+
+  const existing = fs.existsSync(paths.iniPath) ? fs.readFileSync(paths.iniPath, "utf-8") : "";
+  if (backup && !result.backups.length) {
+    const backupPath = backupFile(paths.iniPath);
+    if (backupPath) result.backups.push(backupPath);
+  }
+  const updated = applyModsToIni(existing, mods);
+  writeFile(paths.iniPath, updated);
+
+  const newWorkshop = mods.filter((m) => !existing.includes(m.workshopId)).length;
+  const newMods = mods.filter((m) => m.modId && !existing.includes(m.modId)).length;
+  result.mods = { added: { workshopItems: newWorkshop, modIds: newMods } };
+}
+
 export async function applyTemplate(templateId, serverId, options = {}) {
   const template = await getTemplate(templateId);
   if (!template) return { success: false, error: "Template not found" };
@@ -218,10 +237,28 @@ export async function applyTemplate(templateId, serverId, options = {}) {
   if (!paths) return { success: false, error: "Server has no configured config path" };
 
   const backup = options.backup !== false;
-  const result = { success: true, ini: null, sandbox: null, backups: [] };
+  const result = { success: true, ini: null, sandbox: null, mods: null, backups: [] };
   if (options.applyIni !== false) applyIniChanges(template, paths, backup, result);
+  if (options.applyMods !== false) applyModChanges(template, paths, backup, result);
   if (options.applySandbox !== false) applySandboxChanges(template, paths, backup, result);
 
   log.info(`Applied template "${template.meta.name}" to server ${server.id}`);
   return result;
+}
+
+export async function captureServerConfig(serverId) {
+  const server = await getServer(serverId);
+  if (!server) return { success: false, error: "Server not found" };
+
+  const paths = resolveServerPaths(server);
+  if (!paths) return { success: false, error: "Server has no configured config path" };
+
+  const iniContent = fs.existsSync(paths.iniPath)
+    ? fs.readFileSync(paths.iniPath, "utf-8")
+    : "";
+
+  return {
+    success: true,
+    config: { mods: captureModsFromIni(iniContent) },
+  };
 }

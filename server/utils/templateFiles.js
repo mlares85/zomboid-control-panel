@@ -157,6 +157,49 @@ export function mergeSandboxSections(content, sectionUpdates) {
   return { content: result, applied, skipped };
 }
 
+// ---- Mod capture / apply ---------------------------------------------------
+
+function readIniList(content, key) {
+  const match = content.match(new RegExp(`^${escapeRegExp(key)}=(.*)$`, "m"));
+  return match?.[1]?.split(";").filter(Boolean) || [];
+}
+
+/** Extract paired Workshop IDs + mod IDs from a server INI. */
+export function captureModsFromIni(content) {
+  const workshopIds = readIniList(content, "WorkshopItems");
+  const modIds = readIniList(content, "Mods");
+  return workshopIds.map((workshopId, i) => {
+    const entry = { workshopId };
+    if (i < modIds.length) entry.modId = modIds[i];
+    return entry;
+  });
+}
+
+/** Merge template mods into existing INI content, deduplicating by ID. */
+export function applyModsToIni(content, mods) {
+  if (!mods || mods.length === 0) return content;
+
+  const existingWorkshop = readIniList(content, "WorkshopItems");
+  const existingMods = readIniList(content, "Mods");
+  const workshopSet = new Set(existingWorkshop);
+  const modSet = new Set(existingMods);
+
+  for (const mod of mods) {
+    if (!workshopSet.has(mod.workshopId)) {
+      existingWorkshop.push(mod.workshopId);
+      workshopSet.add(mod.workshopId);
+    }
+    if (mod.modId && !modSet.has(mod.modId)) {
+      existingMods.push(mod.modId);
+      modSet.add(mod.modId);
+    }
+  }
+
+  let result = mergeIniValues(content, { WorkshopItems: existingWorkshop.join(";") });
+  result = mergeIniValues(result, { Mods: existingMods.join(";") });
+  return result;
+}
+
 // ---- Backups ---------------------------------------------------------------
 
 /** Copy `filePath` into a timestamped `.bak` next to it. No-op if missing. */
