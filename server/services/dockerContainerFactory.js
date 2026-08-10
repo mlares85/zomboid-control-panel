@@ -9,6 +9,13 @@ const MANAGED_LABEL = "zomboid-panel.managed";
 const SERVER_ID_LABEL = "zomboid-panel.server-id";
 
 export function createDockerContainerFactory(dockerClient, volumeManager) {
+  // config.basePath: when set, bind-mounts an existing host directory
+  // (e.g. /mnt/user/appdata/steamcmd/pz-server) instead of the named volume.
+  function baseMount(config) {
+    if (config.basePath) return `${config.basePath}:/opt/pz-server:ro`;
+    return "zomboid-panel-base:/opt/pz-server:ro";
+  }
+
   function buildContainerSpec(config) {
     const image = config.image || DEFAULT_IMAGE;
     const gamePort = config.gamePort || BASE_GAME_PORT;
@@ -32,7 +39,7 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       },
       HostConfig: {
         Binds: [
-          `zomboid-panel-base:/opt/pz-server:ro`,
+          baseMount(config),
           `zomboid-srv-${config.serverName}:/opt/pz-data`,
         ],
         PortBindings: {
@@ -54,9 +61,12 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
   }
 
   async function createManagedServer(config) {
-    const volumeResult = await volumeManager.ensureBaseVolume();
-    if (!volumeResult.success) {
-      return { success: false, error: "Failed to ensure base volume" };
+    // Skip base volume creation when using an existing host path
+    if (!config.basePath) {
+      const volumeResult = await volumeManager.ensureBaseVolume();
+      if (!volumeResult.success) {
+        return { success: false, error: "Failed to ensure base volume" };
+      }
     }
     const srvResult = await volumeManager.createServerVolume(config.serverName);
     if (!srvResult.success) {

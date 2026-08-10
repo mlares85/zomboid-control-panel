@@ -3141,12 +3141,24 @@ export const dockerApi = {
     minMemoryMb: number;
     maxMemoryMb: number;
     adminPassword: string;
+    basePath?: string;
   }) =>
     apiPost("/docker/managed/servers", config) as Promise<{
       success: boolean;
       server?: ServerInstance;
       containerId?: string;
       error?: string;
+    }>,
+  populateBase: () =>
+    apiPost("/docker/managed/populate-base") as Promise<{
+      success: boolean;
+      message: string;
+      containerId?: string;
+    }>,
+  validateBasePath: (path: string) =>
+    apiPost("/docker/managed/validate-base-path", { path }) as Promise<{
+      valid: boolean;
+      error?: string | null;
     }>,
 };
 

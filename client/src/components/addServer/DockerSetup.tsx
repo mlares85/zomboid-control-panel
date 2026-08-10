@@ -39,6 +39,7 @@ export interface DockerConfig {
   minMemory: number;
   maxMemory: number;
   adminPassword: string;
+  basePath?: string;
 }
 
 const STEPS = [
@@ -114,6 +115,7 @@ export function DockerSetup({ onBack }: DockerSetupProps) {
         rconPort: config.rconPort, rconPassword: config.rconPassword,
         minMemoryMb: config.minMemory * 1024, maxMemoryMb: config.maxMemory * 1024,
         adminPassword: config.adminPassword,
+        ...(config.basePath ? { basePath: config.basePath } : {}),
       });
       clearInterval(phaseTimer);
       if (result.success) { setCreatePhase("done"); }
@@ -126,7 +128,10 @@ export function DockerSetup({ onBack }: DockerSetupProps) {
   };
 
   if (currentStep === 1) {
-    return <DockerPrereqStep onBack={onBack} onContinue={() => setCurrentStep(2)} />;
+    return <DockerPrereqStep onBack={onBack} onContinue={(basePath) => {
+      if (basePath) setConfig((c) => ({ ...c, basePath }));
+      setCurrentStep(2);
+    }} />;
   }
 
   if (currentStep === 2) {
