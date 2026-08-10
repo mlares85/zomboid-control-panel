@@ -250,4 +250,68 @@ export class DockerClient {
     if (!result.success || !result.data) return null;
     return parseContainerStats(result.data);
   }
+
+  // ── Volume operations ──
+
+  async createVolume(name) {
+    if (!this.available) return { success: false, error: "Docker control is unavailable" };
+    const result = await this._requestJson("POST", "/volumes/create", { Name: name });
+    return result.success ? { success: true, data: result.data } : { success: false, error: result.error };
+  }
+
+  async inspectVolume(name) {
+    if (!this.available || !name) return null;
+    const result = await this._requestJson("GET", `/volumes/${encodeURIComponent(name)}`);
+    return result.success ? result.data : null;
+  }
+
+  async removeVolume(name) {
+    if (!this.available) return { success: false, error: "Docker control is unavailable" };
+    if (!name) return { success: false, error: "Volume name is required" };
+    const result = await this._requestJson("DELETE", `/volumes/${encodeURIComponent(name)}`);
+    return result.success || result.statusCode === 204
+      ? { success: true }
+      : { success: false, error: result.error || `Delete failed (${result.statusCode})` };
+  }
+
+  // ── Container creation/removal ──
+
+  async createContainer(spec, name) {
+    if (!this.available) return { success: false, error: "Docker control is unavailable" };
+    const query = name ? `?name=${encodeURIComponent(name)}` : "";
+    const result = await this._requestJson("POST", `/containers/create${query}`, spec);
+    return result.success
+      ? { success: true, id: result.data?.Id }
+      : { success: false, error: result.error };
+  }
+
+  async removeContainer(id, force = false) {
+    if (!this.available) return { success: false, error: "Docker control is unavailable" };
+    if (!id) return { success: false, error: "Container id is required" };
+    const result = await this._requestJson(
+      "DELETE", `/containers/${encodeURIComponent(id)}?force=${force}`,
+    );
+    return result.success || result.statusCode === 204
+      ? { success: true }
+      : { success: false, error: result.error || `Remove failed (${result.statusCode})` };
+  }
+
+  // ── Image operations ──
+
+  async pullImage(image, tag = "latest") {
+    if (!this.available) return { success: false, error: "Docker control is unavailable" };
+    const query = `fromImage=${encodeURIComponent(image)}&tag=${encodeURIComponent(tag)}`;
+    try {
+      const { statusCode } = await this._request("POST", `/images/create?${query}`);
+      return statusCode < 400 ? { success: true } : { success: false, error: `Pull failed (${statusCode})` };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async inspectImage(imageRef) {
+    if (!this.available || !imageRef) return null;
+    const result = await this._requestJson("GET", `/images/${encodeURIComponent(imageRef)}/json`);
+    return result.success ? result.data : null;
+  }
 }
