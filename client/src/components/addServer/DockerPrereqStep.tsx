@@ -181,7 +181,7 @@ export function DockerPrereqStep({ onBack, onContinue }: DockerPrereqStepProps) 
                   <div>
                     <p className="font-medium">Server Files Needed</p>
                     <p className="text-sm text-muted-foreground">
-                      Point to an existing PZ server folder, or download fresh files (~3GB).
+                      Point to an existing PZ server folder, or download fresh files (~7GB).
                     </p>
                   </div>
                 </div>
@@ -197,16 +197,25 @@ export function DockerPrereqStep({ onBack, onContinue }: DockerPrereqStepProps) 
                       className="font-mono text-sm flex-1"
                     />
                     <Button variant="outline" size="sm" onClick={handleValidatePath} disabled={!existingPath.trim() || validating}>
-                      {validating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />}
+                      {validating ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <FolderOpen className="w-4 h-4 mr-1" />}
+                      Verify
                     </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Enter the path to your PZ dedicated server folder (should contain start-server.sh or ProjectZomboid64), then click Verify.
+                  </p>
                   {pathValid === true && (
                     <p className="text-xs text-green-600 flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" /> Valid PZ server files found
                     </p>
                   )}
                   {pathError && (
-                    <p className="text-xs text-destructive">{pathError}</p>
+                    <div className="text-xs space-y-1">
+                      <p className="text-destructive">{pathError}</p>
+                      <p className="text-muted-foreground">
+                        If you don't have server files yet, use the download option below.
+                      </p>
+                    </div>
                   )}
                 </div>
 
@@ -237,7 +246,7 @@ export function DockerPrereqStep({ onBack, onContinue }: DockerPrereqStepProps) 
                 ) : (
                   <Button variant="outline" size="sm" onClick={handleDownload}>
                     <Download className="w-4 h-4 mr-2" />
-                    {downloadError ? "Retry Download" : "Download Server Files (~3GB)"}
+                    {downloadError ? "Retry Download" : "Download Server Files (~7GB)"}
                   </Button>
                 )}
               </CardContent>
