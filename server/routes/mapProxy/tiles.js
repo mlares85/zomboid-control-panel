@@ -33,7 +33,9 @@ router.get("/tiles/:level/:tile", async (req, res) => {
     return res.status(400).json({ error: "Invalid tile" });
   }
 
-  const dir = await getB42Dir();
+  // Optional ?version= for explicit version selection, else auto-resolve latest.
+  const versionRaw = typeof req.query.version === "string" ? req.query.version : null;
+  const dir = versionRaw && /^[\w.\-]+$/.test(versionRaw) ? versionRaw : await getB42Dir();
   const url = `${PZ_MAP_ROOT}/maps/${dir}/base/layer${floor}_files/${level}/${tile}`;
   const contentType = "image/jpeg";
   const relPath = path.join("b42", dir, `layer${floor}`, String(level), tile);

@@ -3,27 +3,69 @@ import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:MapProxy");
 
 // ─── B42 map version resolution ──────────────────────────────────────────────
-// b42map.com has migrated to map.projectzomboid.com. Tiles are now served at
-// https://map.projectzomboid.com/maps/<version>/base/layer<floor>_files/<level>/<tile>
-// We resolve the latest B42 version directory dynamically from build_list.json
-// so tile loading stays current when PZ ships new map builds without a panel update.
+// Tiles are served at https://map.projectzomboid.com/maps/<version>/base/...
+// build_list.json moved under the versioned static root (e.g.
+// /static_20260803224102/build_list.json) so we discover that root from the
+// homepage HTML and cache it. Tiles themselves are still at /maps/.
 export const PZ_MAP_ROOT = "https://map.projectzomboid.com";
-const B42_DIR_FALLBACK = "42.19.0";
+const B42_DIR_FALLBACK = "42.20.0";
 const B42_DIR_TTL_MS = 24 * 60 * 60 * 1000; // re-resolve at most once per 24 h
 const B42_DIR_RETRY_MS = 5 * 60 * 1000; // ...but retry a failed resolve sooner
 // Geometry of B42_DIR_FALLBACK, used only when layer0.dzi can't be fetched.
-// x0/y0/sqr/scale are the isometric projection origin, copied from 42.19.0's
-// own base/map_info.json (skip:1 => scale 1<<1 = 2).
+// x0/y0/sqr/scale are the isometric projection origin from the build's own
+// base/map_info.json (skip:0 => scale 1<<0 = 1).
 const B42_GEOMETRY_FALLBACK = {
-  tileSize: 1024,
-  width: 1157312,
-  height: 509520,
-  maxLevel: 21,
-  x0: 1036288,
+  tileSize: 2048,
+  width: 2318656,
+  height: 1019040,
+  maxLevel: 22,
+  x0: 1040384,
   y0: -139296,
   sqr: 128,
-  scale: 2,
+  scale: 1,
 };
+
+// ─── Static root discovery ──────────────────────────────────────────────────
+// build_list.json lives under a deploy-timestamped path (e.g.
+// /static_20260803224102/build_list.json). Discover it from the homepage's
+// __PZMAP_STATIC_ROOT assignment and cache it for 24h.
+const UA = "ZomboidControlPanel/1.0 (+https://github.com/fpsacha/zomboid-control-panel)";
+let _staticRoot = null;
+let _staticRootFetchedAt = 0;
+const STATIC_ROOT_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function discoverStaticRoot() {
+  const now = Date.now();
+  if (_staticRoot && now - _staticRootFetchedAt < STATIC_ROOT_TTL_MS) return _staticRoot;
+  try {
+    const resp = await fetch(PZ_MAP_ROOT + "/", {
+      signal: AbortSignal.timeout(5000),
+      headers: { "User-Agent": UA },
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const html = await resp.text();
+    const match = html.match(/__PZMAP_STATIC_ROOT\s*=\s*'([^']+)'/);
+    if (!match) throw new Error("__PZMAP_STATIC_ROOT not found in HTML");
+    _staticRoot = match[1].endsWith("/") ? match[1] : match[1] + "/";
+    _staticRootFetchedAt = now;
+    log.info(`Discovered static root: ${_staticRoot}`);
+    return _staticRoot;
+  } catch (err) {
+    log.warn(`Failed to discover static root: ${err.message}`);
+    return _staticRoot || "static/";
+  }
+}
+
+async function fetchBuildList() {
+  const root = await discoverStaticRoot();
+  const url = `${PZ_MAP_ROOT}/${root}build_list.json`;
+  const resp = await fetch(url, {
+    signal: AbortSignal.timeout(5000),
+    headers: { "User-Agent": UA },
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} from ${url}`);
+  return resp.json();
+}
 
 // The projection origin is NOT derivable from the image dimensions: 42.20.0 is
 // exactly 2x the height of 42.19.0 but 4032 px wider, because the renderer
@@ -37,13 +79,7 @@ async function fetchMapProjection(directory) {
   try {
     const resp = await fetch(
       `${PZ_MAP_ROOT}/maps/${directory}/base/map_info.json`,
-      {
-        signal: AbortSignal.timeout(5000),
-        headers: {
-          "User-Agent":
-            "ZomboidControlPanel/1.0 (+https://github.com/fpsacha/zomboid-control-panel)",
-        },
-      },
+      { signal: AbortSignal.timeout(5000), headers: { "User-Agent": UA } },
     );
     if (!resp.ok) return null;
     const info = await resp.json();
@@ -65,13 +101,7 @@ async function fetchMapGeometry(directory) {
   try {
     const resp = await fetch(
       `${PZ_MAP_ROOT}/maps/${directory}/base/layer0.dzi`,
-      {
-        signal: AbortSignal.timeout(5000),
-        headers: {
-          "User-Agent":
-            "ZomboidControlPanel/1.0 (+https://github.com/fpsacha/zomboid-control-panel)",
-        },
-      },
+      { signal: AbortSignal.timeout(5000), headers: { "User-Agent": UA } },
     );
     if (!resp.ok) return null;
     const xml = await resp.text();
@@ -120,14 +150,7 @@ async function hasTileCoverage(directory, geometry) {
     try {
       const resp = await fetch(
         `${PZ_MAP_ROOT}/maps/${directory}/base/layer0_files/${level}/${col}_${row}.jpg`,
-        {
-          method: "HEAD",
-          signal: AbortSignal.timeout(4000),
-          headers: {
-            "User-Agent":
-              "ZomboidControlPanel/1.0 (+https://github.com/fpsacha/zomboid-control-panel)",
-          },
-        },
+        { method: "HEAD", signal: AbortSignal.timeout(4000), headers: { "User-Agent": UA } },
       );
       if (resp.ok) return true;
     } catch {
@@ -143,15 +166,7 @@ export async function getB42Map() {
     return _b42Map;
   }
   try {
-    const resp = await fetch(`${PZ_MAP_ROOT}/build_list.json`, {
-      signal: AbortSignal.timeout(5000),
-      headers: {
-        "User-Agent":
-          "ZomboidControlPanel/1.0 (+https://github.com/fpsacha/zomboid-control-panel)",
-      },
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const list = await resp.json();
+    const list = await fetchBuildList();
     // Entries are ordered newest-first. Walk B42+ candidates until one
     // actually has rendered tile coverage, not just a build_list.json entry.
     // The full string (not just a prefix) must match a plain version
@@ -200,4 +215,33 @@ export async function getB42Map() {
 
 export async function getB42Dir() {
   return (await getB42Map()).directory;
+}
+
+// Expose the full version list to the frontend for version selection.
+// Cached alongside the static root (24h TTL).
+let _cachedVersions = null;
+let _versionsFetchedAt = 0;
+
+export async function getMapVersions() {
+  const now = Date.now();
+  if (_cachedVersions && now - _versionsFetchedAt < B42_DIR_TTL_MS) {
+    return _cachedVersions;
+  }
+  try {
+    const list = await fetchBuildList();
+    _cachedVersions = Array.isArray(list)
+      ? list
+          .filter((e) => e?.directory && /^[\w.\-]+$/.test(e.directory))
+          .map((e) => ({
+            directory: e.directory,
+            label: e.label || e.directory,
+            isDefault: !!e.default,
+          }))
+      : [];
+    _versionsFetchedAt = now;
+    return _cachedVersions;
+  } catch (err) {
+    log.warn(`Failed to fetch map versions: ${err.message}`);
+    return _cachedVersions || [];
+  }
 }
