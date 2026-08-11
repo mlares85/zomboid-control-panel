@@ -1,30 +1,24 @@
 # Active Context
 
 ## Current Focus
-Docker lifecycle gap analysis complete. Map tile loading fixed (build_list.json
-URL migration). Delete flow expanded to three options for managed servers.
+All Docker lifecycle gaps closed and deployed. Map tile loading fixed.
+Delete flow expanded to three options for managed servers.
 
 ## Recent Decisions
-- Delete dialog for docker-managed servers now has three independent options:
-  (1) Remove from Panel, (2) Delete container & server data, (3) Delete base
-  game files. The base files option warns by name about other managed servers
-  that would break.
-- Map tile proxy: build_list.json moved under a deploy-timestamped static root
-  on map.projectzomboid.com. Panel now discovers it by scraping
-  `__PZMAP_STATIC_ROOT` from the homepage HTML. Fallback updated to 42.20.0.
-- Map version endpoints added: GET /api/map/versions (version list),
-  GET /api/map/resolve?version=X (geometry for any version).
+- All 11 actionable Docker lifecycle gaps fixed in one commit.
+- Managed containers get `RestartPolicy: unless-stopped`.
+- RCON host uses Docker container name on bridge network instead of
+  127.0.0.1. Panel auto-connects itself to `zomboid-panel-net`.
+- Creation has rollback: failed startContainer cleans up container + DB.
+- Docker event streaming via `watchEvents()` → Socket.IO `docker:event`.
+- ServerManager uses `dockerClient.restartContainer()` for Docker-backed
+  servers instead of the multi-step stop → wait → start sequence.
+- Delete dialog: three independent options for managed servers (remove
+  from panel, delete container & data, delete base game files).
+- Map: build_list.json now discovered via `__PZMAP_STATIC_ROOT` scrape.
+  Fallback updated to 42.20.0. Version endpoints ready for frontend.
 - SSH deploy to Unraid: clone → build on server → stop → run.
   Key: ~/.ssh/breakingbread_deploy, host: 192.168.1.85.
-
-## Docker Lifecycle Gaps (from gap analysis)
-1. **No rollback on partial creation failure** — orphaned container+DB if
-   startContainer() fails after create.
-2. **RCON host 127.0.0.1** — breaks container-to-container setups on bridge net.
-3. **No restart policy** — crashed containers stay down.
-4. **Admin password not injected** into container env.
-5. **No orphan container detection** — externally removed containers show "Stopped".
-6. **No preflight check** for start-server.sh in base volume.
 
 ## Blockers / Open Questions
 - PZ server hasn't been validated actually running in the managed
@@ -32,9 +26,10 @@ URL migration). Delete flow expanded to three options for managed servers.
 - Dashboard.tsx (1,556 lines) and Backups.tsx (1,060+ lines) still
   need decomposition.
 - WorldMap.tsx version selector frontend not yet wired (backend API ready).
+- Admin password env var (ADMIN_PASSWORD) is set on the container but PZ
+  reads it from server INI — needs a first-run config injection step.
 
 ## Next Steps
-1. Fix Docker lifecycle gaps (rollback, restart policy, RCON host).
-2. Test managed container actually running PZ — fix runtime issues.
-3. Wire WorldMap.tsx version selector to /api/map/versions.
-4. Template frontend: wire CreateTemplateDialog to capture mods.
+1. Test managed container actually running PZ — fix runtime issues.
+2. Wire WorldMap.tsx version selector to /api/map/versions.
+3. Template frontend: wire CreateTemplateDialog to capture mods.
