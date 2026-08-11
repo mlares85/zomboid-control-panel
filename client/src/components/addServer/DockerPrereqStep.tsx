@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { FolderBrowser } from "@/components/FolderBrowser";
 import { DockerStepIndicator } from "./DockerSetup";
 
 interface DockerPrereqStepProps {
@@ -39,6 +40,7 @@ export function DockerPrereqStep({ onBack, onContinue }: DockerPrereqStepProps) 
   const [pathError, setPathError] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
 
+  const [browseOpen, setBrowseOpen] = useState(false);
   const socket = useContext(SocketContext);
 
   useEffect(() => {
@@ -193,17 +195,27 @@ export function DockerPrereqStep({ onBack, onContinue }: DockerPrereqStepProps) 
                     <Input
                       value={existingPath}
                       onChange={(e) => { setExistingPath(e.target.value); setPathValid(null); setPathError(null); }}
-                      placeholder="/mnt/user/appdata/steamcmd/pzserver"
+                      placeholder="/pz-server or /mnt/user/appdata/..."
                       className="font-mono text-sm flex-1"
                     />
+                    <Button variant="outline" size="icon" className="shrink-0" onClick={() => setBrowseOpen(true)} aria-label="Browse folders">
+                      <FolderOpen className="w-4 h-4" />
+                    </Button>
                     <Button variant="outline" size="sm" onClick={handleValidatePath} disabled={!existingPath.trim() || validating}>
-                      {validating ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <FolderOpen className="w-4 h-4 mr-1" />}
+                      {validating && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
                       Verify
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Enter the path to your PZ dedicated server folder (should contain start-server.sh or ProjectZomboid64), then click Verify.
+                    Browse or type the path to your PZ server folder (should contain start-server.sh or ProjectZomboid64), then click Verify.
                   </p>
+                  <FolderBrowser
+                    open={browseOpen}
+                    onOpenChange={setBrowseOpen}
+                    initialPath={existingPath || "/"}
+                    title="Select PZ Server Folder"
+                    onSelect={(path) => { setExistingPath(path); setPathValid(null); setPathError(null); }}
+                  />
                   {pathValid === true && (
                     <p className="text-xs text-green-600 flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" /> Valid PZ server files found
