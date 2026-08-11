@@ -1484,6 +1484,7 @@ export interface ServerInstance {
   startCommand: string;
   adminPassword: string;
   createdAt: string;
+  provider?: string;
   // Set for docker-local/docker-managed servers — see server/routes/docker.js.
   dockerContainerId?: string | null;
   dockerContainerName?: string | null;
@@ -3160,6 +3161,11 @@ export const dockerApi = {
     apiPost("/docker/managed/validate-base-path", { path }) as Promise<{
       valid: boolean;
       error?: string | null;
+    }>,
+  deleteManagedServer: (id: string | number, removeData = false) =>
+    apiDelete(`/docker/managed/servers/${id}${removeData ? "?removeData=true" : ""}`) as Promise<{
+      success: boolean;
+      error?: string;
     }>,
 };
 

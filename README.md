@@ -85,7 +85,7 @@ Full in-browser INI editor for sandbox options, spawn regions, mod settings, and
 <td width="50%" valign="top">
 
 ### 🆕 Server Setup Wizard
-Spin up a fresh PZ server in minutes. SteamCMD install, port config, RCON setup, admin account — all stepped through with sensible defaults.
+Three setup paths: **Fresh Install** (SteamCMD download), **Existing Files** (point to a PZ folder), or **Docker Server** (panel creates and manages containers with shared game files, auto port assignment, and isolated saves/mods per server).
 
 <img src="Screenshots/screenshot-server-setup.png" alt="Server Setup" />
 
@@ -283,6 +283,28 @@ the automatic server-update setting is for a PZ process managed by the panel.
 A ready-to-import Unraid template is available at
 [`docker/unraid/zomboid-panel.xml`](docker/unraid/zomboid-panel.xml). Edit the
 two PZ host paths and RCON values before importing it.
+
+#### Docker-managed servers (panel creates the containers)
+
+If the panel has Docker socket access (`-v /var/run/docker.sock:/var/run/docker.sock`),
+use **Add Server → Docker Server** to let the panel create and fully manage PZ
+server containers. The panel handles volumes, networking, port assignment, and
+lifecycle — no manual `docker run` needed.
+
+Two ways to provide game files:
+
+- **Use existing files** — enter the path where PZ server files already live
+  *as the panel container sees it* (e.g. `/pz-server`). The panel automatically
+  resolves this to the host path for the bind mount.
+- **Download** — the panel pulls a `steamcmd/steamcmd` image and downloads PZ
+  server files (~7 GB) into a shared Docker volume. Subsequent servers reuse
+  the same files.
+
+Multiple managed servers share the same game binaries. Each server gets its own
+Docker volume for config, saves, and mods. Ports are auto-assigned to avoid
+conflicts. RCON traffic stays on an internal `zomboid-panel-net` bridge network.
+
+Removing a managed server from the panel also stops and removes its container.
 
 ### Linux: installing a new PZ server through the panel
 

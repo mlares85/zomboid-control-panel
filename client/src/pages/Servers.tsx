@@ -69,7 +69,7 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select"
-import { serversApi, serversDetectApi, ServerInstance, configApi, serverApi, updateApi, UpdateStatus, ComposedServerStatus } from '@/lib/api'
+import { serversApi, serversDetectApi, ServerInstance, configApi, serverApi, updateApi, UpdateStatus, ComposedServerStatus, dockerApi } from '@/lib/api'
 import { ServerStatusBadge } from '@/components/ServerStatusBadge'
 import { SocketContext } from '@/contexts/SocketContext'
 import { useNavigate } from 'react-router-dom'
@@ -432,19 +432,34 @@ export default function Servers() {
         }
       }
 
-      await serversApi.delete(deleteServer.id)
+      // Docker-managed servers: also stop and remove the container
+      const isManaged = !!deleteServer.dockerContainerId && deleteServer.provider === 'docker-managed'
+      if (isManaged) {
+        try {
+          await dockerApi.deleteManagedServer(deleteServer.id, deleteFiles)
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : 'Could not remove container'
+          toast({ title: 'Warning', description: `${msg} — removing from panel anyway.`, variant: 'destructive' })
+        }
+      }
+
+      // Always remove the panel record (managed delete also does this, but
+      // the regular delete is the fallback for non-managed or if managed failed)
+      if (!isManaged) {
+        await serversApi.delete(deleteServer.id)
+      }
 
       // Complete the progress bar before closing
       if (deleteProgressRef.current) clearInterval(deleteProgressRef.current)
       setDeleteProgress(100)
       await new Promise(r => setTimeout(r, 350))
 
-      toast({
-        title: 'Deleted',
-        description: deleteFiles
+      const what = isManaged
+        ? `Server "${deleteServer.name}" and its container removed`
+        : deleteFiles
           ? `Server "${deleteServer.name}" and its files have been deleted`
           : `Server "${deleteServer.name}" removed from panel`
-      })
+      toast({ title: 'Deleted', description: what })
       setDeleteServer(null)
       setDeleteFiles(false)
       fetchServers()
