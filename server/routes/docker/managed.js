@@ -211,13 +211,34 @@ router.delete("/servers/:id", async (req, res) => {
     if (!deps) return res.status(503).json({ success: false, error: "Docker unavailable" });
 
     const removeData = req.query.removeData === "true";
-    const removeResult = await deps.containerFactory.removeManagedServer(server.dockerContainerId, removeData);
+    const removeResult = await deps.containerFactory.removeManagedServer(
+      server.dockerContainerId,
+      { removeData, serverName: server.serverName },
+    );
     if (!removeResult.success) return res.status(502).json({ success: false, error: removeResult.error });
 
     await deleteServer(req.params.id);
     res.json({ success: true });
   } catch (error) {
     log.error(`Failed to remove managed server: ${error.message}`);
+    res.status(500).json({ success: false, error: sanitizeError(error.message) });
+  }
+});
+
+// ── Delete the shared base volume (PZ server installation) ──
+
+router.delete("/base-volume", async (req, res) => {
+  try {
+    const deps = getManagedDeps(req);
+    if (!deps) return res.status(503).json({ success: false, error: "Docker unavailable" });
+
+    const result = await deps.volumeManager.removeBaseVolume();
+    if (!result.success) return res.status(502).json({ success: false, error: result.error });
+
+    log.info("Base volume deleted by user request");
+    res.json({ success: true });
+  } catch (error) {
+    log.error(`Failed to delete base volume: ${error.message}`);
     res.status(500).json({ success: false, error: sanitizeError(error.message) });
   }
 });

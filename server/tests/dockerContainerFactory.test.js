@@ -49,6 +49,12 @@ function createFakeVolumeManager() {
       volumes.add(volumeName);
       return { success: true, volumeName };
     },
+    async removeServerVolume(serverName) {
+      const volumeName = `zomboid-srv-${serverName}`;
+      if (!volumes.has(volumeName)) return { success: false, error: "no such volume" };
+      volumes.delete(volumeName);
+      return { success: true };
+    },
   };
 }
 
@@ -167,7 +173,7 @@ describe("dockerContainerFactory", () => {
   });
 
   describe("removeManagedServer", () => {
-    it("removes the container", async () => {
+    it("removes the container without touching volumes by default", async () => {
       const createResult = await factory.createManagedServer({
         serverName: "doomed",
         rconPassword: "pw",
@@ -175,6 +181,60 @@ describe("dockerContainerFactory", () => {
       const removeResult = await factory.removeManagedServer(createResult.containerId);
       expect(removeResult.success).toBe(true);
       expect(fakeClient.containers.has(createResult.containerId)).toBe(false);
+      expect(fakeVolManager.volumes.has("zomboid-srv-doomed")).toBe(true);
+      expect(fakeVolManager.volumes.has("zomboid-panel-base")).toBe(true);
+    });
+
+    it("removes the per-server data volume when removeData is true", async () => {
+      const createResult = await factory.createManagedServer({
+        serverName: "doomed",
+        rconPassword: "pw",
+      });
+      const removeResult = await factory.removeManagedServer(
+        createResult.containerId,
+        { removeData: true, serverName: "doomed" },
+      );
+      expect(removeResult.success).toBe(true);
+      expect(fakeVolManager.volumes.has("zomboid-srv-doomed")).toBe(false);
+    });
+
+    it("never removes the shared base volume", async () => {
+      const createResult = await factory.createManagedServer({
+        serverName: "doomed",
+        rconPassword: "pw",
+      });
+      await factory.removeManagedServer(
+        createResult.containerId,
+        { removeData: true, serverName: "doomed" },
+      );
+      expect(fakeVolManager.volumes.has("zomboid-panel-base")).toBe(true);
+    });
+
+    it("succeeds with volumeError when volume removal fails", async () => {
+      const createResult = await factory.createManagedServer({
+        serverName: "doomed",
+        rconPassword: "pw",
+      });
+      fakeVolManager.removeServerVolume = async () => ({ success: false, error: "in use" });
+      const removeResult = await factory.removeManagedServer(
+        createResult.containerId,
+        { removeData: true, serverName: "doomed" },
+      );
+      expect(removeResult.success).toBe(true);
+      expect(removeResult.volumeError).toBe("in use");
+    });
+
+    it("skips volume removal when removeData is true but serverName is missing", async () => {
+      const createResult = await factory.createManagedServer({
+        serverName: "doomed",
+        rconPassword: "pw",
+      });
+      const removeResult = await factory.removeManagedServer(
+        createResult.containerId,
+        { removeData: true },
+      );
+      expect(removeResult.success).toBe(true);
+      expect(fakeVolManager.volumes.has("zomboid-srv-doomed")).toBe(true);
     });
 
     it("returns failure for a non-existent container", async () => {

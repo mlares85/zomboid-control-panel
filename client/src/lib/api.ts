@@ -3167,6 +3167,11 @@ export const dockerApi = {
       success: boolean;
       error?: string;
     }>,
+  deleteBaseVolume: () =>
+    apiDelete("/docker/managed/base-volume") as Promise<{
+      success: boolean;
+      error?: string;
+    }>,
 };
 
 // System storage health — see server/routes/system.js. Polled by

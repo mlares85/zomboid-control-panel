@@ -87,6 +87,8 @@ export default function Servers() {
   const [savingEdit, setSavingEdit] = useState(false)
   const [deleteServer, setDeleteServer] = useState<ServerInstance | null>(null)
   const [deleteFiles, setDeleteFiles] = useState(false)
+  const [deleteContainer, setDeleteContainer] = useState(false)
+  const [deleteBaseFiles, setDeleteBaseFiles] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteProgress, setDeleteProgress] = useState(0)
   const deleteProgressRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -410,42 +412,46 @@ export default function Servers() {
       setDeleteProgress(prog)
     }, 200)
 
+    const isManaged = !!deleteServer.dockerContainerId && deleteServer.provider === 'docker-managed'
+
     try {
-      // If deleteFiles is checked and server has an installPath, delete the files first
-      if (deleteFiles && deleteServer.installPath) {
+      // Non-managed: honor the legacy deleteFiles checkbox
+      if (!isManaged && deleteFiles && deleteServer.installPath) {
         try {
           const result = await serversDetectApi.deleteFiles(deleteServer.installPath) as { error?: string }
           if (result?.error) {
-            toast({
-              title: 'File deletion failed',
-              description: result.error,
-              variant: 'destructive'
-            })
+            toast({ title: 'File deletion failed', description: result.error, variant: 'destructive' })
           }
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'Could not delete server files'
-          toast({
-            title: 'Warning',
-            description: `${msg} — removing from panel anyway.`,
-            variant: 'destructive'
-          })
+          toast({ title: 'Warning', description: `${msg} — removing from panel anyway.`, variant: 'destructive' })
         }
       }
 
-      // Docker-managed servers: also stop and remove the container
-      const isManaged = !!deleteServer.dockerContainerId && deleteServer.provider === 'docker-managed'
-      if (isManaged) {
+      // Docker-managed: delete container if requested (sends removeData
+      // so the per-server data volume is also removed)
+      if (isManaged && deleteContainer) {
         try {
-          await dockerApi.deleteManagedServer(deleteServer.id, deleteFiles)
+          await dockerApi.deleteManagedServer(deleteServer.id, true)
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'Could not remove container'
           toast({ title: 'Warning', description: `${msg} — removing from panel anyway.`, variant: 'destructive' })
         }
       }
 
-      // Always remove the panel record (managed delete also does this, but
-      // the regular delete is the fallback for non-managed or if managed failed)
-      if (!isManaged) {
+      // Docker-managed: delete shared base game files if requested
+      if (isManaged && deleteBaseFiles) {
+        try {
+          await dockerApi.deleteBaseVolume()
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : 'Could not delete base game files'
+          toast({ title: 'Warning', description: msg, variant: 'destructive' })
+        }
+      }
+
+      // Remove the panel record — for managed servers with deleteContainer,
+      // the managed DELETE route already does this; otherwise call directly.
+      if (!(isManaged && deleteContainer)) {
         await serversApi.delete(deleteServer.id)
       }
 
@@ -454,14 +460,15 @@ export default function Servers() {
       setDeleteProgress(100)
       await new Promise(r => setTimeout(r, 350))
 
-      const what = isManaged
-        ? `Server "${deleteServer.name}" and its container removed`
-        : deleteFiles
-          ? `Server "${deleteServer.name}" and its files have been deleted`
-          : `Server "${deleteServer.name}" removed from panel`
-      toast({ title: 'Deleted', description: what })
+      const parts: string[] = ['Removed from panel']
+      if (isManaged && deleteContainer) parts.push('container deleted')
+      if (isManaged && deleteBaseFiles) parts.push('base game files deleted')
+      if (!isManaged && deleteFiles) parts.push('server files deleted')
+      toast({ title: 'Deleted', description: `"${deleteServer.name}" — ${parts.join(', ')}.` })
       setDeleteServer(null)
       setDeleteFiles(false)
+      setDeleteContainer(false)
+      setDeleteBaseFiles(false)
       fetchServers()
     } catch (error) {
       toast({
@@ -1210,15 +1217,49 @@ export default function Servers() {
       </Dialog>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteServer} onOpenChange={(open) => { if (!open && !deleting) { setDeleteServer(null); setDeleteFiles(false); } }}>
+      <AlertDialog open={!!deleteServer} onOpenChange={(open) => { if (!open && !deleting) { setDeleteServer(null); setDeleteFiles(false); setDeleteContainer(false); setDeleteBaseFiles(false); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Server from Panel?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-4">
-                <p>This will remove "{deleteServer?.name}" from the panel management.</p>
+                <p>This will remove "{deleteServer?.name}" from the panel.</p>
 
-                {deleteServer?.installPath && (
+                {deleteServer?.provider === 'docker-managed' ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 p-3 rounded-lg border bg-muted/50">
+                      <Checkbox
+                        id="deleteContainer"
+                        checked={deleteContainer}
+                        onCheckedChange={(checked) => setDeleteContainer(checked === true)}
+                        disabled={deleting}
+                        className="mt-1"
+                      />
+                      <label htmlFor="deleteContainer" className="text-sm cursor-pointer">
+                        <span className="font-medium text-destructive">Delete container &amp; server data</span>
+                        <p className="text-muted-foreground mt-1">
+                          Stops the container and permanently deletes this server's saves, config, and mods.
+                        </p>
+                      </label>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 rounded-lg border bg-muted/50">
+                      <Checkbox
+                        id="deleteBaseFiles"
+                        checked={deleteBaseFiles}
+                        onCheckedChange={(checked) => setDeleteBaseFiles(checked === true)}
+                        disabled={deleting}
+                        className="mt-1"
+                      />
+                      <label htmlFor="deleteBaseFiles" className="text-sm cursor-pointer">
+                        <span className="font-medium text-destructive">Delete base game files</span>
+                        <p className="text-muted-foreground mt-1">
+                          Removes the shared PZ server installation (~3 GB).{' '}
+                          <strong>Other managed servers using these files will break.</strong>
+                        </p>
+                      </label>
+                    </div>
+                  </div>
+                ) : deleteServer?.installPath ? (
                   <div className="flex items-start gap-3 p-3 rounded-lg border bg-muted/50">
                     <Checkbox
                       id="deleteFiles"
@@ -1230,16 +1271,18 @@ export default function Servers() {
                     <label htmlFor="deleteFiles" className="text-sm cursor-pointer">
                       <span className="font-medium text-destructive">Also delete server files</span>
                       <p className="text-muted-foreground mt-1">
-                        This will permanently delete all files in:<br />
+                        Permanently delete all files in:<br />
                         <code className="text-xs bg-background px-1 rounded">{deleteServer?.installPath}</code>
                       </p>
                     </label>
                   </div>
-                )}
+                ) : null}
 
-                {!deleteFiles && !deleting && (
+                {!deleteFiles && !deleteContainer && !deleteBaseFiles && !deleting && (
                   <p className="text-sm text-muted-foreground">
-                    Server files will NOT be deleted - you can add this server back later.
+                    {deleteServer?.provider === 'docker-managed'
+                      ? 'Container, data, and game files will be kept — you can re-add this server later.'
+                      : 'Server files will NOT be deleted — you can add this server back later.'}
                   </p>
                 )}
 
@@ -1247,7 +1290,7 @@ export default function Servers() {
                   <div className="space-y-2 pt-1">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>{deleteFiles ? 'Deleting server files...' : 'Removing server...'}</span>
+                      <span>{deleteContainer || deleteFiles || deleteBaseFiles ? 'Deleting...' : 'Removing server...'}</span>
                     </div>
                     <Progress value={deleteProgress} className="h-1.5" />
                   </div>
@@ -1260,11 +1303,11 @@ export default function Servers() {
             <Button
               onClick={handleDeleteServer}
               disabled={deleting}
-              className={deleteFiles ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+              className={(deleteContainer || deleteFiles || deleteBaseFiles) ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
             >
               {deleting ? (
                 <><Loader2 className="w-4 h-4 animate-spin mr-2" />Removing...</>
-              ) : deleteFiles ? 'Delete Everything' : 'Remove from Panel'}
+              ) : (deleteContainer || deleteFiles || deleteBaseFiles) ? 'Delete' : 'Remove from Panel'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -46,6 +46,14 @@ export function createDockerVolumeManager(dockerClient) {
     return result;
   }
 
+  async function removeBaseVolume() {
+    const result = await dockerClient.removeVolume(BASE_VOLUME);
+    if (!result.success) {
+      log.warn(`Failed to remove base volume: ${result.error}`);
+    }
+    return result;
+  }
+
   async function listManagedVolumes() {
     const baseInfo = await dockerClient.inspectVolume(BASE_VOLUME);
     const base = baseInfo ? { name: baseInfo.Name, mountpoint: baseInfo.Mountpoint } : null;
@@ -56,5 +64,5 @@ export function createDockerVolumeManager(dockerClient) {
     return { base, servers: [] };
   }
 
-  return { getBaseVolumeStatus, ensureBaseVolume, createServerVolume, removeServerVolume, listManagedVolumes };
+  return { getBaseVolumeStatus, ensureBaseVolume, createServerVolume, removeServerVolume, removeBaseVolume, listManagedVolumes };
 }

@@ -110,14 +110,19 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
     return { success: true, containerId: createResult.id, containerName };
   }
 
-  async function removeManagedServer(containerId, removeData = false) {
+  async function removeManagedServer(containerId, { removeData = false, serverName } = {}) {
     const removeResult = await dockerClient.removeContainer(containerId, true);
     if (!removeResult.success) {
       log.warn(`Failed to remove container ${containerId}: ${removeResult.error}`);
       return { success: false, error: removeResult.error };
     }
-    if (removeData) {
-      log.info(`removeData requested but server-name-to-volume mapping requires the server registry`);
+    if (removeData && serverName) {
+      const volResult = await volumeManager.removeServerVolume(serverName);
+      if (!volResult.success) {
+        log.warn(`Container removed but server volume cleanup failed: ${volResult.error}`);
+        return { success: true, volumeError: volResult.error };
+      }
+      log.info(`Removed server data volume for "${serverName}"`);
     }
     return { success: true };
   }
