@@ -30,6 +30,40 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
     return create.success;
   }
 
+  // Connect the panel's own container to the managed network so Docker DNS
+  // resolves managed container names for RCON. Best-effort — if the panel
+  // runs on the host (not in Docker), the connect call fails harmlessly.
+  async function connectPanelToNetwork() {
+    for (const name of ["zomboid-panel", "zomboid-control-panel"]) {
+      const info = await dockerClient.inspectContainer(name);
+      if (!info) continue;
+      const nets = info.NetworkSettings?.Networks || {};
+      if (nets[PANEL_NETWORK]) return; // already connected
+      const result = await dockerClient._requestJson(
+        "POST", `/networks/${PANEL_NETWORK}/connect`, { Container: info.Id },
+      );
+      if (result.success) log.info(`Connected panel container to ${PANEL_NETWORK}`);
+      else log.warn(`Failed to connect panel to ${PANEL_NETWORK}: ${result.error}`);
+      return;
+    }
+  }
+
+  // Validate the base volume/path has a PZ start script before creating.
+  async function preflightBaseCheck(config) {
+    if (config.basePath) {
+      // Bind-mount: check if start-server.sh exists on the host
+      const { existsSync } = await import("fs");
+      const { join } = await import("path");
+      if (!existsSync(join(config.basePath, "start-server.sh"))) {
+        return "start-server.sh not found in base path — PZ server files may not be installed";
+      }
+    }
+    // For volume mode we can't easily check inside a volume without
+    // running a container, so skip — the container will fail to start
+    // and the error will be visible in logs.
+    return null;
+  }
+
   function buildContainerSpec(config) {
     const image = config.image || DEFAULT_IMAGE;
     const gamePort = config.gamePort || BASE_GAME_PORT;
@@ -43,6 +77,7 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
         `RCON_PASSWORD=${config.rconPassword}`,
         `GAME_PORT=${gamePort}`,
         `PZ_SERVER_ARGS=-Xms${config.minMemoryMb || 2048}m -Xmx${config.maxMemoryMb || 4096}m`,
+        ...(config.adminPassword ? [`ADMIN_PASSWORD=${config.adminPassword}`] : []),
       ],
       Labels: {
         [MANAGED_LABEL]: "true",
@@ -64,6 +99,7 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
           [`${rconPort}/tcp`]: [{ HostPort: String(rconPort) }],
         },
         NetworkMode: PANEL_NETWORK,
+        RestartPolicy: { Name: "unless-stopped" },
       },
     };
   }
@@ -79,6 +115,12 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
   }
 
   async function createManagedServer(config) {
+    // Gap 6: preflight check — validate base has PZ server files
+    const preflightError = await preflightBaseCheck(config);
+    if (preflightError) {
+      return { success: false, error: preflightError };
+    }
+
     if (!config.basePath) {
       const volumeResult = await volumeManager.ensureBaseVolume();
       if (!volumeResult.success) {
@@ -101,6 +143,9 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
     }
 
     await ensureNetwork();
+    // Gap 2: connect panel container to the managed network so Docker DNS
+    // resolves the managed container name for RCON.
+    await connectPanelToNetwork();
     const spec = buildContainerSpec(config);
     const containerName = `zomboid-${config.serverName}`;
     const createResult = await dockerClient.createContainer(spec, containerName);

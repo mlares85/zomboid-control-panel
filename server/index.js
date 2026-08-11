@@ -1076,6 +1076,24 @@ const containerStatsPoller = new ContainerStatsPoller(io, dockerClient);
 containerStatsPoller.start();
 app.set("containerStatsPoller", containerStatsPoller);
 
+// Stream Docker container events (start/stop/die/oom) so the frontend
+// gets instant state updates instead of polling every 8 seconds.
+if (dockerClient?.available) {
+  dockerClient.watchEvents(
+    (event) => {
+      if (event.Type === "container") {
+        io.emit("docker:event", {
+          action: event.Action,
+          containerId: event.Actor?.ID,
+          name: event.Actor?.Attributes?.name,
+          time: event.time,
+        });
+      }
+    },
+    { type: ["container"], event: ["start", "stop", "die", "restart", "oom", "destroy"] },
+  );
+}
+
 // Initialize update checker (needs io for socket events)
 const updateChecker = new UpdateChecker(io, { rconService, serverManager });
 app.set("updateChecker", updateChecker);

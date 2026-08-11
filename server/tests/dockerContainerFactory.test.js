@@ -27,6 +27,10 @@ function createFakeDockerClient() {
       containers.delete(id);
       return { success: true };
     },
+    // connectPanelToNetwork calls inspectContainer to find the panel container
+    async inspectContainer() {
+      return null; // panel not in Docker during tests
+    },
     // ensureNetwork uses _requestJson internally
     async _requestJson(method, path, body) {
       if (method === "GET" && path.includes("/networks/")) return { success: false };

@@ -57,11 +57,21 @@ export function createDockerVolumeManager(dockerClient) {
   async function listManagedVolumes() {
     const baseInfo = await dockerClient.inspectVolume(BASE_VOLUME);
     const base = baseInfo ? { name: baseInfo.Name, mountpoint: baseInfo.Mountpoint } : null;
-    // Docker doesn't support prefix filtering on volumes, so we list managed
-    // containers and check their bound volumes instead. For now, return the
-    // base volume info. Per-server volume listing will be added when we have
-    // a server registry that tracks volume names.
-    return { base, servers: [] };
+    // List all volumes and filter for our prefix.
+    const servers = [];
+    const listResult = await dockerClient._requestJson("GET", "/volumes");
+    if (listResult.success && Array.isArray(listResult.data?.Volumes)) {
+      for (const v of listResult.data.Volumes) {
+        if (v.Name?.startsWith(SERVER_VOLUME_PREFIX)) {
+          servers.push({
+            name: v.Name,
+            serverName: v.Name.slice(SERVER_VOLUME_PREFIX.length),
+            mountpoint: v.Mountpoint,
+          });
+        }
+      }
+    }
+    return { base, servers };
   }
 
   return { getBaseVolumeStatus, ensureBaseVolume, createServerVolume, removeServerVolume, removeBaseVolume, listManagedVolumes };

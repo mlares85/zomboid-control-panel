@@ -19,11 +19,16 @@ function getDockerClient(req) {
 // When the panel runs in a container, paths the user enters (e.g. /pz-server)
 // are container-internal. Docker bind mounts resolve against the HOST.
 // Resolve by inspecting the panel container's mounts via the Docker API.
+// Gap 9: TTL so cache refreshes if panel container's mounts change.
 let hostPathCache = null;
+let hostPathCacheAt = 0;
+const HOST_PATH_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
 async function resolveHostPath(containerPath, dockerClient) {
   if (!containerPath) return containerPath;
-  if (!hostPathCache) {
+  if (!hostPathCache || Date.now() - hostPathCacheAt > HOST_PATH_CACHE_TTL) {
     hostPathCache = new Map();
+    hostPathCacheAt = Date.now();
     // Try common panel container names
     for (const name of ["zomboid-panel", "zomboid-control-panel"]) {
       const info = await dockerClient.inspectContainer(name);
@@ -135,6 +140,16 @@ router.post("/populate-base", async (req, res) => {
     if (!dockerClient?.available) {
       return res.status(503).json({ success: false, error: "Docker unavailable" });
     }
+    // Gap 8: check if a SteamCMD populate container is already running
+    // (e.g. from a prior panel instance that restarted mid-download).
+    const existing = await dockerClient.inspectContainer("zomboid-steamcmd-populate");
+    if (existing?.State?.Running) {
+      return res.status(409).json({ success: false, error: "SteamCMD download already running from a previous session" });
+    }
+    // Clean up a stopped populate container so the new one can use the name.
+    if (existing) {
+      await dockerClient.removeContainer("zomboid-steamcmd-populate", true);
+    }
     const io = req.app.get("io");
     populatingBase = true;
     const result = await startBaseVolumePopulation(dockerClient, io, () => { populatingBase = false; });
@@ -167,10 +182,13 @@ router.post("/servers", async (req, res) => {
       log.info(`Resolved container path ${basePath} → host path ${hostBasePath}`);
     }
     const result = await deps.containerFactory.createManagedServer({
-      serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb, basePath: hostBasePath, image,
+      serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb, basePath: hostBasePath, image, adminPassword,
     });
     if (!result.success) return res.status(502).json({ success: false, error: result.error });
 
+    // Gap 2: use the container name as RCON host — Docker DNS resolves it
+    // on the zomboid-panel-net bridge network. The panel container is
+    // auto-connected to that network during createManagedServer.
     const server = await createServer({
       name: serverName,
       serverName,
@@ -179,7 +197,7 @@ router.post("/servers", async (req, res) => {
       dockerContainerName: result.containerName,
       installPath: basePath || "/opt/pz-server",
       zomboidDataPath: "/opt/pz-data",
-      rconHost: "127.0.0.1",
+      rconHost: result.containerName,
       rconPort,
       rconPassword,
       serverPort: gamePort,
@@ -189,12 +207,18 @@ router.post("/servers", async (req, res) => {
     });
 
     // Auto-install PanelBridge.lua so the server is ready for advanced features.
-    // For bind-mount mode the panel can write to the host path directly;
-    // for volume mode installPath is a container-internal path — best-effort.
     const bridgePath = basePath || server.installPath;
     if (bridgePath) installPanelBridgeMod(bridgePath);
 
-    await deps.dockerClient.startContainer(result.containerId);
+    // Gap 1: rollback on start failure — if startContainer fails, clean up
+    // the container and DB record so nothing is orphaned.
+    const startResult = await deps.dockerClient.startContainer(result.containerId);
+    if (!startResult.success) {
+      log.warn(`Container start failed, rolling back: ${startResult.error}`);
+      await deps.dockerClient.removeContainer(result.containerId, true).catch(() => {});
+      await deleteServer(server.id).catch(() => {});
+      return res.status(502).json({ success: false, error: `Container created but failed to start: ${startResult.error}` });
+    }
     res.status(201).json({ success: true, server, containerId: result.containerId });
   } catch (error) {
     log.error(`Failed to create managed server: ${error.message}`);

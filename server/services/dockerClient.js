@@ -323,4 +323,50 @@ export class DockerClient {
     const result = await this._requestJson("GET", `/images/${encodeURIComponent(imageRef)}/json`);
     return result.success ? result.data : null;
   }
+
+  // Gap 11: stream Docker events for real-time state change detection.
+  // Calls `onEvent({Type, Action, Actor, time})` for each event.
+  // Returns a cancel function. Reconnects automatically on disconnect.
+  watchEvents(onEvent, filters = {}) {
+    if (!this.available) return () => {};
+    let cancelled = false;
+    let currentReq = null;
+
+    const connect = () => {
+      if (cancelled) return;
+      const query = new URLSearchParams();
+      if (Object.keys(filters).length > 0) {
+        query.set("filters", JSON.stringify(filters));
+      }
+      const req = http.request(
+        { socketPath: this.socketPath, method: "GET", path: `/events?${query}` },
+        (res) => {
+          let buf = "";
+          res.on("data", (chunk) => {
+            buf += chunk.toString();
+            const lines = buf.split("\n");
+            buf = lines.pop();
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try { onEvent(JSON.parse(line)); } catch { /* skip malformed */ }
+            }
+          });
+          res.on("end", () => {
+            if (!cancelled) setTimeout(connect, 2000);
+          });
+        },
+      );
+      req.on("error", () => {
+        if (!cancelled) setTimeout(connect, 5000);
+      });
+      req.end();
+      currentReq = req;
+    };
+
+    connect();
+    return () => {
+      cancelled = true;
+      if (currentReq) currentReq.destroy();
+    };
+  }
 }

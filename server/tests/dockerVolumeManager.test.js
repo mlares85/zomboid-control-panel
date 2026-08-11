@@ -19,6 +19,12 @@ function createFakeDockerClient() {
       volumes.delete(name);
       return { success: true };
     },
+    async _requestJson(method, path) {
+      if (method === "GET" && path === "/volumes") {
+        return { success: true, data: { Volumes: [...volumes.values()] } };
+      }
+      return { success: false };
+    },
   };
 }
 
@@ -100,6 +106,15 @@ describe("dockerVolumeManager", () => {
       const result = await manager.listManagedVolumes();
       expect(result.base.name).toBe("zomboid-panel-base");
       expect(result.base.mountpoint).toBeDefined();
+    });
+
+    it("lists per-server volumes with parsed serverName", async () => {
+      await manager.createServerVolume("alpha");
+      await manager.createServerVolume("beta");
+      await fakeClient.createVolume("unrelated-vol");
+      const result = await manager.listManagedVolumes();
+      expect(result.servers).toHaveLength(2);
+      expect(result.servers.map((s) => s.serverName).sort()).toEqual(["alpha", "beta"]);
     });
   });
 });

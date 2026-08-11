@@ -465,11 +465,18 @@ export class ServerManager {
     const ref = this._dockerRef();
     const info = await this.dockerClient.inspectContainer(ref);
     if (!info) {
-      // Could mean "not found" or "socket call failed" — either way we can't
-      // positively confirm it's running, so report not-running rather than
-      // stuck. scanFailed lets callers avoid destructive fallback logic.
+      // Gap 5: distinguish "container gone" from "socket call failed".
+      // If the Docker client is available but inspect returned nothing,
+      // the container was removed externally.
       this.isRunning = false;
-      return { running: false, matched: [], owned: [], scanFailed: true };
+      const socketOk = this.dockerClient?.available;
+      return {
+        running: false,
+        matched: [],
+        owned: [],
+        scanFailed: !socketOk,
+        containerMissing: socketOk,
+      };
     }
     const running = Boolean(info.State?.Running);
     const entry = { cmd: `docker container ${info.Name || ref}`, container: ref };
@@ -479,6 +486,7 @@ export class ServerManager {
       matched: running ? [entry] : [],
       owned: running ? [entry] : [],
       scanFailed: false,
+      containerMissing: false,
     };
   }
 
@@ -1260,27 +1268,39 @@ export class ServerManager {
         attempts++;
       }
 
-      // Force stop if still running
-      if (await this.checkServerRunning()) {
-        const forced = await this.stopServer(false);
-        if (!forced?.success) {
-          throw new Error(
-            `The old server process could not be stopped (${forced?.error || "unknown error"}), so it was not restarted`,
-          );
+      // Gap 7: Docker-backed servers use a single restart call instead of
+      // the multi-step stop → wait → start sequence. The restart policy
+      // handles the timing; we just need to kick it.
+      if (this._isDockerBacked()) {
+        const ref = this._dockerRef();
+        const restartResult = await this.dockerClient.restartContainer(ref);
+        if (!restartResult.success) {
+          throw new Error(`Docker restart failed: ${restartResult.error}`);
         }
-        await this.sleep(5000);
-      }
+        this.isRunning = true;
+      } else {
+        // Force stop if still running (native process path)
+        if (await this.checkServerRunning()) {
+          const forced = await this.stopServer(false);
+          if (!forced?.success) {
+            throw new Error(
+              `The old server process could not be stopped (${forced?.error || "unknown error"}), so it was not restarted`,
+            );
+          }
+          await this.sleep(5000);
+        }
 
-      // Extra delay to let OS reap the process
-      await this.sleep(3000);
+        // Extra delay to let OS reap the process
+        await this.sleep(3000);
 
-      // Start the server — skip running check, we just confirmed it stopped
-      const started = await this.startServer({ skipRunningCheck: true });
-      if (!started?.success) {
-        return {
-          success: false,
-          message: `Server stopped but did not start again: ${started?.error || started?.message || "unknown error"}`,
-        };
+        // Start the server — skip running check, we just confirmed it stopped
+        const started = await this.startServer({ skipRunningCheck: true });
+        if (!started?.success) {
+          return {
+            success: false,
+            message: `Server stopped but did not start again: ${started?.error || started?.message || "unknown error"}`,
+          };
+        }
       }
 
       await logServerEvent("server_restart", "Server restarted");
