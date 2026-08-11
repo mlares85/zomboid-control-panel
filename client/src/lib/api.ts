@@ -2985,7 +2985,7 @@ export const mapApi = {
   // needs to address tiles at all, plus enough to build direct-to-upstream
   // tile URLs and load them from the browser instead of through this
   // server's proxy — see the /api/map/resolve route for why.
-  resolve: (): Promise<{
+  resolve: (version?: string): Promise<{
     root: string;
     b42Dir: string;
     b41Path: string;
@@ -2993,13 +2993,15 @@ export const mapApi = {
     width: number;
     height: number;
     maxLevel: number;
-    // Isometric projection origin from the build's own map_info.json.
-    // Absent if map.projectzomboid.com couldn't be reached.
     x0?: number;
     y0?: number;
     sqr?: number;
     scale?: number;
-  }> => apiGet("/map/resolve"),
+  }> => apiGet(`/map/resolve${version ? `?version=${encodeURIComponent(version)}` : ''}`),
+  versions: (): Promise<{
+    versions: Array<{ directory: string; label: string; isDefault: boolean }>;
+    current: string;
+  }> => apiGet("/map/versions"),
   vehicles: (): Promise<{ vehicles: Array<{ id: number; x: number; y: number }> }> =>
     apiGet("/map/vehicles"),
 };

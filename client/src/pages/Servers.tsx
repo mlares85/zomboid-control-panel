@@ -1253,8 +1253,17 @@ export default function Servers() {
                       <label htmlFor="deleteBaseFiles" className="text-sm cursor-pointer">
                         <span className="font-medium text-destructive">Delete base game files</span>
                         <p className="text-muted-foreground mt-1">
-                          Removes the shared PZ server installation (~3 GB).{' '}
-                          <strong>Other managed servers using these files will break.</strong>
+                          Removes the shared PZ server installation (~3 GB).
+                          {(() => {
+                            const otherManaged = servers.filter(
+                              s => s.provider === 'docker-managed' && s.id !== deleteServer?.id
+                            )
+                            return otherManaged.length > 0 ? (
+                              <span className="block mt-1 text-destructive font-medium">
+                                ⚠ {otherManaged.length} other managed server{otherManaged.length > 1 ? 's' : ''} ({otherManaged.map(s => s.name).join(', ')}) will break!
+                              </span>
+                            ) : null
+                          })()}
                         </p>
                       </label>
                     </div>
