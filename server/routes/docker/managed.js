@@ -16,6 +16,39 @@ function getDockerClient(req) {
   return req.app.get("dockerClient");
 }
 
+// When the panel runs in a container, paths the user enters (e.g. /pz-server)
+// are container-internal. Docker bind mounts resolve against the HOST.
+// Resolve by inspecting the panel container's mounts via the Docker API.
+let hostPathCache = null;
+async function resolveHostPath(containerPath, dockerClient) {
+  if (!containerPath) return containerPath;
+  if (!hostPathCache) {
+    hostPathCache = new Map();
+    // Try common panel container names
+    for (const name of ["zomboid-panel", "zomboid-control-panel"]) {
+      const info = await dockerClient.inspectContainer(name);
+      if (!info?.Mounts) continue;
+      for (const m of info.Mounts) {
+        if (m.Destination && m.Source) hostPathCache.set(m.Destination, m.Source);
+      }
+      break;
+    }
+  }
+  // Exact match first, then longest prefix match
+  if (hostPathCache.has(containerPath)) return hostPathCache.get(containerPath);
+  let bestMount = "";
+  let bestHost = "";
+  for (const [dest, src] of hostPathCache) {
+    if (containerPath.startsWith(dest + "/") && dest.length > bestMount.length) {
+      bestMount = dest;
+      bestHost = src;
+    }
+  }
+  if (bestMount) return containerPath.replace(bestMount, bestHost);
+  return containerPath;
+}
+
+
 function getManagedDeps(req) {
   const dockerClient = getDockerClient(req);
   if (!dockerClient?.available) return null;
@@ -128,8 +161,13 @@ router.post("/servers", async (req, res) => {
     if (!deps) return res.status(503).json({ success: false, error: "Docker unavailable" });
 
     const { serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb, adminPassword, basePath, image } = req.body;
+    // Resolve container-internal paths to host paths for bind mounts
+    const hostBasePath = basePath ? await resolveHostPath(basePath, deps.dockerClient) : undefined;
+    if (basePath && hostBasePath !== basePath) {
+      log.info(`Resolved container path ${basePath} → host path ${hostBasePath}`);
+    }
     const result = await deps.containerFactory.createManagedServer({
-      serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb, basePath, image,
+      serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb, basePath: hostBasePath, image,
     });
     if (!result.success) return res.status(502).json({ success: false, error: result.error });
 
