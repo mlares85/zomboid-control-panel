@@ -1,35 +1,34 @@
 # Active Context
 
 ## Current Focus
-Docker-managed servers fully wired end-to-end. Setup wizard, backend
-routes, container creation with shared base files, and PanelBridge
-auto-install all deployed to Unraid. Need real-world testing of the
-container actually running PZ (start-server.sh with the bind-mount
-topology).
+Docker-managed servers deployed end-to-end on Unraid. Container creates
+but PZ hasn't been validated running yet — the `eclipse-temurin:21-jre`
+image may need additional Linux packages, and the read-only base mount
+may cause issues with PZ writing temp/log files to its install dir.
 
 ## Recent Decisions
-- Alpine images won't work — PZ native libs (libpzexe_jni64.so, 
-  libsteam_api.so) require glibc. Default image: eclipse-temurin:21-jre.
-- Containers join a `zomboid-panel-net` bridge network so RCON traffic
-  stays internal between panel and server containers.
-- Game ports increment by 2 (game + direct connect UDP) to avoid
-  collisions between multi-server setups.
-- Removed ich777 ProjectZomboid container from Unraid — replaced by
-  panel-managed Docker flow. Existing game files at
-  /mnt/cache/appdata/projectzomboid/ kept as shared base.
-- SSH deploy to Unraid: clone → build on server → stop → run with
-  same env/mounts. Key: ~/.ssh/breakingbread_deploy, host: 192.168.1.85.
+- Container-internal paths (e.g. /pz-server) are auto-resolved to host
+  paths via Docker API inspection of the panel's own mounts. System-
+  agnostic — works on any Docker deployment, not just Unraid.
+- "Remove From Panel" for docker-managed servers also stops and removes
+  the container. Non-managed servers just remove the DB record.
+- Docker lifecycle (start/stop/restart) is separate from the Remove
+  button — managed via the existing dashboard card actions.
+- Custom container image configurable in Advanced Options with glibc
+  warning (Alpine won't work).
+- SSH deploy to Unraid: clone → build on server → stop → run.
+  Key: ~/.ssh/breakingbread_deploy, host: 192.168.1.85.
 
 ## Blockers / Open Questions
-- Container may need additional Linux packages (lib32gcc-s1?) for PZ
-  to actually run — untested at runtime yet.
-- PZ start-server.sh expects to write to its install dir for logs/tmp
-  but base is mounted read-only — may need a tmpfs or writable overlay.
+- PZ server hasn't been validated actually running in the managed
+  container yet. May need lib32gcc-s1, tmpfs for install dir writes.
 - Dashboard.tsx (1,556 lines) and Backups.tsx (1,060+ lines) still
   need decomposition.
-- Template frontend integration still pending (capture mods, preview).
+- Template frontend integration pending (capture mods, preview).
+- Docker setup wizard could benefit from better error messaging when
+  the container fails to start (show container logs in the UI).
 
 ## Next Steps
-1. Test a Docker-managed server actually running PZ end-to-end on Unraid.
-2. Fix any runtime issues (missing libs, read-only mount problems).
+1. Test managed container actually running PZ — fix runtime issues.
+2. Show container logs in panel when a managed server fails to start.
 3. Template frontend: wire CreateTemplateDialog to capture mods.
