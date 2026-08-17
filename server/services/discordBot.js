@@ -1000,10 +1000,18 @@ export class DiscordBot {
       );
       return;
     }
-    const quit = await this.rconService.quit();
-    if (!quit?.success) {
+
+    // For Docker-backed servers, stop the container instead of RCON quit.
+    // RCON quit kills PID 1, causing the restart policy to revive it.
+    let result;
+    if (this.serverManager._isDockerBacked()) {
+      result = await this.serverManager.stopServer(false);
+    } else {
+      result = await this.rconService.quit();
+    }
+    if (!result?.success) {
       await interaction.editReply(
-        `❌ The world was saved, but the shutdown command failed: ${sanitizeError(quit?.error)}`,
+        `❌ The world was saved, but the shutdown command failed: ${sanitizeError(result?.error)}`,
       );
       return;
     }

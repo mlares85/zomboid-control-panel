@@ -157,10 +157,10 @@ export class DockerClient {
     });
   }
 
-  async _requestJson(method, path, body) {
+  async _requestJson(method, path, body, timeoutMs) {
     if (!this.available) return { success: false, error: "Docker socket unavailable" };
     try {
-      const { statusCode, body: raw } = await this._request(method, path, body);
+      const { statusCode, body: raw } = await this._request(method, path, body, timeoutMs);
       const text = raw.toString("utf-8").trim();
       const data = text ? JSON.parse(text) : null;
       if (statusCode >= 400) {
@@ -201,10 +201,23 @@ export class DockerClient {
     return this._lifecycleAction(id, "restart");
   }
 
+  // Compute a safe HTTP timeout for stop/restart based on the container's
+  // StopTimeout (the grace period Docker waits before SIGKILL). The default
+  // REQUEST_TIMEOUT_MS is only 8s, but PZ's Build 42 world save can take
+  // much longer — Compose commonly sets stop_grace_period to 90s+.
+  async _lifecycleTimeoutMs(id, action) {
+    if (action === "start") return REQUEST_TIMEOUT_MS;
+    const info = await this.inspectContainer(id);
+    const stopTimeout = info?.Config?.StopTimeout ?? info?.HostConfig?.StopTimeout ?? 10;
+    // Budget: container stop timeout + 15s headroom for Docker overhead
+    return (stopTimeout + 15) * 1000;
+  }
+
   async _lifecycleAction(id, action) {
     if (!id) return { success: false, error: "Container id is required" };
     if (!this.available) return { success: false, error: "Docker socket unavailable" };
-    const result = await this._requestJson("POST", `/containers/${encodeURIComponent(id)}/${action}`);
+    const timeoutMs = await this._lifecycleTimeoutMs(id, action);
+    const result = await this._requestJson("POST", `/containers/${encodeURIComponent(id)}/${action}`, undefined, timeoutMs);
     // Docker returns 204 (no body) on success, 304 if already in that state.
     if (result.statusCode === 304) {
       return { success: true, message: `Container already ${action === "stop" ? "stopped" : "running"}` };

@@ -862,56 +862,70 @@ export class Scheduler {
       }
       await this.sleep(3000);
 
-      // Quit server - skip logging for automated quit
-      log.info("Auto-restart: Sending quit command...");
-      const quit = await rconService.quit({ skipLog: true });
-      if (!quit?.success) {
-        log.warn(
-          `Auto-restart: quit command failed (${quit?.error || "unknown error"}), falling back to a forced stop`,
-        );
-      }
-      await this.sleep(10000);
-
-      // Wait for server to stop
-      let attempts = 0;
-      while ((await serverManager.checkServerRunning()) && attempts < 60) {
-        await this.sleep(1000);
-        attempts++;
-      }
-
-      // Force stop if needed
-      if (await serverManager.checkServerRunning()) {
-        const forced = await serverManager.stopServer(false);
-        if (!forced?.success) {
+      // For Docker-backed servers, use Docker restart instead of the
+      // RCON quit → wait → start sequence. RCON quit kills PID 1 inside
+      // the container, and the restart policy revives it immediately.
+      if (serverManager._isDockerBacked()) {
+        log.info("Auto-restart: Docker-backed server — using container restart");
+        await this._ensureRestartTarget(serverManager, pinnedServerId);
+        const ref = serverManager._dockerRef();
+        const restartResult = await serverManager.dockerClient.restartContainer(ref);
+        if (!restartResult.success) {
+          log.warn(`Auto-restart: Docker restart failed: ${restartResult.error}`);
+        }
+        serverManager.isRunning = true;
+      } else {
+        // Native process path: RCON quit → wait → force stop → start
+        log.info("Auto-restart: Sending quit command...");
+        const quit = await rconService.quit({ skipLog: true });
+        if (!quit?.success) {
           log.warn(
-            `Auto-restart: forced stop reported failure: ${forced?.error || forced?.message || "unknown error"}`,
+            `Auto-restart: quit command failed (${quit?.error || "unknown error"}), falling back to a forced stop`,
           );
         }
-        await this.sleep(5000);
-      }
+        await this.sleep(10000);
 
-      // Extra delay after stop — give OS time to fully reap the process
-      // (zombie processes on Linux, WMI cache on Windows)
-      await this.sleep(3000);
+        // Wait for server to stop
+        let attempts = 0;
+        while ((await serverManager.checkServerRunning()) && attempts < 60) {
+          await this.sleep(1000);
+          attempts++;
+        }
 
-      // Set flag to prevent RCON auto-reconnect from interfering during startup
-      // Use setServerStarting which has a 5-minute failsafe timeout
-      if (rconService.setServerStarting) {
-        rconService.setServerStarting(true);
-      } else {
-        rconService.serverStarting = true;
-      }
+        // Force stop if needed
+        if (await serverManager.checkServerRunning()) {
+          const forced = await serverManager.stopServer(false);
+          if (!forced?.success) {
+            log.warn(
+              `Auto-restart: forced stop reported failure: ${forced?.error || forced?.message || "unknown error"}`,
+            );
+          }
+          await this.sleep(5000);
+        }
 
-      // Start server — skip the running check since we just confirmed the server stopped
-      log.info("Auto-restart: Starting server...");
-      await this._ensureRestartTarget(serverManager, pinnedServerId);
-      const restarted = await serverManager.startServer({
-        skipRunningCheck: true,
-      });
-      if (!restarted?.success) {
-        log.warn(
-          `Auto-restart: start command reported failure: ${restarted?.error || restarted?.message || "unknown error"}`,
-        );
+        // Extra delay after stop — give OS time to fully reap the process
+        // (zombie processes on Linux, WMI cache on Windows)
+        await this.sleep(3000);
+
+        // Set flag to prevent RCON auto-reconnect from interfering during startup
+        // Use setServerStarting which has a 5-minute failsafe timeout
+        if (rconService.setServerStarting) {
+          rconService.setServerStarting(true);
+        } else {
+          rconService.serverStarting = true;
+        }
+
+        // Start server — skip the running check since we just confirmed the server stopped
+        log.info("Auto-restart: Starting server...");
+        await this._ensureRestartTarget(serverManager, pinnedServerId);
+        const restarted = await serverManager.startServer({
+          skipRunningCheck: true,
+        });
+        if (!restarted?.success) {
+          log.warn(
+            `Auto-restart: start command reported failure: ${restarted?.error || restarted?.message || "unknown error"}`,
+          );
+        }
       }
 
       // Wait for server process to be running (up to 60 seconds)

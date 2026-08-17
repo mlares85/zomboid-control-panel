@@ -23,6 +23,7 @@ import {
   Network,
   Play,
   Square,
+  Link,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -978,6 +979,16 @@ export default function Servers() {
                       </Button>
                     )
                   })()}
+                  {server.isRemote && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate('/settings?tab=bridge')}
+                      title="Configure the SFTP bridge for this remote server"
+                    >
+                      <Link className="w-4 h-4 mr-1.5" /> Configure SFTP Bridge
+                    </Button>
+                  )}
                   {hasUpdate && (
                     <Button
                       size="sm"

@@ -100,10 +100,11 @@ export function registerLifecycleRoutes(router) {
     }
   });
 
-  // Stop server (graceful via RCON)
+  // Stop server (graceful via RCON, routed through Docker for managed containers)
   router.post("/stop", async (req, res) => {
     try {
       const rconService = req.app.get("rconService");
+      const serverManager = req.app.get("serverManager");
       log.info("POST /stop — graceful shutdown requested");
 
       // Check if RCON is connected first
@@ -125,8 +126,15 @@ export function registerLifecycleRoutes(router) {
         });
       }
 
-      // Then quit
-      const result = await rconService.quit();
+      // For Docker-backed servers, stop the container instead of RCON quit.
+      // RCON quit kills PID 1 inside the container, causing the restart
+      // policy to revive it — the server never actually stops.
+      let result;
+      if (serverManager._isDockerBacked()) {
+        result = await serverManager.stopServer(false);
+      } else {
+        result = await rconService.quit();
+      }
 
       const io = req.app.get("io");
       if (io) io.to("server-status").emit("server:status", { running: false });

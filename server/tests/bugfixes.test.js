@@ -949,7 +949,10 @@ describe("Discord /stop", () => {
     const { DiscordBot } = await import("../services/discordBot.js");
     const bot = Object.create(DiscordBot.prototype);
     const calls = [];
-    bot.serverManager = { checkServerRunning: async () => true };
+    bot.serverManager = {
+      checkServerRunning: async () => true,
+      _isDockerBacked: () => false,
+    };
     bot.rconService = {
       connected: true,
       save: async () => {

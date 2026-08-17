@@ -29,4 +29,13 @@ fi
 mkdir -p /app/data /app/logs
 chown -R "$puid:$pgid" /app/data /app/logs
 
+# Preserve supplementary groups (e.g. docker GID for /var/run/docker.sock)
+# so group_add / --group-add entries survive the privilege drop.
+supplementary="$(id -G | tr ' ' '\n' | grep -vx '0' | grep -vx "$pgid" | paste -sd, -)"
+
+if [ -n "$supplementary" ]; then
+  echo "Preserving supplementary groups: $supplementary" >&2
+  exec setpriv --reuid="$puid" --regid="$pgid" --groups "$supplementary" "$@"
+fi
+
 exec setpriv --reuid="$puid" --regid="$pgid" --clear-groups "$@"

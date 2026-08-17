@@ -4,9 +4,32 @@ import { getSetting, setSetting } from "../database/init.js";
 const SETTINGS_KEY = "backupRecordsV2";
 const MAX_RECORDS = 500; // matches the retention cap other history arrays use in database/init.js
 
-export async function listRecords({ limit, serverId, serverName } = {}) {
+// Serialized mutation queue — prevents concurrent read-modify-write races
+// when e.g. two backup jobs finish at the same time.
+let mutationChain = Promise.resolve();
+
+function mutateRecords(mutator) {
+  const operation = mutationChain.then(async () => {
+    const records = await readAllRecords();
+    const result = await mutator(records);
+    await saveRecords(records);
+    return result;
+  });
+  // Swallow rejections on the chain so a failed mutation doesn't block
+  // subsequent ones, but the returned promise still rejects for the caller.
+  mutationChain = operation.then(() => undefined, () => undefined);
+  return operation;
+}
+
+// Raw read without filtering/sorting — used by mutateRecords so it operates
+// on the full stored array, not a filtered/truncated subset.
+async function readAllRecords() {
   const stored = await getSetting(SETTINGS_KEY);
-  let records = Array.isArray(stored) ? stored : [];
+  return Array.isArray(stored) ? stored : [];
+}
+
+export async function listRecords({ limit, serverId, serverName } = {}) {
+  let records = await readAllRecords();
   if (serverId) {
     records = records.filter((r) => r.serverSnapshot?.serverId === serverId);
   }
@@ -79,23 +102,22 @@ export async function addRecord(fields) {
     sizeBytes: fields.compressedSize,
     serverSnapshot: fields.serverSnapshot ?? null,
   };
-  const records = await listRecords();
-  records.unshift(record);
-  await saveRecords(records);
+  await mutateRecords((records) => { records.unshift(record); });
   return record;
 }
 
 export async function updateRecord(id, updates) {
-  const records = await listRecords();
-  const index = records.findIndex((r) => r.id === id);
-  if (index === -1) throw new Error(`Backup record not found: ${id}`);
-  records[index] = { ...records[index], ...updates };
-  await saveRecords(records);
-  return records[index];
+  return mutateRecords((records) => {
+    const index = records.findIndex((r) => r.id === id);
+    if (index === -1) throw new Error(`Backup record not found: ${id}`);
+    records[index] = { ...records[index], ...updates };
+    return records[index];
+  });
 }
 
 export async function deleteRecord(id) {
-  const records = await listRecords();
-  const next = records.filter((r) => r.id !== id);
-  await saveRecords(next);
+  await mutateRecords((records) => {
+    const retained = records.filter((r) => r.id !== id);
+    records.splice(0, records.length, ...retained);
+  });
 }

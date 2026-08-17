@@ -136,23 +136,40 @@ describe('DockerClient — against a mock Docker API over a Unix socket', () => 
   });
 
   it('stops a container via POST /containers/{id}/stop', async () => {
-    await startMockServer((req, res) => res.writeHead(204).end());
+    await startMockServer((req, res) => {
+      if (req.method === 'GET' && req.url === '/containers/c1/json') {
+        // inspectContainer to read StopTimeout
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ Config: { StopTimeout: 10 } }));
+      } else {
+        res.writeHead(204).end();
+      }
+    });
     const client = new DockerClient(socketPath);
 
     const result = await client.stopContainer('c1');
 
     expect(result).toEqual({ success: true });
-    expect(requests[0]).toEqual({ method: 'POST', url: '/containers/c1/stop' });
+    expect(requests[0]).toEqual({ method: 'GET', url: '/containers/c1/json' });
+    expect(requests[1]).toEqual({ method: 'POST', url: '/containers/c1/stop' });
   });
 
   it('restarts a container via POST /containers/{id}/restart', async () => {
-    await startMockServer((req, res) => res.writeHead(204).end());
+    await startMockServer((req, res) => {
+      if (req.method === 'GET' && req.url === '/containers/c1/json') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ Config: { StopTimeout: 10 } }));
+      } else {
+        res.writeHead(204).end();
+      }
+    });
     const client = new DockerClient(socketPath);
 
     const result = await client.restartContainer('c1');
 
     expect(result).toEqual({ success: true });
-    expect(requests[0]).toEqual({ method: 'POST', url: '/containers/c1/restart' });
+    expect(requests[0]).toEqual({ method: 'GET', url: '/containers/c1/json' });
+    expect(requests[1]).toEqual({ method: 'POST', url: '/containers/c1/restart' });
   });
 
   it('treats a 304 (already in that state) as success', async () => {
