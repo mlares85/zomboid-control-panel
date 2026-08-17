@@ -1,24 +1,31 @@
 # Active Context
 
 ## Current Focus
-Docker lifecycle hardened and deployed. Map tile loading fixed.
-Next: validate PZ actually runs inside a managed container on Unraid.
+Upstream ports complete (v1.1.42–v1.1.47). Fork is now caught up with
+origin/main. Next: validate PZ actually runs inside a managed container
+on Unraid, then continue frontend decomposition.
 
 ## Recent Decisions
+- Ported 4 upstream fixes: logout jwt.verify (issue #43), Docker
+  lifecycle routing (stop/restart through serverManager for containers),
+  backup records mutation queue, SFTP bridge link on server cards.
+- Docker stop/restart: all call sites (web `/stop`, Discord `/stop`,
+  scheduler auto-restart) now route through `serverManager.stopServer()`
+  or `dockerClient.restartContainer()` for Docker-backed servers instead
+  of `rconService.quit()` (which killed PID 1 and triggered restart
+  policy).
+- `dockerClient._lifecycleAction` reads the container's `StopTimeout`
+  for a per-action HTTP timeout instead of the flat 8s default.
+- `docker/entrypoint.sh` preserves supplementary groups (docker GID)
+  instead of `--clear-groups` unconditionally.
+- `backupRecords.js` mutations serialized through a promise-chain queue
+  to prevent concurrent read-modify-write races.
 - RCON host uses Docker container name (not 127.0.0.1) because the panel
   auto-connects itself to `zomboid-panel-net` — required for container-to-
   container DNS resolution.
-- Managed containers get `RestartPolicy: unless-stopped` so they survive
-  daemon restarts and auto-recover from crashes.
-- Docker restart for managed servers uses a single `restartContainer()`
-  call instead of the multi-step RCON quit → stop → wait → start flow
-  (the RCON warning/save sequence still runs before the restart kicks in).
 - Map build_list.json moved under a deploy-timestamped static root on
   map.projectzomboid.com. Panel discovers it by scraping
   `__PZMAP_STATIC_ROOT` from the homepage HTML (24h cache).
-- Delete dialog for docker-managed servers: three independent options
-  (remove from panel / delete container+data / delete base game files).
-  Base files option warns by name about other affected servers.
 - SSH deploy to Unraid: clone → build on server → stop → run.
   Key: ~/.ssh/breakingbread_deploy, host: 192.168.1.85.
 
