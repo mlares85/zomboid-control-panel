@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 import { sanitizeError, sanitizeIniList, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
 import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
@@ -15,6 +15,7 @@ const router = express.Router();
 // Remove a single mod from server .ini file
 router.post("/remove-from-ini", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { workshopId, modId, modIds: clientModIds } = req.body;
 
     if (!workshopId) {
@@ -50,12 +51,12 @@ router.post("/remove-from-ini", async (req, res) => {
 
     const iniPath = path.join(serverConfigPath, `${sanitizedServerName}.ini`);
 
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(400).json({ error: "Server config file not found" });
     }
 
     // Atomically read-modify-write inside the lock
-    const lockResult = await withIniLock(iniPath, () => {
+    const lockResult = await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
 
       // Get current workshop items
@@ -187,7 +188,7 @@ router.post("/remove-from-ini", async (req, res) => {
         );
       }
 
-      fs.writeFileSync(iniPath, content, "utf-8");
+      await fileAccess.writeFile(iniPath, content);
       return {
         removedModIds,
         removedMapFolders,

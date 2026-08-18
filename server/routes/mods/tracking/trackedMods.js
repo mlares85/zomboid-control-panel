@@ -80,7 +80,8 @@ router.get("/tracked", async (req, res) => {
               for (const wsId of configuredIds) {
                 if (trackedSet.has(wsId)) continue;
                 if (await isModIgnored(wsId)) continue;
-                const nameFromDisk = modChecker?.resolveModNameFromDisk(wsId);
+                const nameFromDisk =
+                  await modChecker?.resolveModNameFromDisk(wsId);
                 await addTrackedMod(
                   wsId,
                   nameFromDisk || `Workshop Mod ${wsId}`,
@@ -107,7 +108,7 @@ router.get("/tracked", async (req, res) => {
       const unresolvedIds = [];
       for (const mod of mods) {
         if (shouldRefreshTrackedModName(mod.name)) {
-          const realName = modChecker.resolveModNameFromDisk(
+          const realName = await modChecker.resolveModNameFromDisk(
             mod.workshop_id,
             true,
           );
@@ -169,7 +170,7 @@ router.post("/refresh-names", async (req, res) => {
 
     // Pass 1: try disk
     for (const mod of candidates) {
-      const nameFromDisk = modChecker?.resolveModNameFromDisk(
+      const nameFromDisk = await modChecker?.resolveModNameFromDisk(
         mod.workshop_id,
         true,
       );

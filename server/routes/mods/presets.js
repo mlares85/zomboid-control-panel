@@ -1,5 +1,4 @@
 import express from "express";
-import fs from "fs";
 import { createLogger } from "../../utils/logger.js";
 import {
   getModPresets,
@@ -10,6 +9,7 @@ import {
 import { sanitizeError, sanitizeIniList, sanitizeModIdList } from "../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getSanitizedIniPath } from "../../utils/mods/serverConfig.js";
 import { readTextFile, withIniLock } from "../../utils/mods/iniFile.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
 const router = express.Router();
@@ -30,6 +30,7 @@ router.get("/presets", async (req, res) => {
 // Create a mod preset (save current mods as a preset)
 router.post("/presets", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     let { name, description } = req.body;
     if (!name || typeof name !== "string") {
       return res.status(400).json({ error: "Preset name is required" });
@@ -55,7 +56,7 @@ router.post("/presets", async (req, res) => {
       return res.status(400).json({ error: "Invalid server name" });
     }
 
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(400).json({ error: "Server INI not found" });
     }
 
@@ -157,6 +158,7 @@ router.delete("/presets/:id", async (req, res) => {
 // Apply a mod preset (load mods from preset)
 router.post("/presets/:id/apply", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { id } = req.params;
     const presets = await getModPresets();
     const preset = presets.find((p) => String(p.id) === String(id));
@@ -173,11 +175,11 @@ router.post("/presets/:id/apply", async (req, res) => {
       return res.status(400).json({ error: "Invalid server name" });
     }
 
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(400).json({ error: "Server INI not found" });
     }
 
-    await withIniLock(iniPath, () => {
+    await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
 
       const workshopLine = `WorkshopItems=${sanitizeIniList(preset.workshop_ids || [])}`;
@@ -194,7 +196,7 @@ router.post("/presets/:id/apply", async (req, res) => {
         content += `\n${modsLine}`;
       }
 
-      fs.writeFileSync(iniPath, content, "utf-8");
+      await fileAccess.writeFile(iniPath, content, "utf-8");
     });
 
     log.info(

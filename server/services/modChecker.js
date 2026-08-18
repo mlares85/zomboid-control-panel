@@ -11,11 +11,11 @@ import {
   isModIgnored,
   markModsChecked,
 } from "../database/init.js";
-import fs from "fs";
 import path from "path";
 import { EventEmitter } from "events";
 import { sanitizeError } from "../utils/sanitize.js";
 import panelBridge from "./panelBridge.js";
+import { LocalFiles } from "./fileAccess/index.js";
 
 export const MOD_CHECK_INTERVAL_MINUTES_MIN = 1;
 export const MOD_CHECK_INTERVAL_MINUTES_MAX = 120;
@@ -102,8 +102,9 @@ function compareModInfoCandidates(leftCandidate, rightCandidate) {
 }
 
 export class ModChecker extends EventEmitter {
-  constructor() {
+  constructor(fileAccess) {
     super();
+    this.fileAccess = fileAccess || new LocalFiles();
     this.checkInterval =
       normalizeStoredCheckInterval(process.env.MOD_CHECK_INTERVAL)
         ?.intervalMs || MOD_CHECK_INTERVAL_DEFAULT_MS;
@@ -238,7 +239,7 @@ export class ModChecker extends EventEmitter {
     try {
       // Allow manual override from settings
       const manualPath = await getSetting("modWorkshopAcfPath");
-      if (manualPath && fs.existsSync(manualPath)) {
+      if (manualPath && (await this.fileAccess.exists(manualPath))) {
         this.workshopAcfPath = manualPath;
         log.info(`Using configured workshop ACF: ${manualPath}`);
         return manualPath;
@@ -270,7 +271,7 @@ export class ModChecker extends EventEmitter {
         "appworkshop_108600.acf",
       );
 
-      if (fs.existsSync(acfPath)) {
+      if (await this.fileAccess.exists(acfPath)) {
         this.workshopAcfPath = acfPath;
         log.info(`Found workshop ACF at ${acfPath}`);
         return acfPath;
@@ -284,7 +285,7 @@ export class ModChecker extends EventEmitter {
         "workshop",
         "appworkshop_108600.acf",
       );
-      if (fs.existsSync(acfPathUp)) {
+      if (await this.fileAccess.exists(acfPathUp)) {
         this.workshopAcfPath = acfPathUp;
         log.info(`Found workshop ACF at parent: ${acfPathUp}`);
         return acfPathUp;
@@ -407,8 +408,49 @@ export class ModChecker extends EventEmitter {
     return result;
   }
 
+  // Helper: pick the best mod.info candidate path for a mod folder, probing
+  // the mod root plus every direct subdirectory (B42 mods may nest mod.info
+  // under a versioned subdirectory like '42' or '42.15').
+  async _resolveModInfoPath(modFolderPath) {
+    const candidatePaths = [
+      { path: path.join(modFolderPath, "mod.info"), version: null, order: 0 },
+    ];
+    try {
+      const subfolders = (
+        await this.fileAccess.readdir(modFolderPath, { withFileTypes: true })
+      )
+        .filter((entry) => entry.isDirectory)
+        .map((entry) => entry.name)
+        .sort((leftName, rightName) =>
+          leftName.localeCompare(rightName, undefined, {
+            numeric: true,
+            sensitivity: "base",
+          }),
+        );
+      for (const [subIndex, subfolder] of subfolders.entries()) {
+        candidatePaths.push({
+          path: path.join(modFolderPath, subfolder, "mod.info"),
+          version: parseModInfoVersionFolder(subfolder),
+          order: subIndex + 1,
+        });
+      }
+    } catch {
+      // Not a directory or unreadable — fall through
+    }
+
+    const withExistence = await Promise.all(
+      candidatePaths.map(async (candidate) => ({
+        ...candidate,
+        exists: await this.fileAccess.exists(candidate.path),
+      })),
+    );
+    return withExistence
+      .filter((candidate) => candidate.exists)
+      .sort(compareModInfoCandidates)[0]?.path;
+  }
+
   // Helper: Try to resolve mod name from disk
-  resolveModNameFromDisk(workshopId, skipCache = false) {
+  async resolveModNameFromDisk(workshopId, skipCache = false) {
     // Check cache first (with size limit)
     if (!skipCache && this.modNameCache.has(workshopId)) {
       return this.modNameCache.get(workshopId).name;
@@ -433,7 +475,7 @@ export class ModChecker extends EventEmitter {
         workshopId,
       );
 
-      if (!fs.existsSync(contentDir)) return null;
+      if (!(await this.fileAccess.exists(contentDir))) return null;
 
       // Inside workshop folder, there is usually 'mods/ModName/mod.info'
       // OR sometimes just 'mods/ModName'. B42 mods may also put mod.info
@@ -441,10 +483,11 @@ export class ModChecker extends EventEmitter {
       // 'mods/ModName/42/mod.info', 'mods/ModName/42.0/mod.info', etc.
       // We probe the mod root and every direct subdirectory.
       const modsDir = path.join(contentDir, "mods");
-      if (fs.existsSync(modsDir)) {
-        const modFolders = fs
-          .readdirSync(modsDir, { withFileTypes: true })
-          .filter((entry) => entry.isDirectory())
+      if (await this.fileAccess.exists(modsDir)) {
+        const modFolders = (
+          await this.fileAccess.readdir(modsDir, { withFileTypes: true })
+        )
+          .filter((entry) => entry.isDirectory)
           .map((entry) => entry.name)
           .sort((leftName, rightName) =>
             leftName.localeCompare(rightName, undefined, {
@@ -455,39 +498,11 @@ export class ModChecker extends EventEmitter {
         // Just take the first valid mod found in the package
         for (const folder of modFolders) {
           const modFolderPath = path.join(modsDir, folder);
-          const candidatePaths = [
-            {
-              path: path.join(modFolderPath, "mod.info"),
-              version: null,
-              order: 0,
-            },
-          ];
-          try {
-            const subfolders = fs
-              .readdirSync(modFolderPath, { withFileTypes: true })
-              .filter((entry) => entry.isDirectory())
-              .map((entry) => entry.name)
-              .sort((leftName, rightName) =>
-                leftName.localeCompare(rightName, undefined, {
-                  numeric: true,
-                  sensitivity: "base",
-                }),
-              );
-            for (const [subIndex, subfolder] of subfolders.entries()) {
-              candidatePaths.push({
-                path: path.join(modFolderPath, subfolder, "mod.info"),
-                version: parseModInfoVersionFolder(subfolder),
-                order: subIndex + 1,
-              });
-            }
-          } catch {
-            // Not a directory or unreadable — fall through
-          }
-          const modInfoPath = candidatePaths
-            .filter((candidate) => fs.existsSync(candidate.path))
-            .sort(compareModInfoCandidates)[0]?.path;
+          const modInfoPath = await this._resolveModInfoPath(modFolderPath);
           if (modInfoPath) {
-            let content = fs.readFileSync(modInfoPath, "utf-8");
+            const result = await this.fileAccess.readFile(modInfoPath);
+            if (!result.success) throw new Error(result.error);
+            let content = result.data;
             if (content.charCodeAt(0) === 0xfeff) content = content.slice(1);
             const nameMatch = content.match(/^\s*name\s*=\s*(.+)$/m);
             if (nameMatch && nameMatch[1]) {
@@ -527,7 +542,10 @@ export class ModChecker extends EventEmitter {
   // Auto-sync mods from workshop ACF file on startup
   async autoSyncModsOnStartup() {
     try {
-      if (!this.workshopAcfPath || !fs.existsSync(this.workshopAcfPath)) {
+      if (
+        !this.workshopAcfPath ||
+        !(await this.fileAccess.exists(this.workshopAcfPath))
+      ) {
         log.debug("No workshop ACF file, skipping auto-sync");
         return;
       }
@@ -543,7 +561,9 @@ export class ModChecker extends EventEmitter {
       }
 
       // Read and parse the ACF file
-      let content = fs.readFileSync(this.workshopAcfPath, "utf-8");
+      const acfResult = await this.fileAccess.readFile(this.workshopAcfPath);
+      if (!acfResult.success) throw new Error(acfResult.error);
+      let content = acfResult.data;
       if (content.charCodeAt(0) === 0xfeff) content = content.slice(1);
       const parsed = this.parseAcfFile(content);
 
@@ -563,7 +583,7 @@ export class ModChecker extends EventEmitter {
           continue;
         }
         // Try to get name from disk
-        const nameFromDisk = this.resolveModNameFromDisk(id);
+        const nameFromDisk = await this.resolveModNameFromDisk(id);
         const name = nameFromDisk || `Workshop Mod ${id}`;
 
         await addTrackedMod(id, name);
@@ -585,7 +605,7 @@ export class ModChecker extends EventEmitter {
     return !!this.intervalId;
   }
 
-  start({ resetGracePeriod = true } = {}) {
+  async start({ resetGracePeriod = true } = {}) {
     // Check if we have the workshop ACF file
     if (!this.workshopAcfPath) {
       log.warn(
@@ -594,7 +614,7 @@ export class ModChecker extends EventEmitter {
       return false;
     }
 
-    if (!fs.existsSync(this.workshopAcfPath)) {
+    if (!(await this.fileAccess.exists(this.workshopAcfPath))) {
       log.warn(`Workshop ACF file not found at ${this.workshopAcfPath}`);
       return false;
     }
@@ -1148,7 +1168,10 @@ export class ModChecker extends EventEmitter {
         await this.findWorkshopAcfPath();
       }
 
-      if (!this.workshopAcfPath || !fs.existsSync(this.workshopAcfPath)) {
+      if (
+        !this.workshopAcfPath ||
+        !(await this.fileAccess.exists(this.workshopAcfPath))
+      ) {
         log.warn("Workshop ACF file not found - cannot check for updates");
         return {
           updated: false,
@@ -1158,7 +1181,9 @@ export class ModChecker extends EventEmitter {
       }
 
       // Read and parse the ACF file for local timestamps
-      let content = fs.readFileSync(this.workshopAcfPath, "utf-8");
+      const acfResult = await this.fileAccess.readFile(this.workshopAcfPath);
+      if (!acfResult.success) throw new Error(acfResult.error);
+      let content = acfResult.data;
       if (content.charCodeAt(0) === 0xfeff) content = content.slice(1);
       const parsed = this.parseAcfFile(content);
 
@@ -1244,7 +1269,7 @@ export class ModChecker extends EventEmitter {
               continue;
             }
             const trackedMod = trackedMap.get(workshopId);
-            const nameFromDisk = this.resolveModNameFromDisk(workshopId);
+            const nameFromDisk = await this.resolveModNameFromDisk(workshopId);
             const modName =
               nameFromDisk || trackedMod?.name || `Workshop Mod ${workshopId}`;
             log.info(`Mod update available (ACF): ${modName} (${workshopId})`);
@@ -1273,7 +1298,7 @@ export class ModChecker extends EventEmitter {
               continue;
             }
 
-            const nameFromDisk = this.resolveModNameFromDisk(workshopId);
+            const nameFromDisk = await this.resolveModNameFromDisk(workshopId);
             const modName =
               nameFromDisk ||
               steam.title ||
@@ -1496,12 +1521,17 @@ export class ModChecker extends EventEmitter {
 
   // Get workshop info from ACF file, enriched with cached Steam API data
   async getWorkshopInfo() {
-    if (!this.workshopAcfPath || !fs.existsSync(this.workshopAcfPath)) {
+    if (
+      !this.workshopAcfPath ||
+      !(await this.fileAccess.exists(this.workshopAcfPath))
+    ) {
       return {};
     }
 
     try {
-      let content = fs.readFileSync(this.workshopAcfPath, "utf-8");
+      const acfResult = await this.fileAccess.readFile(this.workshopAcfPath);
+      if (!acfResult.success) throw new Error(acfResult.error);
+      let content = acfResult.data;
       if (content.charCodeAt(0) === 0xfeff) content = content.slice(1);
       const parsed = this.parseAcfFile(content);
 
@@ -1536,7 +1566,7 @@ export class ModChecker extends EventEmitter {
       const { addTrackedMod } = await import("../database/init.js");
 
       // Try to resolve the real name from mod.info on disk
-      const nameFromDisk = this.resolveModNameFromDisk(workshopId);
+      const nameFromDisk = await this.resolveModNameFromDisk(workshopId);
       const modName = nameFromDisk || `Workshop Mod ${workshopId}`;
 
       // Try to get mod info from local ACF file
@@ -1597,6 +1627,10 @@ export class ModChecker extends EventEmitter {
       },
     ).length;
 
+    const workshopAcfConfigured =
+      !!this.workshopAcfPath &&
+      (await this.fileAccess.exists(this.workshopAcfPath));
+
     return {
       running: !!this.intervalId,
       lastCheck:
@@ -1609,8 +1643,7 @@ export class ModChecker extends EventEmitter {
           : this.lastUpdateDetected || null,
       checkInterval: this.checkInterval,
       modsNeedingUpdate: this.modsNeedingUpdate,
-      workshopAcfConfigured:
-        !!this.workshopAcfPath && fs.existsSync(this.workshopAcfPath),
+      workshopAcfConfigured,
       workshopAcfPath: this.workshopAcfPath,
       totalModsInWorkshop: Object.keys(workshopInfo).length,
       totalModsTracked: Array.isArray(trackedMods) ? trackedMods.length : 0,
@@ -1635,7 +1668,7 @@ export class ModChecker extends EventEmitter {
     this.checkInterval = normalizedInterval.intervalMs;
     await setSetting("modCheckInterval", normalizedInterval.minutes);
     if (this.intervalId) {
-      this.start({ resetGracePeriod: false });
+      await this.start({ resetGracePeriod: false });
     }
     return this.checkInterval;
   }

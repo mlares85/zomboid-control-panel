@@ -1,11 +1,11 @@
 import express from "express";
-import fs from "fs";
 import { createLogger } from "../../utils/logger.js";
 import { sanitizeError, sanitizeModIdList } from "../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath, getSanitizedIniPath } from "../../utils/mods/serverConfig.js";
 import { readTextFile, withIniLock } from "../../utils/mods/iniFile.js";
 import { findAllModIdsFromWorkshop } from "../../utils/mods/workshopModInfo.js";
 import { findMapFoldersFromWorkshop } from "../../utils/mods/workshopPaths.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
 const router = express.Router();
@@ -13,6 +13,7 @@ const router = express.Router();
 // Save mod load order
 router.post("/save-order", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { modIds } = req.body;
 
     if (!Array.isArray(modIds)) {
@@ -37,11 +38,11 @@ router.post("/save-order", async (req, res) => {
       return res.status(400).json({ error: "Invalid server name" });
     }
 
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(400).json({ error: "Server INI not found" });
     }
 
-    await withIniLock(iniPath, () => {
+    await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
 
       const modsLine = `Mods=${sanitizeModIdList(modIds)}`;
@@ -51,7 +52,7 @@ router.post("/save-order", async (req, res) => {
         content += `\n${modsLine}`;
       }
 
-      fs.writeFileSync(iniPath, content, "utf-8");
+      await fileAccess.writeFile(iniPath, content, "utf-8");
     });
 
     log.info(`Saved mod load order: ${modIds.length} mods`);

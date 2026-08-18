@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
 import { removeIgnoredMod, addTrackedMod } from "../../../database/init.js";
 import { sanitizeError, sanitizeIniList, sanitizeModIdList } from "../../../utils/sanitize.js";
@@ -9,6 +8,7 @@ import { getServerConfigPath, getServerName, getServerPath } from "../../../util
 import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
 import { findAllModIdsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { findMapFoldersFromWorkshop } from "../../../utils/mods/workshopPaths.js";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
 const router = express.Router();
@@ -16,6 +16,7 @@ const router = express.Router();
 // Add mod with specific mod IDs selected (for multi-ID mods)
 router.post("/add-mod-advanced", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { workshopId, selectedModIds, includeAllModIds } = req.body;
     // workshopId: the Steam Workshop ID
     // selectedModIds: array of mod IDs to add (user-selected)
@@ -54,7 +55,7 @@ router.post("/add-mod-advanced", async (req, res) => {
     }
 
     const iniPath = path.join(serverConfigPath, `${sanitizedServerName}.ini`);
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(400).json({ error: "Server config file not found" });
     }
 
@@ -92,7 +93,7 @@ router.post("/add-mod-advanced", async (req, res) => {
 
     // Atomically read-modify-write inside the lock
     let addedMapFolders = [];
-    const lockResult = await withIniLock(iniPath, () => {
+    const lockResult = await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
 
       const workshopMatch = content.match(/^WorkshopItems=(.*)$/m);
@@ -155,7 +156,7 @@ router.post("/add-mod-advanced", async (req, res) => {
         }
       }
 
-      fs.writeFileSync(iniPath, content, "utf-8");
+      await fileAccess.writeFile(iniPath, content);
       return {
         addedModIds,
         totalModIdsInConfig: currentModIds.length,

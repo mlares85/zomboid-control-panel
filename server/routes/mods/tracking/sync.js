@@ -112,7 +112,7 @@ router.post("/sync-from-server", async (req, res) => {
           continue;
         }
         // Try to resolve real name from mod.info on disk, fall back to mod ID from INI
-        const nameFromDisk = modChecker?.resolveModNameFromDisk(workshopId);
+        const nameFromDisk = await modChecker?.resolveModNameFromDisk(workshopId);
         // Use Steam API title if available, then disk name, then INI mod ID
         const steamTitle = steamInfo.get(workshopId)?.title;
         const modName =

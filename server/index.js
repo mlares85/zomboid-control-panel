@@ -2267,7 +2267,7 @@ async function start() {
 
     // Start mod checker if workshop ACF file is found
     if (modChecker.workshopAcfPath) {
-      modChecker.start();
+      await modChecker.start();
     } else {
       log.info(
         "Mod checker: Workshop ACF not found — configure server install path",

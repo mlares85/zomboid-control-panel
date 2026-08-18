@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
 import { sanitizeError } from "../../../utils/sanitize.js";
 import { getServerPath } from "../../../utils/mods/serverConfig.js";
@@ -8,6 +7,7 @@ import { getWorkshopPaths } from "../../../utils/mods/workshopPaths.js";
 import { getModDetailsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { readIniModLists } from "../../../utils/mods/conflictScan/fileIndex.js";
 import { computeUnifiedDiff, hashFileSync } from "../../../utils/mods/conflictScan/diffUtils.js";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
 const router = express.Router();
@@ -19,6 +19,7 @@ const DIFF_MAX_BYTES = 512 * 1024; // 512 KB max for diffing
 
 router.get("/conflicts/diff", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { file, modA, modB } = req.query;
     if (!file || !modA || !modB) {
       return res.status(400).json({
@@ -67,7 +68,7 @@ router.get("/conflicts/diff", async (req, res) => {
       const possiblePaths = getWorkshopPaths(wsId, serverPath);
       let workshopPath = null;
       for (const p of possiblePaths) {
-        if (fs.existsSync(p)) {
+        if (await fileAccess.exists(p)) {
           workshopPath = p;
           break;
         }
@@ -76,17 +77,21 @@ router.get("/conflicts/diff", async (req, res) => {
 
       const modDetails = getModDetailsFromWorkshop(wsId, serverPath);
       const modsFolder = path.join(workshopPath, "mods");
-      const searchBase = fs.existsSync(modsFolder) ? modsFolder : workshopPath;
+      const searchBase = (await fileAccess.exists(modsFolder))
+        ? modsFolder
+        : workshopPath;
       let modEntries;
       try {
-        modEntries = fs.readdirSync(searchBase, { withFileTypes: true });
+        modEntries = await fileAccess.readdir(searchBase, {
+          withFileTypes: true,
+        });
       } catch (e) {
         log.debug(`Could not read mod directory ${searchBase}: ${e.message}`);
         continue;
       }
 
       for (const modDir of modEntries) {
-        if (!modDir.isDirectory()) continue;
+        if (!modDir.isDirectory) continue;
         const matchingMod = modDetails.find(
           (m) => m.id === modDir.name || m.name === modDir.name,
         );
@@ -95,13 +100,15 @@ router.get("/conflicts/diff", async (req, res) => {
 
         // Collect media paths: direct media/ + B42 versioned subfolders (42/, 42.X/, common/)
         const mediaCandidates = [path.join(modDirPath, "media")];
-        if (!fs.existsSync(mediaCandidates[0])) {
+        if (!(await fileAccess.exists(mediaCandidates[0]))) {
           mediaCandidates.length = 0;
           try {
-            const subDirs = fs.readdirSync(modDirPath, { withFileTypes: true });
+            const subDirs = await fileAccess.readdir(modDirPath, {
+              withFileTypes: true,
+            });
             for (const sub of subDirs) {
               if (
-                sub.isDirectory() &&
+                sub.isDirectory &&
                 /^(42(\.\d+)?|common)$/i.test(sub.name)
               ) {
                 mediaCandidates.push(path.join(modDirPath, sub.name, "media"));
@@ -121,9 +128,9 @@ router.get("/conflicts/diff", async (req, res) => {
             resolved !== mediaBase
           )
             continue;
-          if (modId === String(modA) && fs.existsSync(candidate))
+          if (modId === String(modA) && (await fileAccess.exists(candidate)))
             pathA = candidate;
-          if (modId === String(modB) && fs.existsSync(candidate))
+          if (modId === String(modB) && (await fileAccess.exists(candidate)))
             pathB = candidate;
         }
       }
@@ -164,33 +171,32 @@ router.get("/conflicts/diff", async (req, res) => {
 
     if (isImage) {
       // For images, return base64 thumbnails
-      const statA = fs.statSync(pathA);
-      const statB = fs.statSync(pathB);
+      const statA = await fileAccess.stat(pathA);
+      const statB = await fileAccess.stat(pathB);
       const maxImg = 2 * 1024 * 1024; // 2 MB cap
+      const readBase64 = async (p, size) => {
+        if (size > maxImg) return null;
+        const result = await fileAccess.readFileBinary(p);
+        return result.success ? result.data.toString("base64") : null;
+      };
       return res.json({
         type: "image",
         ext,
         modA: {
           size: statA.size,
-          base64:
-            statA.size <= maxImg
-              ? fs.readFileSync(pathA).toString("base64")
-              : null,
+          base64: await readBase64(pathA, statA.size),
         },
         modB: {
           size: statB.size,
-          base64:
-            statB.size <= maxImg
-              ? fs.readFileSync(pathB).toString("base64")
-              : null,
+          base64: await readBase64(pathB, statB.size),
         },
       });
     }
 
     if (!isText) {
       // Binary/unknown — just return file sizes and hashes
-      const statA = fs.statSync(pathA);
-      const statB = fs.statSync(pathB);
+      const statA = await fileAccess.stat(pathA);
+      const statB = await fileAccess.stat(pathB);
       return res.json({
         type: "binary",
         ext,
@@ -200,8 +206,8 @@ router.get("/conflicts/diff", async (req, res) => {
     }
 
     // Text diff — simple LCS-based unified diff
-    const statA = fs.statSync(pathA);
-    const statB = fs.statSync(pathB);
+    const statA = await fileAccess.stat(pathA);
+    const statB = await fileAccess.stat(pathB);
     if (statA.size > DIFF_MAX_BYTES || statB.size > DIFF_MAX_BYTES) {
       return res.json({
         type: "text-too-large",
@@ -211,8 +217,10 @@ router.get("/conflicts/diff", async (req, res) => {
       });
     }
 
-    const contentA = fs.readFileSync(pathA, "utf-8");
-    const contentB = fs.readFileSync(pathB, "utf-8");
+    const resultA = await fileAccess.readFile(pathA);
+    const resultB = await fileAccess.readFile(pathB);
+    const contentA = resultA.success ? resultA.data : "";
+    const contentB = resultB.success ? resultB.data : "";
     const linesA = contentA.split("\n");
     const linesB = contentB.split("\n");
 

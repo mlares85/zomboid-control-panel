@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
 import { getTrackedMods, getSetting } from "../../../database/init.js";
 import { sanitizeError } from "../../../utils/sanitize.js";
@@ -10,6 +9,7 @@ import {
 } from "../../../services/workshopCollectionSync.js";
 import { getServerConfigPath, getServerName } from "../../../utils/mods/serverConfig.js";
 import { readTextFile } from "../../../utils/mods/iniFile.js";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
 const router = express.Router();
@@ -22,6 +22,7 @@ const router = express.Router();
 
 router.get("/collection/diff", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const tracked = await getTrackedMods();
     const ids = tracked.map((m) => String(m.workshop_id));
     const diff = await computeCollectionDiff(ids);
@@ -40,7 +41,7 @@ router.get("/collection/diff", async (req, res) => {
         !serverName.includes("..")
       ) {
         const iniPath = path.join(serverConfigPath, `${serverName}.ini`);
-        if (fs.existsSync(iniPath)) {
+        if (await fileAccess.exists(iniPath)) {
           const workshopMatch = readTextFile(iniPath).match(
             /^WorkshopItems=(.*)$/m,
           );

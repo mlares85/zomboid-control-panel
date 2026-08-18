@@ -1,12 +1,12 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
 import { getIgnoredMods, removeIgnoredMod } from "../../../database/init.js";
 import { sanitizeError, sanitizeIniList, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
 import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
 import { findAllModIdsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
 const router = express.Router();
@@ -19,6 +19,7 @@ const router = express.Router();
 // "Show disabled" toggle, with a quick Enable action.
 router.get("/disk-only", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const modChecker = req.app.get("modChecker");
     if (!modChecker || !modChecker.workshopAcfPath) {
       return res.json({ mods: [], reason: "workshop folder not configured" });
@@ -32,7 +33,7 @@ router.get("/disk-only", async (req, res) => {
       const sanitized = path.basename(serverName);
       if (sanitized === serverName && !serverName.includes("..")) {
         const iniPath = path.join(serverConfigPath, `${sanitized}.ini`);
-        if (fs.existsSync(iniPath)) {
+        if (await fileAccess.exists(iniPath)) {
           const content = readTextFile(iniPath);
           const m = content.match(/^WorkshopItems=(.*)$/m);
           for (const id of m?.[1]?.split(";").filter(Boolean) || [])
@@ -56,13 +57,13 @@ router.get("/disk-only", async (req, res) => {
     // Enumerate the steamapps/workshop/content/108600 folder for the active server.
     const workshopDir = path.dirname(modChecker.workshopAcfPath);
     const contentDir = path.join(workshopDir, "content", "108600");
-    if (!fs.existsSync(contentDir)) {
+    if (!(await fileAccess.exists(contentDir))) {
       return res.json({ mods: [], reason: "no workshop content folder" });
     }
 
     let entries = [];
     try {
-      entries = fs.readdirSync(contentDir, { withFileTypes: true });
+      entries = await fileAccess.readdir(contentDir, { withFileTypes: true });
     } catch (e) {
       log.warn(`disk-only: failed to read ${contentDir}: ${e.message}`);
       return res.json({ mods: [], reason: "cannot read workshop folder" });
@@ -70,13 +71,14 @@ router.get("/disk-only", async (req, res) => {
 
     const mods = [];
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
+      if (!entry.isDirectory) continue;
       const wsId = entry.name;
       if (!/^\d{1,15}$/.test(wsId)) continue;
       if (inIni.has(wsId)) continue; // already enabled in INI
       if (ignored.has(wsId)) continue; // user explicitly ignored — shown in the Ignored panel instead
       const name =
-        modChecker.resolveModNameFromDisk(wsId) || `Workshop Mod ${wsId}`;
+        (await modChecker.resolveModNameFromDisk(wsId)) ||
+        `Workshop Mod ${wsId}`;
       mods.push({ workshop_id: wsId, name });
     }
 
@@ -92,6 +94,7 @@ router.get("/disk-only", async (req, res) => {
 // loads it on next start. This is the inverse of the existing batch-remove.
 router.post("/enable-disk-mod", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { workshopId } = req.body || {};
     const wsId = String(workshopId || "");
     if (!/^\d{1,15}$/.test(wsId)) {
@@ -109,7 +112,7 @@ router.post("/enable-disk-mod", async (req, res) => {
       return res.status(400).json({ error: "Invalid server name" });
     }
     const iniPath = path.join(serverConfigPath, `${sanitized}.ini`);
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(404).json({ error: "Server INI not found" });
     }
 
@@ -119,7 +122,7 @@ router.post("/enable-disk-mod", async (req, res) => {
       ? findAllModIdsFromWorkshop(wsId, serverPath)
       : [];
 
-    await withIniLock(iniPath, () => {
+    await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
 
       // WorkshopItems
@@ -150,7 +153,7 @@ router.post("/enable-disk-mod", async (req, res) => {
         ? content.replace(/^Mods=.*/m, modsLine)
         : content.trimEnd() + `\n${modsLine}\n`;
 
-      fs.writeFileSync(iniPath, content, "utf-8");
+      await fileAccess.writeFile(iniPath, content, "utf-8");
     });
 
     // Lift any prior ignore-list entry so auto-track picks it up.

@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 import { sanitizeError, sanitizeIniList, sanitizeModIdList, looksLikeWorkshopId } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
 import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
@@ -15,6 +15,7 @@ const router = express.Router();
 // Write mods to server .ini file
 router.post("/write-to-ini", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { mods, mapFolders } = req.body;
     log.info(
       `POST /write-to-ini: ${mods?.length || 0} mods, ${mapFolders?.length || 0} map folders`,
@@ -57,7 +58,7 @@ router.post("/write-to-ini", async (req, res) => {
 
     const iniPath = path.join(serverConfigPath, `${sanitizedServerName}.ini`);
 
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(400).json({
         error:
           "Server config file not found. Start the server once first to generate the config file.",
@@ -178,7 +179,7 @@ router.post("/write-to-ini", async (req, res) => {
     }
 
     // Atomically read-modify-write the ini file inside the lock
-    await withIniLock(iniPath, () => {
+    await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
 
       // Update or add Mods= (mod IDs like NeatUI_Framework)
@@ -207,7 +208,7 @@ router.post("/write-to-ini", async (req, res) => {
         }
       }
 
-      fs.writeFileSync(iniPath, content, "utf-8");
+      await fileAccess.writeFile(iniPath, content);
     });
 
     log.info(

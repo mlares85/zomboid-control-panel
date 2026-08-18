@@ -272,7 +272,7 @@ describe("mod name resolution from disk", () => {
         "appworkshop_108600.acf",
       );
 
-      expect(checker.resolveModNameFromDisk(workshopId, true)).toBe(
+      expect(await checker.resolveModNameFromDisk(workshopId, true)).toBe(
         "Project Cook",
       );
     } finally {

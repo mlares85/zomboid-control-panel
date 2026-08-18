@@ -44,7 +44,7 @@ router.get("/check-rcon", async (req, res) => {
 // Start mod checker
 router.post("/start", requireModChecker, async (req, res) => {
   try {
-    req.modChecker.start();
+    await req.modChecker.start();
     res.json({ success: true, message: "Mod checker started" });
   } catch (error) {
     log.error(`Failed to start mod checker: ${error.message}`);

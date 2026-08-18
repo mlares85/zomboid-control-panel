@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
 import { getIgnoredMods } from "../../../database/init.js";
 import { sanitizeError, sanitizeIniList, sanitizeModIdList } from "../../../utils/sanitize.js";
@@ -8,6 +7,7 @@ import { getServerConfigPath, getServerName, getServerPath } from "../../../util
 import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
 import { findAllModIdsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { getWorkshopPaths } from "../../../utils/mods/workshopPaths.js";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
 const router = express.Router();
@@ -20,6 +20,7 @@ const router = express.Router();
 // One INI write for the whole batch. Returns a per-ID breakdown.
 router.post("/resolve-orphan-workshop", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { workshopIds } = req.body || {};
     if (!Array.isArray(workshopIds) || workshopIds.length === 0) {
       return res
@@ -44,7 +45,7 @@ router.post("/resolve-orphan-workshop", async (req, res) => {
       return res.status(400).json({ error: "Invalid server name" });
     }
     const iniPath = path.join(serverConfigPath, `${sanitized}.ini`);
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(404).json({ error: "Server INI not found" });
     }
 
@@ -63,9 +64,15 @@ router.post("/resolve-orphan-workshop", async (req, res) => {
     const breakdown = [];
     for (const wsId of cleaned) {
       const ignored = ignoredSet.has(wsId);
-      const folderExists = serverPath
-        ? getWorkshopPaths(wsId, serverPath).some((p) => fs.existsSync(p))
-        : false;
+      let folderExists = false;
+      if (serverPath) {
+        for (const p of getWorkshopPaths(wsId, serverPath)) {
+          if (await fileAccess.exists(p)) {
+            folderExists = true;
+            break;
+          }
+        }
+      }
       let action;
       const ids =
         folderExists && serverPath
@@ -90,7 +97,7 @@ router.post("/resolve-orphan-workshop", async (req, res) => {
     }
 
     // Apply both INI mutations in a single locked write.
-    await withIniLock(iniPath, () => {
+    await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
 
       if (wsToDrop.size > 0) {
@@ -128,7 +135,7 @@ router.post("/resolve-orphan-workshop", async (req, res) => {
           : content.trimEnd() + `\n${newLine}\n`;
       }
 
-      fs.writeFileSync(iniPath, content, "utf-8");
+      await fileAccess.writeFile(iniPath, content, "utf-8");
     });
 
     const counts = {

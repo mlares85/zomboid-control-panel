@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 import { sanitizeError } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
 import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
@@ -13,6 +13,7 @@ const router = express.Router();
 // Repair Map= entries - validates each entry has actual map data on disk and removes invalid ones
 router.post("/repair-map-entries", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const serverConfigPath = await getServerConfigPath();
     const serverPath = await getServerPath();
     const serverName = await getServerName();
@@ -35,12 +36,12 @@ router.post("/repair-map-entries", async (req, res) => {
     }
 
     const iniPath = path.join(serverConfigPath, `${sanitizedServerName}.ini`);
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(400).json({ error: "Server config file not found." });
     }
 
     // Atomically read-modify-write inside the lock
-    const lockResult = await withIniLock(iniPath, () => {
+    const lockResult = await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
       const mapMatch = content.match(/^Map=(.*)$/m);
       const currentMaps = mapMatch?.[1]?.split(";").filter(Boolean) || [];
@@ -96,7 +97,7 @@ router.post("/repair-map-entries", async (req, res) => {
         if (content.includes("Map=")) {
           content = content.replace(/^Map=.*/m, `Map=${newMapLine}`);
         }
-        fs.writeFileSync(iniPath, content, "utf-8");
+        await fileAccess.writeFile(iniPath, content);
         log.info(
           `Repaired Map= entries: removed ${removedEntries.length} invalid, added ${addedEntries.length} missing`,
         );

@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 import { sanitizeError, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
 import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
@@ -14,6 +14,7 @@ const router = express.Router();
 // ─── Sync mod IDs from Workshop → INI ─────────────────────────────────────
 router.post("/sync-mod-ids", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const serverConfigPath = await getServerConfigPath();
     const serverName = await getServerName();
     const serverPath = await getServerPath();
@@ -29,7 +30,7 @@ router.post("/sync-mod-ids", async (req, res) => {
       return res.status(400).json({ error: "Invalid server name" });
     }
     const iniPath = path.join(serverConfigPath, `${sanitizedServerName}.ini`);
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(400).json({ error: "Server config file not found" });
     }
 
@@ -65,7 +66,7 @@ router.post("/sync-mod-ids", async (req, res) => {
     }
 
     // Atomically re-read, modify, and write inside the lock
-    const lockResult = await withIniLock(iniPath, () => {
+    const lockResult = await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
 
       const modsMatch = content.match(/^Mods=(.*)$/m);
@@ -139,7 +140,7 @@ router.post("/sync-mod-ids", async (req, res) => {
         content += `\nMods=${newModList}`;
       }
 
-      fs.writeFileSync(iniPath, content, "utf-8");
+      await fileAccess.writeFile(iniPath, content);
       return { syncedMods, missingMods, totalModIds: finalModIds.length };
     });
 

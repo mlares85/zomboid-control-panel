@@ -1,10 +1,10 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
 import { sanitizeError, sanitizeModIdList, looksLikeWorkshopId } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName } from "../../../utils/mods/serverConfig.js";
 import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
 const router = express.Router();
@@ -12,6 +12,7 @@ const router = express.Router();
 // Toggle a single mod ID on/off in the Mods= line
 router.post("/toggle-mod-id", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { modId, enabled } = req.body;
 
     if (!modId || typeof modId !== "string") {
@@ -42,7 +43,7 @@ router.post("/toggle-mod-id", async (req, res) => {
     }
 
     const iniPath = path.join(serverConfigPath, `${sanitizedServerName}.ini`);
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(400).json({ error: "Server config file not found" });
     }
 
@@ -56,7 +57,7 @@ router.post("/toggle-mod-id", async (req, res) => {
       });
     }
 
-    const result = await withIniLock(iniPath, () => {
+    const result = await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
       const modsMatch = content.match(/^Mods=(.*)$/m);
       let currentModIds = modsMatch?.[1]?.split(";").filter(Boolean) || [];
@@ -76,7 +77,7 @@ router.post("/toggle-mod-id", async (req, res) => {
         content += `\nMods=${newModList}`;
       }
 
-      fs.writeFileSync(iniPath, content, "utf-8");
+      await fileAccess.writeFile(iniPath, content);
       return { totalMods: currentModIds.length };
     });
     log.info(
@@ -98,6 +99,7 @@ router.post("/toggle-mod-id", async (req, res) => {
 // Batch toggle multiple mod IDs on/off in a single INI write
 router.post("/batch-toggle-mod-ids", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { changes } = req.body;
 
     if (!Array.isArray(changes) || changes.length === 0) {
@@ -143,7 +145,7 @@ router.post("/batch-toggle-mod-ids", async (req, res) => {
     }
 
     const iniPath = path.join(serverConfigPath, `${sanitizedServerName}.ini`);
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(400).json({ error: "Server config file not found" });
     }
 
@@ -158,7 +160,7 @@ router.post("/batch-toggle-mod-ids", async (req, res) => {
       });
     }
 
-    const result = await withIniLock(iniPath, () => {
+    const result = await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
       const modsMatch = content.match(/^Mods=(.*)$/m);
       let currentModIds = modsMatch?.[1]?.split(";").filter(Boolean) || [];
@@ -181,7 +183,7 @@ router.post("/batch-toggle-mod-ids", async (req, res) => {
         content += `\nMods=${newModList}`;
       }
 
-      fs.writeFileSync(iniPath, content, "utf-8");
+      await fileAccess.writeFile(iniPath, content);
       return { totalMods: currentModIds.length };
     });
     log.info(`Batch toggled ${changes.length} mod IDs in ${iniPath}`);
@@ -200,6 +202,7 @@ router.post("/batch-toggle-mod-ids", async (req, res) => {
 // Deduplicate mod IDs in the Mods= line — removes exact duplicates, keeps one of each
 router.post("/deduplicate-mod-ids", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const serverConfigPath = await getServerConfigPath();
     const serverName = await getServerName();
 
@@ -221,12 +224,12 @@ router.post("/deduplicate-mod-ids", async (req, res) => {
     }
 
     const iniPath = path.join(serverConfigPath, `${sanitizedServerName}.ini`);
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(400).json({ error: "Server config file not found." });
     }
 
     // Atomically read-modify-write inside the lock
-    const lockResult = await withIniLock(iniPath, () => {
+    const lockResult = await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
       const modsMatch = content.match(/^Mods=(.*)$/m);
       const currentMods = modsMatch?.[1]?.split(";").filter(Boolean) || [];
@@ -252,7 +255,7 @@ router.post("/deduplicate-mod-ids", async (req, res) => {
         /^Mods=.*/m,
         `Mods=${sanitizeModIdList(deduped)}`,
       );
-      fs.writeFileSync(iniPath, content, "utf-8");
+      await fileAccess.writeFile(iniPath, content);
       return { noChanges: false, removed, deduped };
     });
 

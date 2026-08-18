@@ -1,5 +1,4 @@
 import express from "express";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
 import { getTrackedMods, removeTrackedMod, addIgnoredMod } from "../../../database/init.js";
 import { sanitizeError, sanitizeIniList, sanitizeModIdList } from "../../../utils/sanitize.js";
@@ -8,12 +7,14 @@ import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
 import { findAllModIdsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { getWorkshopPaths } from "../../../utils/mods/workshopPaths.js";
 import path from "path";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
 const router = express.Router();
 
 router.post("/batch-delete-disk-mods", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { workshopIds } = req.body || {};
     if (!Array.isArray(workshopIds) || workshopIds.length === 0) {
       return res
@@ -51,22 +52,21 @@ router.post("/batch-delete-disk-mods", async (req, res) => {
       const possiblePaths = getWorkshopPaths(wsId, serverPath || "");
       let removed = false;
       for (const p of possiblePaths) {
-        if (fs.existsSync(p)) {
-          try {
-            fs.rmSync(p, { recursive: true, force: true });
+        if (await fileAccess.exists(p)) {
+          const result = await fileAccess.rm(p, { recursive: true, force: true });
+          if (result.success) {
             removed = true;
             break;
-          } catch (e) {
-            log.warn(`Failed to delete ${p}: ${e.message}`);
           }
+          log.warn(`Failed to delete ${p}: ${result.error}`);
         }
       }
       results.push({ workshopId: wsId, deletedFromDisk: removed });
     }
 
     // One INI write for the whole batch.
-    if (iniPath && fs.existsSync(iniPath)) {
-      await withIniLock(iniPath, () => {
+    if (iniPath && (await fileAccess.exists(iniPath))) {
+      await withIniLock(iniPath, async () => {
         let content = readTextFile(iniPath);
         const wsMatch = content.match(/^WorkshopItems=(.*)$/m);
         if (wsMatch) {
@@ -90,7 +90,7 @@ router.post("/batch-delete-disk-mods", async (req, res) => {
             `Mods=${sanitizeModIdList(modsList)}`,
           );
         }
-        fs.writeFileSync(iniPath, content, "utf-8");
+        await fileAccess.writeFile(iniPath, content, "utf-8");
       });
     }
 

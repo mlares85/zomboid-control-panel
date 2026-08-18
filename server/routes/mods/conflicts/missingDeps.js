@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
 import { sanitizeError, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
@@ -8,6 +7,7 @@ import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
 import { findMapFoldersFromWorkshop } from "../../../utils/mods/workshopPaths.js";
 import { fetchModIdFromWorkshop } from "../../../utils/mods/workshopFetch.js";
 import { findModIdFromWorkshop, getModDetailsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
 const router = express.Router();
@@ -15,6 +15,7 @@ const router = express.Router();
 // ─── Missing Dependencies: Add a resolved dependency to INI ─────────────────
 router.post("/add-missing-dep", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { workshopId, modId } = req.body;
     if (!workshopId || !/^\d{1,15}$/.test(String(workshopId))) {
       return res.status(400).json({ error: "Valid Workshop ID is required" });
@@ -44,7 +45,7 @@ router.post("/add-missing-dep", async (req, res) => {
       return res.status(400).json({ error: "Invalid server name" });
     }
     const iniPath = path.join(serverConfigPath, `${sanitizedServerName}.ini`);
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(400).json({ error: "Server config file not found" });
     }
 
@@ -64,7 +65,7 @@ router.post("/add-missing-dep", async (req, res) => {
       : [];
 
     // Atomically read-modify-write inside the lock
-    const lockResult = await withIniLock(iniPath, () => {
+    const lockResult = await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
 
       // Add to WorkshopItems if not present
@@ -124,7 +125,7 @@ router.post("/add-missing-dep", async (req, res) => {
         }
       }
 
-      fs.writeFileSync(iniPath, content, "utf-8");
+      await fileAccess.writeFile(iniPath, content, "utf-8");
       return { wsAdded, modIdAdded };
     });
 
@@ -150,6 +151,7 @@ router.post("/add-missing-dep", async (req, res) => {
 // ─── Missing Dependencies: Auto-resolve all unresolved deps ─────────────────
 router.post("/resolve-missing-deps", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { deps } = req.body;
     if (!deps || !Array.isArray(deps)) {
       return res.status(400).json({ error: "Dependencies array is required" });
@@ -181,12 +183,13 @@ router.post("/resolve-missing-deps", async (req, res) => {
           ),
         ];
         for (const workshopBase of workshopPaths) {
-          if (found || !fs.existsSync(workshopBase)) continue;
+          if (found || !(await fileAccess.exists(workshopBase))) continue;
           try {
-            for (const entry of fs.readdirSync(workshopBase, {
+            const entries = await fileAccess.readdir(workshopBase, {
               withFileTypes: true,
-            })) {
-              if (!entry.isDirectory() || found) continue;
+            });
+            for (const entry of entries) {
+              if (!entry.isDirectory || found) continue;
               try {
                 const details = getModDetailsFromWorkshop(
                   entry.name,

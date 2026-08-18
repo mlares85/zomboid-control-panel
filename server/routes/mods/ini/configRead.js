@@ -1,10 +1,10 @@
 import express from "express";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
 import { sanitizeError } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath, getSanitizedIniPath } from "../../../utils/mods/serverConfig.js";
 import { readTextFile } from "../../../utils/mods/iniFile.js";
 import { getModDetailsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
 const router = express.Router();
@@ -12,6 +12,7 @@ const router = express.Router();
 // Get current mod configuration from .ini file
 router.get("/current-config", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const serverConfigPath = await getServerConfigPath();
     const serverName = await getServerName();
 
@@ -30,7 +31,7 @@ router.get("/current-config", async (req, res) => {
       return res.status(400).json({ error: "Invalid server name" });
     }
 
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.json({
         configured: false,
         error: "Server config file not found",

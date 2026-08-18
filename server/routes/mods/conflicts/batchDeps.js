@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../../utils/logger.js";
 import { sanitizeError, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
@@ -8,6 +7,7 @@ import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
 import { findMapFoldersFromWorkshop } from "../../../utils/mods/workshopPaths.js";
 import { findModIdFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { fetchModIdFromWorkshop } from "../../../utils/mods/workshopFetch.js";
+import { LocalFiles } from "../../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
 const router = express.Router();
@@ -15,6 +15,7 @@ const router = express.Router();
 // ─── Missing Dependencies: Batch add all resolved deps ──────────────────────
 router.post("/add-all-resolved-deps", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { deps } = req.body;
     if (!deps || !Array.isArray(deps) || deps.length === 0) {
       return res.status(400).json({ error: "No dependencies provided" });
@@ -49,7 +50,7 @@ router.post("/add-all-resolved-deps", async (req, res) => {
       return res.status(400).json({ error: "Invalid server name" });
     }
     const iniPath = path.join(serverConfigPath, `${sanitizedServerName}.ini`);
-    if (!fs.existsSync(iniPath)) {
+    if (!(await fileAccess.exists(iniPath))) {
       return res.status(400).json({ error: "Server config file not found" });
     }
 
@@ -73,7 +74,7 @@ router.post("/add-all-resolved-deps", async (req, res) => {
     }
 
     // Atomically read-modify-write inside the lock
-    const lockResult = await withIniLock(iniPath, () => {
+    const lockResult = await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
       const wsMatch = content.match(/^WorkshopItems=(.*)$/m);
       const currentWs = new Set(wsMatch?.[1]?.split(";").filter(Boolean) || []);
@@ -124,7 +125,7 @@ router.post("/add-all-resolved-deps", async (req, res) => {
         else content += `\nMap=${mapLine}`;
       }
 
-      fs.writeFileSync(iniPath, content, "utf-8");
+      await fileAccess.writeFile(iniPath, content, "utf-8");
       return { wsAdded, modIdsAdded, allMapFolders };
     });
 
