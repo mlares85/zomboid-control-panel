@@ -13,9 +13,10 @@ import {
   getServer,
   getServers,
 } from "../database/init.js";
-import { withFileLock, writeFileAtomic } from "../utils/fileWriteQueue.js";
+import { withFileLock } from "../utils/fileWriteQueue.js";
 import { escapeRegExp } from "../utils/regex.js";
 import { getDataPaths } from "../utils/paths.js";
+import { LocalFiles } from "./fileAccess/index.js";
 import { isRemoteProvider } from "../utils/serverProvider.js";
 
 const isWindows = process.platform === "win32";
@@ -195,7 +196,8 @@ export function scoreServerProcessOwnership(commandLine, descriptor = {}) {
 }
 
 export class ServerManager {
-  constructor() {
+  constructor(options) {
+    this._files = options?.fileAccess || new LocalFiles();
     this.serverProcess = null;
     this.serverPath = process.env.PZ_SERVER_PATH || "";
     this.serverBat = process.env.PZ_SERVER_BAT || getDefaultStartupScript();
@@ -1476,29 +1478,29 @@ export class ServerManager {
       `${this.serverName}.ini`,
     );
 
-    if (fs.existsSync(serverNameIniPath)) {
+    if (await this._files.exists(serverNameIniPath)) {
       log.debug(`Reading config from ${serverNameIniPath}`);
-      return this.parseIniFile(serverNameIniPath);
+      return await this.parseIniFile(serverNameIniPath);
     }
 
     // Fallback: try old path directly in savePath (for backwards compatibility)
     const configPath = path.join(this.savePath, `${this.serverName}.ini`);
-    if (fs.existsSync(configPath)) {
+    if (await this._files.exists(configPath)) {
       log.debug(`Reading config from fallback ${configPath}`);
-      return this.parseIniFile(configPath);
+      return await this.parseIniFile(configPath);
     }
 
     // Legacy fallback: servertest.ini
     const legacyPath = path.join(this.savePath, "servertest.ini");
-    if (fs.existsSync(legacyPath)) {
+    if (await this._files.exists(legacyPath)) {
       log.debug(`Reading config from legacy ${legacyPath}`);
-      return this.parseIniFile(legacyPath);
+      return await this.parseIniFile(legacyPath);
     }
 
     // Try alternative path
     const altPath = path.join(this.savePath, "serveroptions.ini");
-    if (fs.existsSync(altPath)) {
-      return this.parseIniFile(altPath);
+    if (await this._files.exists(altPath)) {
+      return await this.parseIniFile(altPath);
     }
 
     log.warn(
@@ -1507,9 +1509,11 @@ export class ServerManager {
     return null;
   }
 
-  parseIniFile(filePath) {
+  async parseIniFile(filePath) {
     try {
-      const content = fs.readFileSync(filePath, "utf-8");
+      const result = await this._files.readFile(filePath, "utf-8");
+      if (!result.success) throw new Error(result.error);
+      const content = result.data;
       const config = {};
       const lines = content.split("\n");
 
@@ -1541,11 +1545,11 @@ export class ServerManager {
       : "servertest.ini";
     const serverSubdirPath = path.join(this.savePath, "Server", serverIni);
     let configPath;
-    if (fs.existsSync(serverSubdirPath)) {
+    if (await this._files.exists(serverSubdirPath)) {
       configPath = serverSubdirPath;
     } else {
       configPath = path.join(this.savePath, serverIni);
-      if (!fs.existsSync(configPath)) {
+      if (!(await this._files.exists(configPath))) {
         configPath = path.join(this.savePath, "servertest.ini");
       }
     }
@@ -1556,8 +1560,9 @@ export class ServerManager {
       // this one and clobber part of the change.
       await withFileLock(configPath, async () => {
         let content = "";
-        if (fs.existsSync(configPath)) {
-          content = fs.readFileSync(configPath, "utf-8");
+        if (await this._files.exists(configPath)) {
+          const readResult = await this._files.readFile(configPath, "utf-8");
+          content = readResult.success ? readResult.data : "";
         }
 
         // Update values
@@ -1578,7 +1583,8 @@ export class ServerManager {
           }
         }
 
-        writeFileAtomic(configPath, content, "utf-8");
+        const writeResult = await this._files.writeFile(configPath, content, { atomic: true });
+        if (!writeResult.success) throw new Error(writeResult.error);
       });
       log.info("Server config saved");
       return { success: true };
