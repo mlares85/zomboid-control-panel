@@ -30,6 +30,7 @@ import {
   backupFile,
   writeFile,
 } from "../utils/templateFiles.js";
+import { LocalFiles } from "./fileAccess/index.js";
 
 const log = createLogger("TemplateService");
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -131,20 +132,20 @@ function resolveServerPaths(server) {
   };
 }
 
-async function readCurrentConfig(template, paths) {
+async function readCurrentConfig(template, paths, fileAccess) {
   const serverIni = {};
-  if (fs.existsSync(paths.iniPath)) {
-    const content = fs.readFileSync(paths.iniPath, "utf-8");
-    Object.assign(serverIni, readIniValues(content, Object.keys(template.serverIni || {})));
+  const iniResult = await fileAccess.readFile(paths.iniPath);
+  if (iniResult.success) {
+    Object.assign(serverIni, readIniValues(iniResult.data, Object.keys(template.serverIni || {})));
   }
 
   const sandboxVars = {};
-  if (fs.existsSync(paths.sandboxPath)) {
-    const content = fs.readFileSync(paths.sandboxPath, "utf-8");
+  const sandboxResult = await fileAccess.readFile(paths.sandboxPath);
+  if (sandboxResult.success) {
     for (const [section, values] of Object.entries(template.sandboxVars || {})) {
       sandboxVars[section] = {};
       for (const key of Object.keys(values || {})) {
-        sandboxVars[section][key] = readSandboxValue(content, section, key);
+        sandboxVars[section][key] = readSandboxValue(sandboxResult.data, section, key);
       }
     }
   }
@@ -152,7 +153,7 @@ async function readCurrentConfig(template, paths) {
   return { serverIni, sandboxVars };
 }
 
-export async function previewTemplate(templateId, serverId) {
+export async function previewTemplate(templateId, serverId, { fileAccess } = {}) {
   const template = await getTemplate(templateId);
   if (!template) return { success: false, error: "Template not found" };
 
@@ -162,18 +163,20 @@ export async function previewTemplate(templateId, serverId) {
   const paths = resolveServerPaths(server);
   if (!paths) return { success: false, error: "Server has no configured config path" };
 
-  const currentConfig = await readCurrentConfig(template, paths);
+  const fa = fileAccess || new LocalFiles();
+  const currentConfig = await readCurrentConfig(template, paths, fa);
   return { success: true, diff: computeDiff(template, currentConfig) };
 }
 
-function applyIniChanges(template, paths, backup, result) {
+async function applyIniChanges(template, paths, backup, result, fileAccess) {
   const exclusions = template.iniExclusions || DEFAULT_INI_EXCLUSIONS;
   const updates = Object.fromEntries(
     Object.entries(template.serverIni || {}).filter(([key]) => !exclusions.includes(key)),
   );
   if (Object.keys(updates).length === 0) return;
 
-  const existing = fs.existsSync(paths.iniPath) ? fs.readFileSync(paths.iniPath, "utf-8") : "";
+  const iniResult = await fileAccess.readFile(paths.iniPath);
+  const existing = iniResult.success ? iniResult.data : "";
   if (backup) {
     const backupPath = backupFile(paths.iniPath);
     if (backupPath) result.backups.push(backupPath);
@@ -182,10 +185,10 @@ function applyIniChanges(template, paths, backup, result) {
   result.ini = { appliedKeys: Object.keys(updates) };
 }
 
-function applySandboxChanges(template, paths, backup, result) {
+async function applySandboxChanges(template, paths, backup, result, fileAccess) {
   if (Object.keys(template.sandboxVars || {}).length === 0) return;
 
-  if (!fs.existsSync(paths.sandboxPath)) {
+  if (!(await fileAccess.exists(paths.sandboxPath))) {
     result.sandbox = {
       skipped: true,
       reason: "SandboxVars.lua not found — start the server once to generate it.",
@@ -193,21 +196,23 @@ function applySandboxChanges(template, paths, backup, result) {
     return;
   }
 
-  const existing = fs.readFileSync(paths.sandboxPath, "utf-8");
+  const sandboxResult = await fileAccess.readFile(paths.sandboxPath);
+  if (!sandboxResult.success) return;
   if (backup) {
     const backupPath = backupFile(paths.sandboxPath);
     if (backupPath) result.backups.push(backupPath);
   }
-  const { content, applied, skipped } = mergeSandboxSections(existing, template.sandboxVars);
+  const { content, applied, skipped } = mergeSandboxSections(sandboxResult.data, template.sandboxVars);
   writeFile(paths.sandboxPath, content);
   result.sandbox = { applied, skipped };
 }
 
-function applyModChanges(template, paths, backup, result) {
+async function applyModChanges(template, paths, backup, result, fileAccess) {
   const mods = template.mods;
   if (!Array.isArray(mods) || mods.length === 0) return;
 
-  const existing = fs.existsSync(paths.iniPath) ? fs.readFileSync(paths.iniPath, "utf-8") : "";
+  const iniResult = await fileAccess.readFile(paths.iniPath);
+  const existing = iniResult.success ? iniResult.data : "";
   if (backup && !result.backups.length) {
     const backupPath = backupFile(paths.iniPath);
     if (backupPath) result.backups.push(backupPath);
@@ -236,26 +241,27 @@ export async function applyTemplate(templateId, serverId, options = {}) {
   const paths = resolveServerPaths(server);
   if (!paths) return { success: false, error: "Server has no configured config path" };
 
+  const fa = options.fileAccess || new LocalFiles();
   const backup = options.backup !== false;
   const result = { success: true, ini: null, sandbox: null, mods: null, backups: [] };
-  if (options.applyIni !== false) applyIniChanges(template, paths, backup, result);
-  if (options.applyMods !== false) applyModChanges(template, paths, backup, result);
-  if (options.applySandbox !== false) applySandboxChanges(template, paths, backup, result);
+  if (options.applyIni !== false) await applyIniChanges(template, paths, backup, result, fa);
+  if (options.applyMods !== false) await applyModChanges(template, paths, backup, result, fa);
+  if (options.applySandbox !== false) await applySandboxChanges(template, paths, backup, result, fa);
 
   log.info(`Applied template "${template.meta.name}" to server ${server.id}`);
   return result;
 }
 
-export async function captureServerConfig(serverId) {
+export async function captureServerConfig(serverId, { fileAccess } = {}) {
   const server = await getServer(serverId);
   if (!server) return { success: false, error: "Server not found" };
 
   const paths = resolveServerPaths(server);
   if (!paths) return { success: false, error: "Server has no configured config path" };
 
-  const iniContent = fs.existsSync(paths.iniPath)
-    ? fs.readFileSync(paths.iniPath, "utf-8")
-    : "";
+  const fa = fileAccess || new LocalFiles();
+  const iniResult = await fa.readFile(paths.iniPath);
+  const iniContent = iniResult.success ? iniResult.data : "";
 
   return {
     success: true,
