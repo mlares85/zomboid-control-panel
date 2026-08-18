@@ -159,6 +159,13 @@ const ROUTE_LOADERS: Record<string, RouteLoaderMeta> = {
     variant: 'console',
     metrics: ['logs', 'probes', 'bundle'],
   },
+  '/wiki': {
+    title: 'Help & Wiki',
+    description: 'Loading guides, search index, and reference articles.',
+    eyebrow: '// SYSTEM · HELP',
+    variant: 'list',
+    metrics: ['search', 'articles', 'related'],
+  },
 }
 
 const AUTH_BOOT_STEPS = [
@@ -191,6 +198,7 @@ const WorldMap = lazy(() => import('./pages/WorldMap'))
 const Login = lazy(() => import('./pages/Login'))
 const Setup = lazy(() => import('./pages/Setup'))
 const Welcome = lazy(() => import('./pages/Welcome'))
+const Wiki = lazy(() => import('./pages/Wiki'))
 
 // Loading fallback — shows a skeleton layout instead of a plain spinner
 function PageLoader() {
@@ -583,6 +591,7 @@ function AppContent() {
               <Route path="/world-map" element={<FeatureErrorBoundary featureName="World Map"><WorldMap /></FeatureErrorBoundary>} />
               <Route path="/chat" element={<FeatureErrorBoundary featureName="In-Game Chat"><Chat /></FeatureErrorBoundary>} />
               <Route path="/backups" element={<FeatureErrorBoundary featureName="Backups"><Backups /></FeatureErrorBoundary>} />
+              <Route path="/wiki/:articleId?" element={<FeatureErrorBoundary featureName="Help & Wiki"><Wiki /></FeatureErrorBoundary>} />
               <Route path="*" element={<NotFoundRoute />} />
             </Routes>
           </Suspense>

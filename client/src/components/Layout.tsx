@@ -30,7 +30,8 @@ import {
   Coffee,
   PanelLeftClose,
   PanelLeft,
-  LogOut
+  LogOut,
+  BookOpen
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ConnectionStatus } from './ConnectionStatus'
@@ -141,6 +142,7 @@ const navSections: NavSection[] = [
       { to: '/discord', icon: MessageSquare, label: 'Discord' },
       { to: '/settings', icon: Settings, label: 'Panel Settings' },
       { to: '/debug', icon: Bug, label: 'Debug Logs' },
+      { to: '/wiki', icon: BookOpen, label: 'Help & Wiki' },
     ]
   },
 ]
