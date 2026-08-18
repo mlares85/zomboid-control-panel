@@ -6,7 +6,6 @@ import { sanitizeError } from "../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, createBackup } from "./context.js";
 import { getTemplatesPath } from "./templates.js";
 import { getActiveServer, updateServer } from "../../database/init.js";
-import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
@@ -14,7 +13,7 @@ const router = express.Router();
 router.post("/templates/:id/apply", async (req, res) => {
   log.info(`POST /templates/${req.params.id}/apply`);
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     // Sanitize template ID to prevent path traversal
     const safeId = path.basename(req.params.id).replace(/[^a-z0-9_-]/gi, "");
     if (!safeId || safeId !== req.params.id) {
@@ -102,7 +101,7 @@ router.post("/templates/:id/apply", async (req, res) => {
 // PUT /templates/:id - Update template metadata
 router.put("/templates/:id", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     // Sanitize template ID to prevent path traversal
     const safeId = path.basename(req.params.id).replace(/[^a-z0-9_-]/gi, "");
     if (!safeId || safeId !== req.params.id) {
@@ -147,7 +146,7 @@ router.put("/templates/:id", async (req, res) => {
 router.delete("/templates/:id", async (req, res) => {
   log.info(`DELETE /templates/${req.params.id}`);
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     // Sanitize template ID to prevent path traversal
     const safeId = path.basename(req.params.id).replace(/[^a-z0-9_-]/gi, "");
     if (!safeId || safeId !== req.params.id) {

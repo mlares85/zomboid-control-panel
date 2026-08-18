@@ -5,7 +5,6 @@ const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
 import { getServerConfigPath, getServerName, createBackup } from "./context.js";
-import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
@@ -13,7 +12,7 @@ const router = express.Router();
 router.get("/paths", async (req, res) => {
   try {
     log.info("GET /paths");
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
 
@@ -42,7 +41,7 @@ router.get("/paths", async (req, res) => {
 router.get("/raw/:type", async (req, res) => {
   log.info(`GET /raw/${req.params.type}`);
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const type = req.params.type;
@@ -78,7 +77,7 @@ router.get("/raw/:type", async (req, res) => {
 // Save raw file content
 router.put("/raw/:type", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const type = req.params.type;

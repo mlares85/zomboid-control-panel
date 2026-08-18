@@ -6,7 +6,6 @@ const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { getServerConfigPath, getServerName } from "./context.js";
 import { parseIni } from "./ini.js";
-import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
@@ -28,7 +27,7 @@ async function ensureTemplatesDir(fileAccess) {
 // GET /templates - List all saved templates
 router.get("/templates", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const templatesPath = await ensureTemplatesDir(fileAccess);
 
     const entries = await fileAccess.readdir(templatesPath);
@@ -75,7 +74,7 @@ router.get("/templates", async (req, res) => {
 // GET /templates/:id - Get a specific template
 router.get("/templates/:id", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     // Sanitize template ID to prevent path traversal
     const safeId = path.basename(req.params.id).replace(/[^a-z0-9_-]/gi, "");
     if (!safeId || safeId !== req.params.id) {
@@ -105,7 +104,7 @@ router.get("/templates/:id", async (req, res) => {
 router.post("/templates", async (req, res) => {
   log.info("POST /templates (create)");
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const {
       name,
       description,

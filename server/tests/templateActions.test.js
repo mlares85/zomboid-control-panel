@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { LocalFiles } from "../services/fileAccess/index.js";
 
 const getActiveServer = vi.fn();
 const updateServer = vi.fn();
@@ -62,7 +63,11 @@ afterEach(() => {
 describe("POST /templates/:id/apply", () => {
   it("records the applied template on the active server", async () => {
     getActiveServer.mockResolvedValue({ id: "server-1" });
-    const req = { params: { id: "hardcore-survivor" }, body: {} };
+    const req = {
+      params: { id: "hardcore-survivor" },
+      body: {},
+      fileAccess: new LocalFiles(),
+    };
     const res = createResponse();
 
     await getHandler("/templates/:id/apply", "post")(req, res);
@@ -78,7 +83,11 @@ describe("POST /templates/:id/apply", () => {
 
   it("skips recording when there is no active server", async () => {
     getActiveServer.mockResolvedValue(null);
-    const req = { params: { id: "hardcore-survivor" }, body: {} };
+    const req = {
+      params: { id: "hardcore-survivor" },
+      body: {},
+      fileAccess: new LocalFiles(),
+    };
     const res = createResponse();
 
     await getHandler("/templates/:id/apply", "post")(req, res);

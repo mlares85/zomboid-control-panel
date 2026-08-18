@@ -5,14 +5,13 @@ import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { getServerConfigPath, getBackupPath, createBackup } from "./context.js";
-import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
 // List backups
 router.get("/backups", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const backupDir = await getBackupPath();
 
     if (!(await fileAccess.exists(backupDir))) {
@@ -63,7 +62,7 @@ router.get("/backups", async (req, res) => {
 // Restore from backup
 router.post("/restore/:filename", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const backupDir = await getBackupPath();
     const configPath = await getServerConfigPath();
 

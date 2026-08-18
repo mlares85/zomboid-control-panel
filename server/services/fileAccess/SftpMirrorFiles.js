@@ -47,14 +47,24 @@ export class SftpMirrorFiles extends FileAccess {
 
   // ── Path helpers ───────────────────────────────────────────────────
 
-  /** @private */
+  /**
+   * Route handlers build paths as `path.join(configPath, name)`, and
+   * `getServerConfigPath()` returns this mirror dir for remote servers — so
+   * an absolute path arrives already resolved inside the mirror. A bare name
+   * (as callers of this class working relatively pass) is joined normally.
+   * @private
+   */
   _localPath(filePath) {
+    if (path.isAbsolute(filePath)) return filePath;
     return path.join(this.mirrorDir, filePath);
   }
 
   /** @private */
   _remotePath(filePath) {
-    return `${this.config.configPath}/${filePath}`;
+    const rel = path.isAbsolute(filePath)
+      ? path.relative(this.mirrorDir, filePath)
+      : filePath;
+    return `${this.config.configPath}/${rel}`;
   }
 
   /** @private Ensure the mirror is populated before a read outside a session. */

@@ -5,7 +5,6 @@ const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
 import { getServerConfigPath, getServerName, createBackup } from "./context.js";
-import { LocalFiles } from "../../services/fileAccess/index.js";
 import { parseSandboxVars, modifySandboxValue } from "./sandboxParse.js";
 import {
   checkSandboxBraceBalance,
@@ -19,7 +18,7 @@ const router = express.Router();
 // Get SandboxVars (parsed)
 router.get("/sandbox", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_SandboxVars.lua`);
@@ -45,7 +44,7 @@ router.get("/sandbox", async (req, res) => {
 router.put("/sandbox", async (req, res) => {
   try {
     log.info("PUT /sandbox");
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_SandboxVars.lua`);
@@ -125,7 +124,7 @@ router.put("/sandbox", async (req, res) => {
 // since PZ regenerates those from the mod's own defaults.
 router.put("/sandbox-option", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const { name, value } = req.body || {};
 
     if (typeof name !== "string" || !name) {
@@ -181,7 +180,7 @@ router.put("/sandbox-option", async (req, res) => {
 // cause of "server won't boot, no obvious reason" reports.
 router.get("/sandbox/validate", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_SandboxVars.lua`);
@@ -209,7 +208,7 @@ router.get("/sandbox/validate", async (req, res) => {
 router.post("/sandbox/repair", async (req, res) => {
   try {
     log.info("POST /sandbox/repair");
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_SandboxVars.lua`);

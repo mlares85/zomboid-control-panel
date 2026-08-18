@@ -5,7 +5,6 @@ const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
 import { getServerConfigPath, getServerName, createBackup } from "./context.js";
-import { LocalFiles } from "../../services/fileAccess/index.js";
 import { escapeLuaString } from "./luaEscape.js";
 
 const router = express.Router();
@@ -68,7 +67,7 @@ function toSpawnRegions(regions, serverName) {
 // Get spawn regions
 router.get("/spawnregions", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_spawnregions.lua`);
@@ -95,7 +94,7 @@ router.get("/spawnregions", async (req, res) => {
 // Save spawn regions
 router.put("/spawnregions", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_spawnregions.lua`);

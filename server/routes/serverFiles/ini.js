@@ -5,7 +5,6 @@ const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
 import { getServerConfigPath, getServerName, createBackup } from "./context.js";
-import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
@@ -99,7 +98,7 @@ export function toIni(obj, originalContent = "") {
 // Get INI file (parsed)
 router.get("/ini", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}.ini`);
@@ -124,7 +123,7 @@ router.get("/ini", async (req, res) => {
 // Save INI file
 router.put("/ini", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     log.info(

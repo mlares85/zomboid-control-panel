@@ -5,7 +5,6 @@ const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
 import { getServerConfigPath, getServerName, createBackup } from "./context.js";
-import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
@@ -93,7 +92,7 @@ function toSpawnPoints(professions, serverName) {
 // Get spawn points
 router.get("/spawnpoints", async (req, res) => {
   try {
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_spawnpoints.lua`);
@@ -121,7 +120,7 @@ router.get("/spawnpoints", async (req, res) => {
 router.put("/spawnpoints", async (req, res) => {
   try {
     log.info("PUT /spawnpoints");
-    const fileAccess = new LocalFiles();
+    const fileAccess = req.fileAccess;
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_spawnpoints.lua`);
