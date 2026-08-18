@@ -1,31 +1,21 @@
 # Active Context
 
 ## Current Focus
-Upstream ports complete (v1.1.42–v1.1.47). Fork is now caught up with
-origin/main. Next: validate PZ actually runs inside a managed container
-on Unraid, then continue frontend decomposition.
+Dashboard decomposed, E2E testing framework added. Upstream ports
+complete. Next: decompose Backups.tsx, then validate PZ in managed
+container on Unraid.
 
 ## Recent Decisions
-- Ported 4 upstream fixes: logout jwt.verify (issue #43), Docker
-  lifecycle routing (stop/restart through serverManager for containers),
-  backup records mutation queue, SFTP bridge link on server cards.
-- Docker stop/restart: all call sites (web `/stop`, Discord `/stop`,
-  scheduler auto-restart) now route through `serverManager.stopServer()`
-  or `dockerClient.restartContainer()` for Docker-backed servers instead
-  of `rconService.quit()` (which killed PID 1 and triggered restart
-  policy).
-- `dockerClient._lifecycleAction` reads the container's `StopTimeout`
-  for a per-action HTTP timeout instead of the flat 8s default.
-- `docker/entrypoint.sh` preserves supplementary groups (docker GID)
-  instead of `--clear-groups` unconditionally.
-- `backupRecords.js` mutations serialized through a promise-chain queue
-  to prevent concurrent read-modify-write races.
+- Dashboard.tsx decomposed: 1,556 → 131-line shell + 12 components +
+  1 hook. Components in `components/dashboard/`, hook in
+  `hooks/dashboard/useDashboardData.ts`.
+- E2E framework: Playwright with chromium, auth setup (handles first-run
+  + login), 3 spec files (smoke, dashboard controls, navigation).
+  Run `npx playwright install chromium` before first use.
+- Ported 4 upstream fixes (v1.1.42–v1.1.47): logout jwt.verify, Docker
+  lifecycle routing, backup records mutation queue, SFTP bridge link.
 - RCON host uses Docker container name (not 127.0.0.1) because the panel
-  auto-connects itself to `zomboid-panel-net` — required for container-to-
-  container DNS resolution.
-- Map build_list.json moved under a deploy-timestamped static root on
-  map.projectzomboid.com. Panel discovers it by scraping
-  `__PZMAP_STATIC_ROOT` from the homepage HTML (24h cache).
+  auto-connects itself to `zomboid-panel-net`.
 - SSH deploy to Unraid: clone → build on server → stop → run.
   Key: ~/.ssh/breakingbread_deploy, host: 192.168.1.85.
 
@@ -37,6 +27,7 @@ on Unraid, then continue frontend decomposition.
 - WorldMap.tsx version selector frontend not yet wired (backend ready).
 
 ## Next Steps
-1. Test managed container actually running PZ — fix runtime issues.
-2. Wire WorldMap.tsx version selector to /api/map/versions.
-3. Decompose Dashboard.tsx (1,556 lines) and Backups.tsx (1,060+ lines).
+1. Decompose Backups.tsx (1,060+ lines).
+2. Test managed container actually running PZ — fix runtime issues.
+3. Wire WorldMap.tsx version selector to /api/map/versions.
+4. Expand E2E test coverage (server lifecycle, settings, backups).
