@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
+import { FieldHelp } from "@/components/FieldHelp";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1956,6 +1957,11 @@ export default function ChunkCleaner() {
                 <CardTitle className="text-xs font-medium flex items-center gap-2 text-muted-foreground">
                   <Save className="w-3.5 h-3.5" />
                   Save
+                  <FieldHelp
+                    description="Which save-game folder the chunk scanner reads from."
+                    context="Chunks, vehicles, and safehouses shown below all come from this save. Switching saves reloads the map and clears your current selection."
+                    recommendation="must-configure"
+                  />
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4 pt-2 space-y-2.5">
@@ -2033,6 +2039,16 @@ export default function ChunkCleaner() {
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="space-y-2 pt-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-muted-foreground/70">
+                        Manual folder override
+                      </span>
+                      <FieldHelp
+                        description="Manually point at the Zomboid data folder when auto-detection can't find your saves."
+                        context="Only needed if the server runs on a non-default path or a remote/custom install. Leave this alone if your save already appears in the dropdown above."
+                        recommendation="advanced"
+                      />
+                    </div>
                     <div className="flex gap-1.5">
                       <Input
                         value={customPathInput}
@@ -2228,6 +2244,12 @@ export default function ChunkCleaner() {
                     </TooltipContent>
                   </Tooltip>
 
+                  <FieldHelp
+                    description="Select draws a rectangle to pick chunks for deletion; Pan drags the map view."
+                    context="Switching to Pan does not clear an existing chunk selection — it only changes what click-and-drag does on the canvas."
+                    recommendation="safe-default"
+                  />
+
                   <Separator orientation="vertical" className="h-6 mx-0.5" />
 
                   <Tooltip>
@@ -2303,6 +2325,11 @@ export default function ChunkCleaner() {
                       <ImageOff className="w-3.5 h-3.5" />
                     )}
                     Map
+                    <FieldHelp
+                      description="Shows or hides the rendered map tile background behind the chunk grid."
+                      context="A display-only toggle — it doesn't affect which chunks are loaded or selectable, just whether the underlying terrain image is drawn."
+                      recommendation="safe-default"
+                    />
                   </Label>
                   <Switch checked={showMap} onCheckedChange={setShowMap} />
                 </div>
@@ -2316,6 +2343,11 @@ export default function ChunkCleaner() {
                         ({chunkVehicles.length})
                       </span>
                     )}
+                    <FieldHelp
+                      description="Shows or hides vehicle markers overlaid on the map."
+                      context="Display-only — helps you see which chunks have vehicles in them before selecting an area to delete. Turning it off doesn't remove any vehicles."
+                      recommendation="safe-default"
+                    />
                   </Label>
                   <Switch
                     checked={showVehicles}

@@ -83,6 +83,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { useToast } from '@/components/ui/use-toast'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { EmptyState } from '@/components/EmptyState'
+import { FieldHelp } from '@/components/FieldHelp'
 import { SpawnBrowser } from '@/components/SpawnBrowser'
 import { playersApi, panelBridgeApi, configApi } from '@/lib/api'
 import { PageHeader } from '@/components/PageHeader'
@@ -1051,8 +1052,14 @@ export default function Players() {
                 }
                 value={playerSearchFilter}
                 onChange={(e) => setPlayerSearchFilter(e.target.value)}
-                className="pl-9"
+                className="pl-9 pr-8"
                 aria-label="Search players"
+              />
+              <FieldHelp
+                description="Filters the list below by name (or by Steam ID / reason on the Banned tab)."
+                context="Matches anywhere in the name as you type — it doesn't change who's actually online, just what's shown."
+                recommendation="safe-default"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2"
               />
             </div>
 
@@ -1280,9 +1287,16 @@ export default function Players() {
 
             {/* Manual entry — for offline or unlisted usernames */}
             <div className="space-y-1.5 border-t border-border/40 pt-3">
-              <Label className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground/80">
-                <span className="text-primary/70">›</span> Manual target
-              </Label>
+              <div className="flex items-center gap-1.5">
+                <Label className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground/80">
+                  <span className="text-primary/70">›</span> Manual target
+                </Label>
+                <FieldHelp
+                  description="Type an exact username to target it for actions below, bypassing the roster list."
+                  context="Useful for offline or unlisted players — moderation actions like ban/kick still need the player's exact in-game name."
+                  recommendation="safe-default"
+                />
+              </div>
               <Input
                 placeholder="Enter username…"
                 value={selectedPlayer}
@@ -1519,7 +1533,14 @@ export default function Players() {
                       </DialogHeader>
                       <div className="space-y-4">
                         <div>
-                          <Label htmlFor="kick-reason">Reason (optional)</Label>
+                          <div className="flex items-center gap-1.5">
+                            <Label htmlFor="kick-reason">Reason (optional)</Label>
+                            <FieldHelp
+                              description="Shown to the player in their disconnect message."
+                              context="A kick just disconnects the player — they can rejoin immediately. Use Ban if you need to keep them out."
+                              recommendation="safe-default"
+                            />
+                          </div>
                           <Input
                             id="kick-reason"
                             value={kickReason}
@@ -1789,6 +1810,11 @@ export default function Players() {
                           <Label htmlFor="voiceBanEnabled">
                             {voiceBanEnabled ? 'Ban from voice chat' : 'Unban from voice chat'}
                           </Label>
+                          <FieldHelp
+                            description="Mutes the player's in-game proximity voice chat without disconnecting them."
+                            context="They stay connected and can still text-chat and play — this only silences their mic. Fully reversible by toggling again."
+                            recommendation="safe-default"
+                          />
                         </div>
                       </div>
                       <DialogFooter>
@@ -1829,7 +1855,14 @@ export default function Players() {
                       </DialogHeader>
                       <div className="space-y-4">
                         <div>
-                          <Label>Steam ID</Label>
+                          <div className="flex items-center gap-1.5">
+                            <Label>Steam ID</Label>
+                            <FieldHelp
+                              description="The 17-digit SteamID64 to ban — bans by ID even while the player is offline."
+                              context="Useful for evading players who won't connect, but double-check the ID: banning the wrong SteamID64 blocks an unrelated player."
+                              recommendation="must-configure"
+                            />
+                          </div>
                           <Input
                             value={banSteamId}
                             onChange={(e) => setBanSteamId(e.target.value)}
@@ -1886,7 +1919,14 @@ export default function Players() {
                           />
                         </div>
                         <div>
-                          <Label>Password</Label>
+                          <div className="flex items-center gap-1.5">
+                            <Label>Password</Label>
+                            <FieldHelp
+                              description="This account's server login password — separate from the player's Steam login."
+                              context="Only used on whitelist-only servers where players log in with a username/password instead of Steam. Share it with the player through a secure channel."
+                              recommendation="must-configure"
+                            />
+                          </div>
                           <Input
                             type="password"
                             value={addUserPassword}
@@ -2100,7 +2140,14 @@ export default function Players() {
                       <TrendingUp className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="font-medium">Give XP</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium">Give XP</p>
+                        <FieldHelp
+                          description="Instantly adds experience points to the chosen skill for this player."
+                          context="This is a live game-state change, not reversible with an undo — it directly affects character progression and level."
+                          recommendation="advanced"
+                        />
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         Grant experience to {selectedPlayer ? <span className="text-foreground font-medium">{selectedPlayer}</span> : 'the selected player'}
                       </p>
@@ -2309,6 +2356,11 @@ export default function Players() {
                       <Label className="text-sm font-medium flex items-center gap-2">
                         <Tag className="w-4 h-4" />
                         Tags
+                        <FieldHelp
+                          description="Short labels attached to this player, visible to admins only."
+                          context="Purely organizational — tags don't affect gameplay or permissions, just help you filter and remember players at a glance."
+                          recommendation="safe-default"
+                        />
                       </Label>
                       <div className="flex flex-wrap gap-2 min-h-[32px]">
                         {currentTags.map(tag => (
@@ -2365,6 +2417,11 @@ export default function Players() {
                       <Label className="text-sm font-medium flex items-center gap-2">
                         <StickyNote className="w-4 h-4" />
                         Admin Note
+                        <FieldHelp
+                          description="Free-text note attached to this player, visible only to server admins."
+                          context="Not shown to the player and not sent anywhere — just a private record other admins can read when they select this player."
+                          recommendation="safe-default"
+                        />
                       </Label>
                       <Textarea
                         value={currentNote}

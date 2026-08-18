@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/use-toast'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { FieldHelp } from '@/components/FieldHelp'
 import { rconApi, configApi, serverApi, serversApi, type ServerInstance } from '@/lib/api'
 import { useSocket } from '@/contexts/SocketContext'
 import { EmptyState } from '@/components/EmptyState'
@@ -1016,6 +1017,13 @@ export default function Console() {
                 aria-label="RCON command input"
               />
             </div>
+            <FieldHelp
+              className="self-center"
+              description="Raw RCON command console."
+              context="Commands run immediately against the live server with no confirmation step — some can kick/ban players, wipe zombies, or alter world state instantly. Use ↑/↓ to browse recent commands."
+              recommendation="advanced"
+              articleId="rcon-setup"
+            />
             <Button
               onClick={executeCommand}
               disabled={loading || !command.trim() || !hasRconConfig}
@@ -1065,21 +1073,31 @@ export default function Console() {
 
                 {/* Channel tag selector */}
                 <div className="grid gap-2 sm:grid-cols-[180px_1fr] sm:items-start">
-                  <Select value={selectedChannel} onValueChange={setSelectedChannel}>
-                    <SelectTrigger aria-label="Channel tag">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {chatChannels.map((channel) => (
-                        <SelectItem key={channel.value} value={channel.value}>
-                          <div className="flex flex-col">
-                            <span>{channel.label}</span>
-                            <span className="text-xs text-muted-foreground">{channel.description}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">Channel tag</span>
+                      <FieldHelp
+                        description="Cosmetic label prefixed to the broadcast text."
+                        context="RCON's servermsg command cannot target specific in-game chat channels — every option sends the same server-wide broadcast, just with a different bracketed tag such as [ADMIN] in front."
+                        recommendation="safe-default"
+                      />
+                    </div>
+                    <Select value={selectedChannel} onValueChange={setSelectedChannel}>
+                      <SelectTrigger aria-label="Channel tag">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {chatChannels.map((channel) => (
+                          <SelectItem key={channel.value} value={channel.value}>
+                            <div className="flex flex-col">
+                              <span>{channel.label}</span>
+                              <span className="text-xs text-muted-foreground">{channel.description}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Textarea
                     value={announcement}
                     onChange={(e) => setAnnouncement(e.target.value)}

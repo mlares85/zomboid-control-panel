@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
+import { FieldHelp } from '@/components/FieldHelp'
 import { panelBridgeApi, playersApi, configApi } from '@/lib/api'
 import { useSocket } from '@/contexts/SocketContext'
 import { EmptyState } from '@/components/EmptyState'
@@ -395,6 +396,12 @@ export default function Chat() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                  <FieldHelp
+                    className="hidden self-center sm:inline-flex"
+                    description="Delivery channel for this message."
+                    context="Server broadcast uses RCON servermsg and reaches every connected player. Admin chat is visible only to admins in-game. General chat posts as a custom author into the public chat stream via the Panel Bridge mod."
+                    recommendation="safe-default"
+                  />
                   <Input
                     ref={messageInputRef}
                     placeholder={

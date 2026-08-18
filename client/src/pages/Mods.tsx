@@ -44,6 +44,7 @@ import { WorkshopCollectionPanel } from '@/components/WorkshopCollectionPanel'
 import { ConflictsPanel } from '@/components/mods/ConflictsPanel'
 import { ModRow, WorkshopIdChip, WorkshopLinkAction, WorkshopThumb } from '@/components/mods/ModRow'
 import { SafeModUpdateButton } from '@/components/mods/SafeModUpdateButton'
+import { FieldHelp } from '@/components/FieldHelp'
 import {
   useLocalStorageState,
   type TrackedMod,
@@ -2437,6 +2438,12 @@ export default function Mods() {
                 })() : <span>Never checked</span>}
               </TooltipContent>
             </Tooltip>
+            <FieldHelp
+              description="Checks the Steam Workshop for newer file timestamps on your tracked mods."
+              context="Runs on a schedule too, but you can force it here after a mod author pushes an update. It only flags updates — it doesn't download or apply them."
+              recommendation="safe-default"
+              articleId="mod-updates"
+            />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="More actions">
@@ -2455,7 +2462,15 @@ export default function Mods() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm">Auto-restart</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">Auto-restart</span>
+                      <FieldHelp
+                        description="Automatically restarts the server when a tracked mod's Workshop update is detected."
+                        context="Applies updated files immediately without waiting for a manual restart, but it will interrupt active play sessions — tune warning time and player-delay behavior in Auto-Restart Settings."
+                        recommendation="safe-default"
+                        articleId="mod-updates"
+                      />
+                    </div>
                     <Switch
                       checked={status?.autoRestartEnabled || false}
                       onCheckedChange={handleToggleAutoRestart}
@@ -2611,7 +2626,15 @@ export default function Mods() {
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <Label htmlFor="collection-url-input">Collection URL or ID</Label>
+                      <div className="flex items-center gap-1.5">
+                        <Label htmlFor="collection-url-input">Collection URL or ID</Label>
+                        <FieldHelp
+                          description="The Steam Workshop collection URL or numeric collection ID to import."
+                          context="Every mod in the collection is added to your tracked list at once. Wrong or unrelated collections can pull in mods you don't want — review the list before adding."
+                          recommendation="must-configure"
+                          articleId="mod-manager-basics"
+                        />
+                      </div>
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <Input
                           id="collection-url-input"
@@ -2790,6 +2813,15 @@ export default function Mods() {
                     {/* Input section */}
                     <div className="space-y-2">
                       <Label htmlFor="advanced-mod-input" className="sr-only">Workshop URL or ID</Label>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">Workshop URL or ID</span>
+                        <FieldHelp
+                          description="The Steam Workshop item's URL or its numeric ID (the id= value in the Workshop page URL)."
+                          context="This is how the panel finds the mod's internal mod IDs to write into the server config. Mods usually won't load without a correct Workshop ID here."
+                          recommendation="must-configure"
+                          articleId="mod-manager-basics"
+                        />
+                      </div>
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <Input
                           id="advanced-mod-input"
@@ -3084,7 +3116,15 @@ export default function Mods() {
 
                     <div className="flex items-center justify-between rounded-lg border border-border/70 bg-card/65 p-3">
                       <div className="space-y-1">
-                        <Label>Delay if Players Online</Label>
+                        <div className="flex items-center gap-1.5">
+                          <Label>Delay if Players Online</Label>
+                          <FieldHelp
+                            description="Holds off an update restart while players are still connected."
+                            context="Prevents mid-session disconnects, but the restart is only postponed — it still fires once players leave or the maximum delay below is reached."
+                            recommendation="safe-default"
+                            articleId="mod-updates"
+                          />
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           Wait for all players to leave before restarting
                         </p>
@@ -3151,6 +3191,11 @@ export default function Mods() {
                   aria-label="Search mods"
                 />
               </div>
+              <FieldHelp
+                description="Filters the mod list below by name or Workshop ID."
+                context="Search-only — it doesn't change what's installed or enabled, so it's always safe to use."
+                recommendation="safe-default"
+              />
 
               <Button
                 variant={showUpdatesOnly ? "secondary" : "outline"}

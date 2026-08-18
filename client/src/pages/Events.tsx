@@ -60,6 +60,7 @@ import { cn } from '@/lib/utils'
 import { getUserErrorMessage, getErrorFixUrl } from '@/lib/errorMessage'
 import { errorToastContent } from '@/lib/errorToast'
 import { FixThisAction } from '@/components/ui/fix-this-action'
+import { FieldHelp } from '@/components/FieldHelp'
 
 interface Player {
   name: string
@@ -1831,10 +1832,17 @@ export default function Events() {
               <div className="p-4 space-y-6">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
-                      <CloudRain className="w-3.5 h-3.5 text-info" />
-                      rain
-                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
+                        <CloudRain className="w-3.5 h-3.5 text-info" />
+                        rain
+                      </Label>
+                      <FieldHelp
+                        description="How heavy the rain is, from a light drizzle to a downpour."
+                        context="Takes effect immediately over the whole map via RCON. Stop rain any time to clear it — nothing here persists past a server restart."
+                        recommendation="safe-default"
+                      />
+                    </div>
                     <span className="font-mono text-[11px] tabular-nums text-info">{rainIntensity}%</span>
                   </div>
                   <Slider aria-label="Rain intensity" value={[rainIntensity]} onValueChange={([val]) => setRainIntensity(val)} min={1} max={100} step={1} />
@@ -1852,10 +1860,17 @@ export default function Events() {
 
                 <div className="space-y-3 pt-4 border-t border-border/40">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
-                      <CloudLightning className="w-3.5 h-3.5 text-amber-400" />
-                      storm
-                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
+                        <CloudLightning className="w-3.5 h-3.5 text-amber-400" />
+                        storm
+                      </Label>
+                      <FieldHelp
+                        description="How many in-game hours the storm runs before clearing on its own."
+                        context="Longer storms mean longer thunder/lightning and reduced visibility — use Clear Weather to cut it short at any time."
+                        recommendation="safe-default"
+                      />
+                    </div>
                     <span className="font-mono text-[11px] tabular-nums text-amber-400">{stormDuration}h</span>
                   </div>
                   <Slider aria-label="Storm duration" value={[stormDuration]} onValueChange={([val]) => setStormDuration(val)} min={1} max={24} step={1} />
@@ -1885,10 +1900,17 @@ export default function Events() {
               <div className="p-4 space-y-6">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
-                      <Snowflake className="w-3.5 h-3.5 text-info" />
-                      blizzard
-                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
+                        <Snowflake className="w-3.5 h-3.5 text-info" />
+                        blizzard
+                      </Label>
+                      <FieldHelp
+                        description="How many in-game hours the blizzard lasts."
+                        context="Requires the PanelBridge connection — the button stays disabled until the bridge is online. Snow accumulation and cold exposure scale with duration."
+                        recommendation="must-configure"
+                      />
+                    </div>
                     <span className="font-mono text-[11px] tabular-nums text-info">{blizzardDuration}h</span>
                   </div>
                   <Slider aria-label="Blizzard duration" value={[blizzardDuration]} onValueChange={([val]) => setBlizzardDuration(val)} min={1} max={24} step={1} disabled={!bridgeConnected} />
@@ -1900,10 +1922,17 @@ export default function Events() {
 
                 <div className="space-y-3 pt-4 border-t border-border/40">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
-                      <Wind className="w-3.5 h-3.5 text-amber-400" />
-                      tropical storm
-                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
+                        <Wind className="w-3.5 h-3.5 text-amber-400" />
+                        tropical storm
+                      </Label>
+                      <FieldHelp
+                        description="How many in-game hours the tropical storm lasts."
+                        context="Requires the PanelBridge connection to trigger. Brings high wind and heavy rain together — good for testing weather-driven events."
+                        recommendation="must-configure"
+                      />
+                    </div>
                     <span className="font-mono text-[11px] tabular-nums text-amber-400">{tropicalDuration}h</span>
                   </div>
                   <Slider aria-label="Tropical storm duration" value={[tropicalDuration]} onValueChange={([val]) => setTropicalDuration(val)} min={1} max={24} step={1} disabled={!bridgeConnected} />
@@ -1955,10 +1984,17 @@ export default function Events() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
-                      <Eye className="w-3.5 h-3.5 text-primary/80" />
-                      fog
-                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
+                        <Eye className="w-3.5 h-3.5 text-primary/80" />
+                        fog
+                      </Label>
+                      <FieldHelp
+                        description="Overrides fog density on the running server."
+                        context="Applied live to the current world via the bridge, similar to the power/water overrides — it doesn't get written back to sandbox settings, so a server restart clears it back to map defaults."
+                        recommendation="must-configure"
+                      />
+                    </div>
                     <span className="font-mono text-[11px] tabular-nums text-primary">{fogIntensity}%</span>
                   </div>
                   <Slider aria-label="Fog intensity" value={[fogIntensity]} onValueChange={([val]) => { markClimateDirty(); setFogIntensity(val) }} min={0} max={100} step={5} disabled={!bridgeConnected} />
@@ -1977,10 +2013,17 @@ export default function Events() {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
-                      <Thermometer className="w-3.5 h-3.5 text-primary/80" />
-                      temperature
-                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
+                        <Thermometer className="w-3.5 h-3.5 text-primary/80" />
+                        temperature
+                      </Label>
+                      <FieldHelp
+                        description="Overrides the ambient world temperature in °C."
+                        context="Extreme values affect hypothermia/heatstroke risk for players. Like the other climate sliders, this is a live override only — it resets on server restart."
+                        recommendation="must-configure"
+                      />
+                    </div>
                     <span className="font-mono text-[11px] tabular-nums text-primary">{temperature}°C</span>
                   </div>
                   <Slider aria-label="Temperature" value={[temperature]} onValueChange={([val]) => { markClimateDirty(); setTemperature(val) }} min={-30} max={45} step={1} disabled={!bridgeConnected} />
@@ -2063,10 +2106,17 @@ export default function Events() {
               <div className="p-4 space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
-                      {gameHour >= 6 && gameHour < 20 ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-info" />}
-                      hour
-                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
+                        {gameHour >= 6 && gameHour < 20 ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-info" />}
+                        hour
+                      </Label>
+                      <FieldHelp
+                        description="Sets the in-game hour (0-23), applied together with day and month below."
+                        context="Requires the PanelBridge connection. Nothing changes until you click Apply time & date — adjusting the slider alone doesn't touch the server."
+                        recommendation="must-configure"
+                      />
+                    </div>
                     <span className="font-mono text-[11px] tabular-nums text-primary">{String(gameHour).padStart(2, '0')}:00</span>
                   </div>
                   <Slider aria-label="Game hour" value={[gameHour]} onValueChange={([val]) => setGameHour(val)} min={0} max={23} step={1} disabled={!bridgeConnected} />
