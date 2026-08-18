@@ -60,5 +60,6 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     stdout: 'pipe',
     stderr: 'pipe',
+    env: { ...process.env, NODE_ENV: 'test' },
   },
 })

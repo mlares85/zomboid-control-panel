@@ -48,6 +48,12 @@ setup('authenticate', async ({ page }) => {
     await page.getByRole('button', { name: /^sign in$/i }).click()
   }
 
-  await expect(dashboardHeader).toBeVisible({ timeout: 15_000 })
+  // After login/signup the app lands on the dashboard — either the full
+  // StatusHeader (returning user) or the first-run SetupChecklist (fresh
+  // install). Both render inside the authenticated shell with the sidebar
+  // nav, so wait for that instead of the status banner specifically.
+  const authedShell = dashboardHeader
+    .or(page.getByRole('navigation', { name: 'Main navigation' }))
+  await expect(authedShell).toBeVisible({ timeout: 15_000 })
   await page.context().storageState({ path: authFile })
 })

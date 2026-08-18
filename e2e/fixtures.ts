@@ -1,19 +1,38 @@
 import { test as base, expect, type Page } from '@playwright/test'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const authFile = path.join(__dirname, '.auth', 'user.json')
+
+const USERNAME = process.env.E2E_USERNAME || 'e2e_admin'
+const PASSWORD = process.env.E2E_PASSWORD || 'E2eTestPassword123!'
 
 /**
- * Auth itself is handled by project config: the `chromium` project (see
- * playwright.config.ts) depends on the `setup` project and loads its
- * storage state (e2e/.auth/user.json, written by e2e/auth.setup.ts), so any
- * test using this `test` already starts signed in.
- *
- * This file adds a small `dashboard` fixture — a Page already navigated to
- * "/" with the post-login shell (sidebar nav) visible — so spec files don't
- * each repeat the same wait.
+ * `dashboard` fixture — navigates to "/" and ensures the authenticated shell
+ * (sidebar nav) is visible.  If the storage-state cookie has gone stale
+ * (e.g. the server regenerated its JWT secret), the fixture signs in via the
+ * login form and updates the saved storage state so subsequent tests skip
+ * the login round-trip entirely.
  */
 export const test = base.extend<{ dashboard: Page }>({
-  dashboard: async ({ page }, use) => {
+  dashboard: async ({ page, context }, use) => {
     await page.goto('/')
-    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({ timeout: 15_000 })
+
+    const nav = page.getByRole('navigation', { name: 'Main navigation' })
+    const loginHeading = page.getByRole('heading', { name: 'Sign in' })
+
+    await expect(nav.or(loginHeading)).toBeVisible({ timeout: 15_000 })
+
+    if (await loginHeading.isVisible().catch(() => false)) {
+      await page.getByLabel('Username').fill(USERNAME)
+      await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
+      await page.getByRole('button', { name: /^sign in$/i }).click()
+      await expect(nav).toBeVisible({ timeout: 15_000 })
+      // Persist the fresh session so later tests skip the login form
+      await context.storageState({ path: authFile })
+    }
+
     await use(page)
   },
 })

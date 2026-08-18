@@ -567,10 +567,12 @@ app.use(cookieParser());
 // Compress all HTTP responses (gzip/deflate)
 app.use(compression({ threshold: 1024 }));
 
-// Rate limiting — applied before auth to protect against unauthenticated floods
+// Rate limiting — applied before auth to protect against unauthenticated floods.
+// E2E tests open ~100 pages in quick succession; the default 300/min is too low
+// for that volume. NODE_ENV=test (set by Playwright) relaxes the cap.
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 300, // 300 requests per minute per IP
+  max: process.env.NODE_ENV === "test" ? 5000 : 300,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
