@@ -35,12 +35,13 @@ export default defineConfig({
   },
 
   projects: [
-    // Logs in (or completes first-run setup) once and saves storage state
-    // for every other project to reuse — see e2e/auth.setup.ts.
+    // --- Auth setup (shared by all browser projects) ---
     {
       name: 'setup',
       testMatch: /auth\.setup\.ts/,
     },
+
+    // --- UI smoke tests (no Docker required) ---
     {
       name: 'chromium',
       use: {
@@ -48,6 +49,39 @@ export default defineConfig({
         storageState: 'e2e/.auth/user.json',
       },
       dependencies: ['setup'],
+    },
+
+    // --- Integration: Docker lifecycle ---
+    // Spins up a real PZ server via the managed-server API, runs *.spec.ts
+    // tests against it, then tears it down.
+    //
+    // Prerequisites:
+    //   - Docker available on the host
+    //   - Base volume populated (run populate-base in the panel UI first)
+    //
+    // Run with: npm run test:e2e:integration
+    {
+      name: 'docker-setup',
+      testMatch: /docker-setup\.ts/,
+      testDir: './e2e/integration',
+      dependencies: ['setup'],
+    },
+    {
+      name: 'docker-teardown',
+      testMatch: /docker-teardown\.ts/,
+      testDir: './e2e/integration',
+    },
+    {
+      name: 'integration',
+      testDir: './e2e/integration',
+      testMatch: '**/*.spec.ts',
+      timeout: 60_000,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/user.json',
+      },
+      dependencies: ['docker-setup'],
+      teardown: 'docker-teardown',
     },
   ],
 
