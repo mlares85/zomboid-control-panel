@@ -66,6 +66,10 @@ JWT-authenticated in handshake middleware. Room-based pub/sub: `server-status`, 
 
 Pages are decomposed into `components/{page}/` directories. The main page file becomes a thin shell (tab management + component composition). Shared state extracted into hooks. Target: no file over 300 lines.
 
+## E2E testing
+
+Playwright (`@playwright/test`) with chromium. `e2e/auth.setup.ts` handles both first-run (account creation) and login, saving auth state to `e2e/.auth/user.json` for reuse. Credentials via `E2E_USERNAME`/`E2E_PASSWORD` env vars (defaults: `admin`/`testpassword123`). Specs in `e2e/`: smoke, dashboard, navigation. Run `npx playwright install chromium` once, then `npm run test:e2e`. The dev server (`npm run dev`, Vite on port 5173 proxying to Express on 3001) is started automatically by the Playwright `webServer` config.
+
 ## Test environment: localStorage under Node's built-in Storage
 
 On Node versions that ship a built-in global `localStorage` (22+), that global shadows jsdom's Storage implementation in Vitest and every call throws `TypeError: ... is not a function` unless `--localstorage-file` is set. `client/src/test-setup.ts` overrides `globalThis.localStorage` with a minimal in-memory `Storage` for the test environment only — needed by any component test exercising a dismiss-to-localStorage pattern (`MountDiscoveryBanner`, `PlatformGuidanceCard`, etc.).
