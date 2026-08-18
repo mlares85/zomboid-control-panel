@@ -1,6 +1,8 @@
 import { Eye, EyeOff, Info, Key, Loader2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FieldHelp } from "@/components/FieldHelp";
 
 interface LocalPasswordResetCardProps {
   localPasswordResetSupported: boolean;
@@ -92,8 +94,19 @@ export function LocalPasswordResetCard({
                     void handleResetLostPassword();
                   }}
                 >
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="local-reset-password" className="text-xs">
+                      New password
+                    </Label>
+                    <FieldHelp
+                      description="The new panel login password to set, without needing the old one."
+                      context="Only available when running this panel session directly on the server host. Choose a unique password of at least 6 characters."
+                      recommendation="must-configure"
+                    />
+                  </div>
                   <div className="relative">
                     <Input
+                      id="local-reset-password"
                       type={showLocalResetPassword ? "text" : "password"}
                       value={localPasswordResetPassword}
                       onChange={(e) =>
@@ -122,7 +135,18 @@ export function LocalPasswordResetCard({
                       )}
                     </button>
                   </div>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="local-reset-confirm" className="text-xs">
+                      Confirm new password
+                    </Label>
+                    <FieldHelp
+                      description="Re-enter the new password to catch typos before it's saved."
+                      context="Must match the New Password field exactly, or the reset will be rejected."
+                      recommendation="must-configure"
+                    />
+                  </div>
                   <Input
+                    id="local-reset-confirm"
                     type={showLocalResetPassword ? "text" : "password"}
                     value={localPasswordResetConfirm}
                     onChange={(e) =>

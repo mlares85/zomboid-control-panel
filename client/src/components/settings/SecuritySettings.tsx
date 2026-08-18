@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FieldHelp } from "@/components/FieldHelp";
 import { RecoveryCodesCard } from "./RecoveryCodesCard";
 import { LocalPasswordResetCard } from "./LocalPasswordResetCard";
 import { useSecuritySettings } from "@/hooks/settings/useSecuritySettings";
@@ -96,8 +98,19 @@ export function SecuritySettings({
                 readOnly
                 hidden
               />
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="current-password" className="text-xs text-muted-foreground">
+                  Current password
+                </Label>
+                <FieldHelp
+                  description="Your existing panel login password, used to authorize the change."
+                  context="Required to prove you're the account owner before setting a new password."
+                  recommendation="must-configure"
+                />
+              </div>
               <div className="relative">
                 <Input
+                  id="current-password"
                   type={security.showCurrentPassword ? "text" : "password"}
                   value={currentPassword}
                   onChange={(e) => security.setCurrentPassword(e.target.value)}
@@ -126,8 +139,19 @@ export function SecuritySettings({
                   )}
                 </button>
               </div>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="new-password" className="text-xs text-muted-foreground">
+                  New password
+                </Label>
+                <FieldHelp
+                  description="The password you'll use to log into the panel going forward."
+                  context="Choose something unique and at least 6 characters — this account guards full admin control of your server."
+                  recommendation="must-configure"
+                />
+              </div>
               <div className="relative">
                 <Input
+                  id="new-password"
                   type={security.showNewPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => security.setNewPassword(e.target.value)}
@@ -154,7 +178,18 @@ export function SecuritySettings({
                   )}
                 </button>
               </div>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="confirm-new-password" className="text-xs text-muted-foreground">
+                  Confirm new password
+                </Label>
+                <FieldHelp
+                  description="Re-enter the new password to catch typos before it's saved."
+                  context="Must match the New Password field exactly, or the change will be rejected."
+                  recommendation="must-configure"
+                />
+              </div>
               <Input
+                id="confirm-new-password"
                 type={security.showNewPassword ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(e) => security.setConfirmPassword(e.target.value)}

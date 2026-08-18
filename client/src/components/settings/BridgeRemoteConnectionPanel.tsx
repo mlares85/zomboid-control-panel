@@ -3,6 +3,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldHelp } from "@/components/FieldHelp";
 import { AppSettings } from "@/lib/settingsTypes";
 import { BridgeStatus } from "@/hooks/settings/useBridgeStatus";
 import { ServerInstance } from "@/lib/api";
@@ -143,7 +144,15 @@ export function BridgeRemoteConnectionPanel({
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[18rem] flex-1 space-y-1.5">
-            <Label htmlFor="sftp-config-path">Remote Server folder</Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="sftp-config-path">Remote Server folder</Label>
+              <FieldHelp
+                description="Absolute path, on the remote host, to the Zomboid Server folder containing your .ini and SandboxVars.lua files."
+                context="Only needed to edit a remote server's config from the Server Config page — the panel mirrors these files over SFTP, edits the copy, then writes it back."
+                recommendation="advanced"
+                articleId="server-config-deep-dive"
+              />
+            </div>
             <Input
               id="sftp-config-path"
               value={settings.panelBridgeSftpConfigPath}

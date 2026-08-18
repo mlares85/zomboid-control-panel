@@ -1,6 +1,8 @@
 import { FolderOpen, Loader2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FieldHelp } from "@/components/FieldHelp";
 
 interface BridgeGetStartedPanelProps {
   bridgeLoading: boolean;
@@ -51,11 +53,20 @@ export function BridgeGetStartedPanel({
       </Button>
 
       <div className="border-t border-border/50 pt-3 mt-1 space-y-2">
-        <p className="text-xs text-muted-foreground">
-          Or set the bridge path manually (Linux / VPS / custom installs):
-        </p>
+        <div className="flex items-center gap-1.5">
+          <Label htmlFor="manual-bridge-path" className="text-xs text-muted-foreground">
+            Or set the bridge path manually (Linux / VPS / custom installs):
+          </Label>
+          <FieldHelp
+            description="Absolute local path to the PanelBridge status/command-queue folder, for setups where Auto Setup can't detect it."
+            context="Only needed on Linux, VPS, or custom install layouts where the panel can't guess the path automatically. Most Windows/local installs should use Auto Setup instead."
+            recommendation="advanced"
+            articleId="panelbridge-internals"
+          />
+        </div>
         <div className="flex gap-2">
           <Input
+            id="manual-bridge-path"
             value={manualBridgePath}
             onChange={(e) => setManualBridgePath(e.target.value)}
             placeholder="/home/pzuser/Zomboid/Lua/panelbridge/MyServer"

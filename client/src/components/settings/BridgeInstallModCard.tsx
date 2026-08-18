@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/select";
 import { ServerInstance } from "@/lib/api";
 import { FieldHelp } from "@/components/FieldHelp";
-import { Label } from "@/components/ui/label";
 
 interface BridgeInstallModCardProps {
   servers: ServerInstance[];
@@ -42,9 +41,6 @@ export function BridgeInstallModCard({
         />
       </div>
       <div className="flex flex-wrap gap-3 items-center">
-        <Label htmlFor="bridge-install-server" className="sr-only">
-          Target server
-        </Label>
         <Select
           value={selectedInstallServerId}
           onValueChange={setSelectedInstallServerId}

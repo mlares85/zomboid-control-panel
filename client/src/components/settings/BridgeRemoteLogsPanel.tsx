@@ -2,6 +2,7 @@ import { FolderOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldHelp } from "@/components/FieldHelp";
 import { AppSettings } from "@/lib/settingsTypes";
 
 interface RemoteFile {
@@ -56,7 +57,15 @@ export function BridgeRemoteLogsPanel({
       </div>
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[18rem] flex-1 space-y-1.5">
-          <Label htmlFor="sftp-log-path">Remote log folder</Label>
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor="sftp-log-path">Remote log folder</Label>
+            <FieldHelp
+              description="Absolute path, on the remote host, to the Zomboid Logs folder."
+              context="Only needed if you want to browse and tail remote server logs from the panel. The panel reads files on demand — nothing is mirrored to disk."
+              recommendation="advanced"
+              articleId="panelbridge-internals"
+            />
+          </div>
           <Input
             id="sftp-log-path"
             value={settings.panelBridgeSftpLogPath}
