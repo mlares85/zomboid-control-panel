@@ -1,9 +1,9 @@
 # Active Context
 
 ## Current Focus
-Server provider extraction in progress (Phase 2: file access). FileAccess
-interface + LocalFiles implementation landed, templateService.js migrated as
-first consumer. E2E suite covers all pages + Docker integration framework.
+FileAccess migration COMPLETE (59 files). Wiki/help system live with 26
+articles. FieldHelp tooltips on every field across Settings, Backups, Servers,
+Discord, Scheduler, Templates. E2E suite covers all pages.
 
 ## Recent Decisions
 - Backups decomposition follows Dashboard pattern: `useBackupsData` hook
@@ -25,7 +25,8 @@ first consumer. E2E suite covers all pages + Docker integration framework.
 - WorldMap.tsx version selector frontend not yet wired (backend ready).
 
 ## Next Steps
-1. Continue FileAccess migration: Tier 1 remaining (auth tokens, backupDestinations/local, debug routes), then Tier 2 (logTailer, modChecker, mod INI routes).
-2. Fix remaining 14 E2E test failures (selector mismatches, timeouts).
-3. Test managed container actually running PZ — fix runtime issues.
-4. Wire WorldMap.tsx version selector to /api/map/versions.
+1. Build SftpMirrorFiles (FileAccess implementation for remote servers).
+2. Build NativeSteamCmdInstaller for Windows/Linux local server installs.
+3. Add FieldHelp to remaining pages (Console, Players, Chat, Events, Mods, ServerConfig).
+4. Test managed container actually running PZ — fix runtime issues.
+5. Wire WorldMap.tsx version selector to /api/map/versions.
