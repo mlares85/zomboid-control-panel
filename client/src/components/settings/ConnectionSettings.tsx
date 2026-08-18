@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { FieldHelp } from "@/components/FieldHelp";
 import { AppSettings } from "@/lib/settingsTypes";
 import { useConnectionSettings } from "@/hooks/settings/useConnectionSettings";
 
@@ -61,13 +62,27 @@ export function ConnectionSettings({
                 aria-label="Auto-reconnect RCON on disconnect"
               />
               <Label>Auto-reconnect on disconnect</Label>
+              <FieldHelp
+                description="Automatically retries the RCON connection if it drops."
+                context="Keeps the panel talking to your server without manual intervention after network blips or server restarts."
+                recommendation="safe-default"
+                articleId="rcon-setup"
+              />
             </div>
           </div>
           {settings.autoReconnect && (
             <div className="max-w-xs">
-              <Label htmlFor="reconnect-interval">
-                Reconnect Interval (seconds)
-              </Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="reconnect-interval">
+                  Reconnect Interval (seconds)
+                </Label>
+                <FieldHelp
+                  description="How long the panel waits between RCON reconnect attempts."
+                  context="The default works for most setups. Lower it for faster recovery on a stable network; raise it to avoid hammering a flaky connection."
+                  recommendation="safe-default"
+                  articleId="rcon-setup"
+                />
+              </div>
               <Input
                 id="reconnect-interval"
                 type="number"
@@ -110,9 +125,17 @@ export function ConnectionSettings({
         <CardContent>
           <div className="flex items-start justify-between gap-4 rounded-lg border border-border/60 bg-muted/25 p-3">
             <div className="space-y-1">
-              <Label htmlFor="auto-start-server" className="text-sm font-medium">
-                Start the game server when the panel starts
-              </Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="auto-start-server" className="text-sm font-medium">
+                  Start the game server when the panel starts
+                </Label>
+                <FieldHelp
+                  description="Launches the Zomboid server process automatically whenever the panel starts up."
+                  context="Only works for locally-installed servers with a valid install path. Servers hosted by a provider or run via Docker are started differently — leave this off in those cases."
+                  recommendation="advanced"
+                  articleId="adding-servers"
+                />
+              </div>
               <p className="text-xs text-muted-foreground">
                 Skipped automatically when the RCON port is already in use,
                 so a server that is already running is never duplicated.

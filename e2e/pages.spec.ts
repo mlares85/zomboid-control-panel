@@ -17,7 +17,12 @@ test.describe('Mod Manager', () => {
     await page.getByRole('navigation', { name: 'Main navigation' })
       .getByRole('link', { name: 'Mod Manager', exact: true }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Mod Manager' })).toBeVisible()
-    await expect(page.getByRole('searchbox').or(page.getByPlaceholder(/search/i))).toBeVisible()
+    // The search box only renders once at least one mod is tracked — on a
+    // fresh install the "no mods tracked yet" empty state shows instead.
+    const content = page.getByRole('searchbox')
+      .or(page.getByPlaceholder(/search/i))
+      .or(page.getByText(/no mods tracked/i))
+    await expect(content.first()).toBeVisible({ timeout: 10_000 })
   })
 
   test('mod list or empty state renders', async ({ dashboard: page }) => {
@@ -72,10 +77,12 @@ test.describe('Server Setup', () => {
     await page.getByRole('navigation', { name: 'Main navigation' })
       .getByRole('link', { name: 'Server Setup', exact: true }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Server Setup' })).toBeVisible()
-    // Mode selection: Fresh Install, Use Existing Files, Docker Server
-    await expect(page.getByText('Fresh Install')).toBeVisible()
-    await expect(page.getByText('Use Existing Files')).toBeVisible()
-    await expect(page.getByText('Docker Server')).toBeVisible()
+    // Mode selection: Fresh Install, Use Existing Files, Docker Server.
+    // Match the card headings specifically — "Fresh Install" also appears as
+    // plain text in the "not sure which to choose?" hint below the cards.
+    await expect(page.getByRole('heading', { name: 'Fresh Install' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Use Existing Files' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Docker Server' })).toBeVisible()
   })
 })
 

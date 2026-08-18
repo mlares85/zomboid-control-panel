@@ -45,8 +45,13 @@ test.describe('backups', () => {
     const settingsHeading = page.getByRole('heading', { name: 'Backup Settings' })
     const wasOpen = await settingsHeading.isVisible().catch(() => false)
 
+    // "Settings" is a substring of "Save Settings" (shown once the panel is
+    // open), so this must be an exact match or it strict-mode-violates as
+    // soon as both buttons are on the page.
+    const settingsToggle = page.getByRole('button', { name: 'Settings', exact: true })
+
     // Click Settings to toggle
-    await page.getByRole('button', { name: 'Settings' }).click()
+    await settingsToggle.click()
 
     if (wasOpen) {
       await expect(settingsHeading).not.toBeVisible()
@@ -55,7 +60,7 @@ test.describe('backups', () => {
     }
 
     // Click again to toggle back
-    await page.getByRole('button', { name: 'Settings' }).click()
+    await settingsToggle.click()
 
     if (wasOpen) {
       await expect(settingsHeading).toBeVisible()
@@ -67,8 +72,9 @@ test.describe('backups', () => {
   test('settings panel shows frequency selector, max backups input, and save button', async ({ dashboard: page }) => {
     await goToBackups(page)
 
-    // Open settings
-    await page.getByRole('button', { name: 'Settings' }).click()
+    // Open settings ("Settings" is a substring of "Save Settings", so this
+    // must be exact or it risks a strict-mode violation)
+    await page.getByRole('button', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Backup Settings' })).toBeVisible()
 
     // Backup frequency selector (label + trigger)

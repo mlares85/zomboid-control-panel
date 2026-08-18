@@ -29,8 +29,10 @@ test.describe('Server Configuration page', () => {
 
   test('header action buttons are visible', async ({ dashboard: page }) => {
     await goToConfig(page)
-    await expect(page.getByRole('button', { name: /Templates/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Backups/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Refresh/ })).toBeVisible()
+    // Exact match — the settings-category sidebar on this page also has an
+    // "Ops" group button labeled "Backups N", which the loose regex matched.
+    await expect(page.getByRole('button', { name: 'Templates', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Backups', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeVisible()
   })
 })

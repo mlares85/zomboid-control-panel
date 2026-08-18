@@ -22,26 +22,32 @@ test.describe('Panel Settings page', () => {
 
   test('General tab content is shown by default', async ({ dashboard: page }) => {
     await goToSettings(page)
-    // General tab shows "Panel Settings" or "Panel Port" content
-    await expect(page.getByText('Panel Port').or(page.getByText('Panel Settings'))).toBeVisible({ timeout: 10_000 })
+    // "Panel Settings" also appears as the nav link label — the "Panel
+    // Port" field label is the one unique to this tab's content.
+    await expect(page.getByText('Panel Port')).toBeVisible({ timeout: 10_000 })
   })
 
   test('switching to RCON tab shows RCON content', async ({ dashboard: page }) => {
     await goToSettings(page)
     await page.getByRole('tab', { name: 'RCON' }).click()
-    await expect(page.getByText(/RCON/i)).toBeVisible()
+    // A broad /RCON/i text match hits several elements on this tab (strict
+    // mode violation) — assert on the section's own heading instead.
+    await expect(page.getByRole('heading', { name: 'RCON Connection' })).toBeVisible()
   })
 
   test('switching to Security tab shows security content', async ({ dashboard: page }) => {
     await goToSettings(page)
     await page.getByRole('tab', { name: 'Security' }).click()
-    await expect(page.getByText(/Security|Password|Account/i)).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Security & Authentication' })).toBeVisible()
   })
 
   test('switching to About tab shows version info', async ({ dashboard: page }) => {
     await goToSettings(page)
     await page.getByRole('tab', { name: 'About' }).click()
-    await expect(page.getByText(/v\d+\.\d+/)).toBeVisible({ timeout: 10_000 })
+    // Version strings also appear in the sidebar brand strip and footer —
+    // scope to the About panel and take the first match within it.
+    const versionText = page.getByRole('tabpanel', { name: 'About' }).getByText(/v\d+\.\d+/).first()
+    await expect(versionText).toBeVisible({ timeout: 10_000 })
   })
 
   test('save button is visible in header', async ({ dashboard: page }) => {

@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AppSettings, CorsDiagnostics } from "@/lib/settingsTypes";
+import { FieldHelp } from "@/components/FieldHelp";
 import { CorsDiagnosticsPanel } from "./CorsDiagnosticsPanel";
 
 interface AccessSettingsProps {
@@ -80,9 +81,17 @@ export function AccessSettings({
 
       <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/25 p-3">
         <div>
-          <Label className="text-sm font-medium">
-            Allow Private/LAN Origins
-          </Label>
+          <div className="flex items-center gap-1.5">
+            <Label className="text-sm font-medium">
+              Allow Private/LAN Origins
+            </Label>
+            <FieldHelp
+              description="Automatically trusts browser requests coming from localhost and private/LAN IP ranges."
+              context="Keep this on for typical home/LAN setups. Turning it off can lock you out of the panel from other devices on your network until you add their origin manually below."
+              recommendation="safe-default"
+              articleId="first-run-checklist"
+            />
+          </div>
           <p className="text-xs text-muted-foreground">
             Automatically allow connections from localhost and private/LAN IP
             ranges.
@@ -97,9 +106,16 @@ export function AccessSettings({
 
       <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/25 p-3">
         <div>
-          <Label className="text-sm font-medium">
-            Show Public IP Address
-          </Label>
+          <div className="flex items-center gap-1.5">
+            <Label className="text-sm font-medium">
+              Show Public IP Address
+            </Label>
+            <FieldHelp
+              description="Looks up and displays this machine's public IP address on the dashboard."
+              context="Purely cosmetic convenience for sharing your server's address with players. Off by default to avoid the external lookup call and minor privacy leak for LAN-only setups."
+              recommendation="safe-default"
+            />
+          </div>
           <p className="text-xs text-muted-foreground">
             Look up this machine's public IP (via api.ipify.org) to display
             on the dashboard. Off by default — an unnecessary external
@@ -118,7 +134,15 @@ export function AccessSettings({
 
       <div className="space-y-2 rounded-lg border border-border/60 bg-muted/25 p-3">
         <div>
-          <Label className="text-sm font-medium">Dashboard LAN Address</Label>
+          <div className="flex items-center gap-1.5">
+            <Label className="text-sm font-medium">Dashboard LAN Address</Label>
+            <FieldHelp
+              description="Which of this machine's network interface addresses the dashboard displays to you."
+              context="Display-only — has no effect on CORS or who can actually connect. Auto-detect works for most single-NIC setups; pick manually if you run Tailscale, ZeroTier, or multiple network adapters."
+              recommendation="safe-default"
+              articleId="server-config-deep-dive"
+            />
+          </div>
           <p className="text-xs text-muted-foreground">
             Which network interface's address the dashboard shows. Useful
             when this host has more than one, e.g. Tailscale and ZeroTier at
@@ -146,7 +170,15 @@ export function AccessSettings({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="cors-origins">Additional Allowed Origins</Label>
+        <div className="flex items-center gap-1.5">
+          <Label htmlFor="cors-origins">Additional Allowed Origins</Label>
+          <FieldHelp
+            description="Extra browser origins (scheme + host + port) allowed to connect to the panel, beyond the auto-trusted LAN ranges."
+            context="Required for accessing the panel from outside your LAN — e.g. a VPS public IP or a domain name. Must exactly match what's in your browser's address bar, including http:// or https://."
+            recommendation="must-configure"
+            articleId="server-config-deep-dive"
+          />
+        </div>
         <Textarea
           id="cors-origins"
           value={settings.corsAllowedOrigins}
@@ -167,9 +199,17 @@ export function AccessSettings({
 
       <div className="flex items-center justify-between rounded-lg border border-warning/40 bg-warning/10 p-3">
         <div>
-          <Label className="text-sm font-medium text-warning">
-            Allow All Origins (Debug Only)
-          </Label>
+          <div className="flex items-center gap-1.5">
+            <Label className="text-sm font-medium text-warning">
+              Allow All Origins (Debug Only)
+            </Label>
+            <FieldHelp
+              description="Disables browser-origin checks entirely, letting any website's requests reach the panel."
+              context="Removes a real security boundary — only use it briefly to diagnose a CORS problem, then turn it back off. Never leave enabled on a panel reachable from the internet."
+              recommendation="advanced"
+              articleId="server-config-deep-dive"
+            />
+          </div>
           <p className="text-xs text-muted-foreground">
             Skip all origin checks — useful for diagnosing connection
             problems.
@@ -184,9 +224,16 @@ export function AccessSettings({
 
       <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/25 p-3">
         <div>
-          <Label className="text-sm font-medium">
-            Enable CORS Debug Logging
-          </Label>
+          <div className="flex items-center gap-1.5">
+            <Label className="text-sm font-medium">
+              Enable CORS Debug Logging
+            </Label>
+            <FieldHelp
+              description="Logs each connection attempt that gets blocked by an origin check, with the reason why."
+              context="Safe to leave on or off — it only affects logging, not behavior. Turn it on temporarily when troubleshooting why a device can't reach the panel."
+              recommendation="safe-default"
+            />
+          </div>
           <p className="text-xs text-muted-foreground">
             Log blocked connection attempts for troubleshooting.
           </p>

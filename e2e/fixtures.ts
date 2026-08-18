@@ -29,9 +29,16 @@ export const test = base.extend<{ dashboard: Page }>({
       await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
       await page.getByRole('button', { name: /^sign in$/i }).click()
       await expect(nav).toBeVisible({ timeout: 15_000 })
-      // Persist the fresh session so later tests skip the login form
-      await context.storageState({ path: authFile })
     }
+
+    // Persist the current session so the next test's context starts from a
+    // valid cookie. The refresh token rotates on every use (old one is
+    // revoked server-side), so even when this test authenticated via the
+    // silent cookie refresh — not the login form above — the storage state
+    // on disk is now stale. Without rewriting it here, the next test to load
+    // e2e/.auth/user.json would present an already-revoked refresh token,
+    // fail its own silent refresh, and land on the login screen mid-test.
+    await context.storageState({ path: authFile })
 
     await use(page)
   },

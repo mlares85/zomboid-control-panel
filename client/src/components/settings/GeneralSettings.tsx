@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useTheme, type ThemeName } from "@/contexts/ThemeContext";
+import { FieldHelp } from "@/components/FieldHelp";
 import { AppSettings } from "@/lib/settingsTypes";
 
 function ThemeSelect() {
@@ -69,7 +70,15 @@ export function GeneralSettings({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="max-w-xs">
-          <Label htmlFor="panel-port">Panel Port</Label>
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor="panel-port">Panel Port</Label>
+            <FieldHelp
+              description="The HTTP port the panel's web interface listens on."
+              context="Change this if port 3001 conflicts with another service on this machine. You'll need to restart the panel and update your bookmark/URL afterward."
+              recommendation="safe-default"
+              articleId="welcome-tour"
+            />
+          </div>
           <Input
             id="panel-port"
             type="number"
@@ -135,7 +144,15 @@ export function GeneralSettings({
 
           <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/25 p-3">
             <div>
-              <Label className="text-sm font-medium">Theme</Label>
+              <div className="flex items-center gap-1.5">
+                <Label className="text-sm font-medium">Theme</Label>
+                <FieldHelp
+                  description="Switches the panel's color scheme between the dark 'Survival' look and a clean light theme."
+                  context="Purely cosmetic — pick whichever is easier on your eyes. Applies instantly, no restart or save needed."
+                  recommendation="safe-default"
+                  articleId="welcome-tour"
+                />
+              </div>
               <p className="text-xs text-muted-foreground">
                 Choose between the gritty survival look or a clean light
                 theme.

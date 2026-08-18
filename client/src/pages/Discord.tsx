@@ -55,6 +55,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { FieldHelp } from "@/components/FieldHelp";
+import type { FieldHelpData } from "@/lib/wiki/types";
 
 interface DiscordStatus {
   running: boolean;
@@ -200,6 +202,97 @@ const eventLabels: Record<
     description: "When a player dies",
     variables: "{player}, {location}, {x}, {y}, {z}, {pvp}",
     defaultTemplate: "💀 **{player}** died at {location}",
+  },
+};
+
+// Field-level help shown next to each config input — kept as data so setup
+// wizard and management view (which duplicate the same fields) stay in sync.
+const FIELD_HELP: Record<string, FieldHelpData> = {
+  botToken: {
+    description:
+      "The secret token for your bot application, copied from the Discord Developer Portal's Bot page.",
+    context:
+      "Anyone who has this token can fully control the bot. Without it, the panel cannot log in to Discord — commands, notifications, and chat relay all stay offline.",
+    recommendation: "must-configure",
+    articleId: "discord-bot-setup",
+  },
+  guildId: {
+    description:
+      "The Discord server (guild) ID the bot registers slash commands and roles for.",
+    context:
+      "Slash commands are registered per-server. A missing or wrong Guild ID means /status, /restart, and the rest never show up in your server.",
+    recommendation: "must-configure",
+    articleId: "discord-bot-setup",
+  },
+  channelId: {
+    description:
+      "The text channel used for event notifications and the two-way chat bridge.",
+    context:
+      "Leave this blank to skip notifications and chat bridging — slash commands still work without it. Right-click a channel with Developer Mode on to copy its ID.",
+    recommendation: "safe-default",
+    articleId: "discord-channel-wiring",
+  },
+  adminRoleId: {
+    description:
+      "Discord role granted full access to role-protected bot commands.",
+    context:
+      "Leave blank and every member can run admin-tier commands like /restart and /rcon. Server owners and Discord Administrators always retain access regardless of this setting.",
+    recommendation: "must-configure",
+    articleId: "discord-commands",
+  },
+  modRoleId: {
+    description: "Discord role granted access to moderator-tier commands.",
+    context:
+      "Without a configured role, any command set to the moderator tier stays locked to admins only — nobody else can use it.",
+    recommendation: "safe-default",
+    articleId: "discord-commands",
+  },
+  autoStart: {
+    description: "Start the Discord bot automatically whenever the panel launches.",
+    context:
+      "Turn this off to start the bot manually each session — useful while testing a new token or intent change.",
+    recommendation: "safe-default",
+  },
+  chatRelay: {
+    description: "Bridges chat both directions between the game server and the Discord channel.",
+    context:
+      "Requires the Message Content Intent enabled on the bot in the Developer Portal, or Discord messages sent by players never reach the game.",
+    recommendation: "safe-default",
+    articleId: "discord-channel-wiring",
+  },
+  chatRelayScope: {
+    description: "Which in-game chat tabs get forwarded to Discord.",
+    context:
+      "Faction, safehouse, radio, and admin chat are never forwarded regardless of this setting. Broader scopes expose more of players' conversations in your Discord server.",
+    recommendation: "safe-default",
+    articleId: "discord-channel-wiring",
+  },
+  chatRelayChannelId: {
+    description: "Optional separate channel for the chat bridge, distinct from the notification channel.",
+    context: "Leave empty to relay chat through the main notification channel configured above.",
+    recommendation: "safe-default",
+    articleId: "discord-channel-wiring",
+  },
+  commandPermissions: {
+    description: "Minimum permission tier required to run each slash command.",
+    context:
+      "Destructive commands like /restart, /stop, and /rcon default to Admin. Loosening a tier lets more Discord members run that command against your live server.",
+    recommendation: "advanced",
+    articleId: "discord-commands",
+  },
+  botStatus: {
+    description: "Live connection state of the bot process running inside the panel.",
+    context:
+      "\"Offline\" with a token already configured usually means an invalid or revoked token, a missing privileged intent, or a crashed bot process — check the error box below if one appears.",
+    recommendation: "safe-default",
+    articleId: "discord-bot-setup",
+  },
+  webhookTemplate: {
+    description: "The message text posted to Discord when this event fires.",
+    context:
+      "Supports the variables listed below the box. An enabled event with a blank template falls back to the default wording instead of sending an empty message.",
+    recommendation: "safe-default",
+    articleId: "discord-channel-wiring",
   },
 };
 
@@ -798,8 +891,9 @@ export default function Discord() {
                 </Alert>
 
                 <div className="space-y-3">
-                  <Label htmlFor="setup-token" className="text-sm font-medium">
+                  <Label htmlFor="setup-token" className="flex items-center gap-1.5 text-sm font-medium">
                     Bot Token
+                    <FieldHelp {...FIELD_HELP.botToken} />
                   </Label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
@@ -1115,6 +1209,7 @@ export default function Discord() {
                       <Badge variant="secondary" className="text-xs">
                         Required
                       </Badge>
+                      <FieldHelp {...FIELD_HELP.guildId} />
                     </Label>
                     <Input
                       id="setup-guildId"
@@ -1147,6 +1242,7 @@ export default function Discord() {
                         <Badge variant="outline" className="text-xs">
                           Recommended
                         </Badge>
+                        <FieldHelp {...FIELD_HELP.channelId} />
                       </Label>
                       <Input
                         id="setup-channelId"
@@ -1179,6 +1275,7 @@ export default function Discord() {
                         <Badge variant="outline" className="text-xs">
                           Optional
                         </Badge>
+                        <FieldHelp {...FIELD_HELP.adminRoleId} />
                       </Label>
                       <Input
                         id="setup-adminRole"
@@ -1294,7 +1391,10 @@ export default function Discord() {
                 {/* Auto-Start */}
                 <div className="flex items-center justify-between p-4 rounded-lg border">
                   <div>
-                    <Label className="font-medium">Auto-start bot</Label>
+                    <Label className="flex items-center gap-1.5 font-medium">
+                      Auto-start bot
+                      <FieldHelp {...FIELD_HELP.autoStart} />
+                    </Label>
                     <p className="text-sm text-muted-foreground">
                       Automatically start the Discord bot when the panel
                       launches
@@ -1450,6 +1550,7 @@ export default function Discord() {
             <CardTitle className="flex items-center gap-2">
               <Bot className="w-5 h-5" />
               Bot Status
+              <FieldHelp {...FIELD_HELP.botStatus} />
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1564,6 +1665,7 @@ export default function Discord() {
             <CardTitle className="flex items-center gap-2">
               <Shield className="w-5 h-5" />
               Command Permissions
+              <FieldHelp {...FIELD_HELP.commandPermissions} />
             </CardTitle>
             <CardDescription>
               Control who can use each slash command. Assign a permission tier
@@ -1725,6 +1827,7 @@ export default function Discord() {
             <Label htmlFor="token" className="flex items-center gap-2">
               <Bot className="w-4 h-4" />
               Bot Token
+              <FieldHelp {...FIELD_HELP.botToken} />
               {config?.hasToken && (
                 <Badge variant="outline" className="text-xs">
                   <CheckCircle2 className="w-3 h-3 mr-1" /> Configured
@@ -1803,6 +1906,7 @@ export default function Discord() {
               <Label htmlFor="guildId" className="flex items-center gap-2">
                 <Server className="w-4 h-4" />
                 Guild (Server) ID *
+                <FieldHelp {...FIELD_HELP.guildId} />
               </Label>
               <Input
                 id="guildId"
@@ -1827,6 +1931,7 @@ export default function Discord() {
               <Label htmlFor="channelId" className="flex items-center gap-2">
                 <Hash className="w-4 h-4" />
                 Notification / Chat Channel
+                <FieldHelp {...FIELD_HELP.channelId} />
               </Label>
               <Input
                 id="channelId"
@@ -1851,6 +1956,7 @@ export default function Discord() {
               <Label htmlFor="adminRoleId" className="flex items-center gap-2">
                 <Lock className="w-4 h-4 text-primary" />
                 Admin Role ID
+                <FieldHelp {...FIELD_HELP.adminRoleId} />
               </Label>
               <Input
                 id="adminRoleId"
@@ -1875,6 +1981,7 @@ export default function Discord() {
               <Label htmlFor="modRoleId" className="flex items-center gap-2">
                 <Shield className="w-4 h-4 text-primary" />
                 Moderator Role ID
+                <FieldHelp {...FIELD_HELP.modRoleId} />
               </Label>
               <Input
                 id="modRoleId"
@@ -1898,7 +2005,10 @@ export default function Discord() {
           {/* Auto-Start */}
           <div className="flex items-center justify-between p-4 rounded-lg border">
             <div>
-              <Label className="font-medium">Auto-start on panel launch</Label>
+              <Label className="flex items-center gap-1.5 font-medium">
+                Auto-start on panel launch
+                <FieldHelp {...FIELD_HELP.autoStart} />
+              </Label>
               <p className="text-sm text-muted-foreground">
                 The bot will start automatically when the panel boots up
               </p>
@@ -1910,7 +2020,10 @@ export default function Discord() {
           <div className="space-y-4 p-4 rounded-lg border">
             <div className="flex items-center justify-between">
               <div>
-                <Label className="font-medium">Chat Relay</Label>
+                <Label className="flex items-center gap-1.5 font-medium">
+                  Chat Relay
+                  <FieldHelp {...FIELD_HELP.chatRelay} />
+                </Label>
                 <p className="text-sm text-muted-foreground">
                   Bridge chat both ways between the game server and Discord
                 </p>
@@ -1922,8 +2035,9 @@ export default function Discord() {
             </div>
             {chatRelayEnabled && (
               <div className="space-y-2">
-                <Label htmlFor="chatRelayScope" className="text-sm">
+                <Label htmlFor="chatRelayScope" className="flex items-center gap-1.5 text-sm">
                   Which messages to forward
+                  <FieldHelp {...FIELD_HELP.chatRelayScope} />
                 </Label>
                 <Select
                   value={chatRelayScope}
@@ -1959,8 +2073,9 @@ export default function Discord() {
             )}
             {chatRelayEnabled && (
               <div className="space-y-2">
-                <Label htmlFor="chatRelayChannelId" className="text-sm">
+                <Label htmlFor="chatRelayChannelId" className="flex items-center gap-1.5 text-sm">
                   Chat Relay Channel (optional)
+                  <FieldHelp {...FIELD_HELP.chatRelayChannelId} />
                 </Label>
                 <Input
                   id="chatRelayChannelId"
@@ -2065,9 +2180,10 @@ export default function Discord() {
                     <div className="space-y-2">
                       <Label
                         htmlFor={`template-${eventKey}`}
-                        className="text-sm"
+                        className="flex items-center gap-1.5 text-sm"
                       >
                         Message Template
+                        <FieldHelp {...FIELD_HELP.webhookTemplate} />
                       </Label>
                       <Textarea
                         id={`template-${eventKey}`}

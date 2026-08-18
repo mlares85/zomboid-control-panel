@@ -8,15 +8,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { AppSettings } from "@/lib/settingsTypes";
 import { useWorkshopCookies } from "@/hooks/settings/useWorkshopCookies";
 import { useWorkshopDiff } from "@/hooks/settings/useWorkshopDiff";
 import { WorkshopCookiesSection } from "./WorkshopCookiesSection";
 import { WorkshopItemTable } from "./WorkshopItemTable";
 import { WorkshopPurgeDialog } from "./WorkshopPurgeDialog";
+import { WorkshopSyncConfigFields } from "./WorkshopSyncConfigFields";
 
 /**
  * Workshop Collection Sync card.
@@ -93,62 +91,13 @@ export function WorkshopCollectionSyncCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-7">
-        <div className="grid gap-6 border-b border-border/40 pb-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,.8fr)]">
-          <div className="space-y-2">
-            <Label htmlFor="ws-collection-id" className="text-base">
-              Collection ID
-            </Label>
-            <Input
-              id="ws-collection-id"
-              value={settings.workshopCollectionId}
-              onChange={(e) =>
-                updateSetting("workshopCollectionId", e.target.value.trim())
-              }
-              placeholder="e.g. 3123456789"
-              className="h-11 max-w-md font-mono"
-              maxLength={20}
-            />
-            <p className="text-sm text-muted-foreground">
-              Open your collection on Steam and copy the numeric ID from the
-              URL (the digits after <code>?id=</code>). You must own the
-              collection.
-            </p>
-          </div>
-
-          <div
-            className={`flex items-start justify-between gap-4 lg:border-l lg:border-border/40 lg:pl-6 ${
-              autoSyncOn && !effectiveCredsConfigured ? "text-warning" : ""
-            }`}
-          >
-            <div className="space-y-1">
-              <Label className="text-base">Auto-sync on add / remove</Label>
-              <p className="text-sm text-muted-foreground">
-                When you track or untrack a mod, the panel updates the
-                collection in the background. Failures are logged but don't
-                block your action.
-              </p>
-              {autoSyncOn && !effectiveCredsConfigured && (
-                <p className="text-xs text-warning flex items-center gap-1 pt-1">
-                  <AlertTriangle className="w-3 h-3" />
-                  Auto-sync needs Steam session cookies below to actually
-                  push changes.
-                </p>
-              )}
-              {autoSyncOn && !collectionIdValid && (
-                <p className="text-xs text-warning flex items-center gap-1 pt-1">
-                  <AlertTriangle className="w-3 h-3" />
-                  Set a Collection ID first — nothing to sync to yet.
-                </p>
-              )}
-            </div>
-            <Switch
-              checked={autoSyncOn}
-              onCheckedChange={(v) =>
-                updateSetting("workshopCollectionAutoSync", v)
-              }
-            />
-          </div>
-        </div>
+        <WorkshopSyncConfigFields
+          settings={settings}
+          updateSetting={updateSetting}
+          autoSyncOn={autoSyncOn}
+          effectiveCredsConfigured={effectiveCredsConfigured}
+          collectionIdValid={collectionIdValid}
+        />
 
         <WorkshopCookiesSection
           settings={settings}

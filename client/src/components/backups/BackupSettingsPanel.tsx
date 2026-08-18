@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { FieldHelp } from '@/components/FieldHelp'
 
 interface BackupSettingsPanelProps {
   backupSchedule: string
@@ -42,7 +43,15 @@ export function BackupSettingsPanel({
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="backup-schedule">Backup Frequency</Label>
+            <Label htmlFor="backup-schedule" className="flex items-center gap-1.5">
+              Backup Frequency
+              <FieldHelp
+                description="How often the panel automatically creates a backup of your world save."
+                context="More frequent backups mean less data loss if the server crashes or a save gets corrupted, but each run uses CPU and disk I/O while it copies the world."
+                recommendation="safe-default"
+                articleId="scheduled-backups"
+              />
+            </Label>
             <Select value={backupSchedule} onValueChange={onScheduleChange}>
               <SelectTrigger id="backup-schedule" className="w-full">
                 <SelectValue placeholder="Select frequency" />
@@ -67,7 +76,15 @@ export function BackupSettingsPanel({
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="backup-max">Maximum Backups to Keep</Label>
+            <Label htmlFor="backup-max" className="flex items-center gap-1.5">
+              Maximum Backups to Keep
+              <FieldHelp
+                description="Number of automatic backups kept before the oldest one is deleted."
+                context="Set this based on available disk space and world save size — once you're over the limit, the oldest backup is removed each time a new one is created."
+                recommendation="safe-default"
+                articleId="scheduled-backups"
+              />
+            </Label>
             <Input
               id="backup-max"
               type="number"

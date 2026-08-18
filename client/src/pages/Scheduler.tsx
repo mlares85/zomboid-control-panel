@@ -57,6 +57,8 @@ import { useToast } from '@/components/ui/use-toast'
 import { schedulerApi, rconApi, serverApi, serversApi, ScheduleHistoryEntry, ServerInstance } from '@/lib/api'
 import { EmptyState } from '@/components/EmptyState'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { FieldHelp } from '@/components/FieldHelp'
+import type { FieldHelpData } from '@/lib/wiki/types'
 
 interface ScheduledTask {
   id: number
@@ -92,6 +94,52 @@ const commonCommands = [
   { label: 'Save World (PanelBridge)', value: 'bridge:saveWorld' },
   { label: 'Broadcast (Server Chat)', value: 'bridge:sendToServerChat {"message":"Scheduled broadcast"}' },
 ]
+
+// Field-level help shown next to each config input in the create/edit task
+// dialog and the quick-action cards.
+const FIELD_HELP: Record<string, FieldHelpData> = {
+  taskName: {
+    description: 'A label to identify this scheduled task in the list and execution history.',
+    context: 'Purely cosmetic — it has no effect on when or what the task runs. Pick something that tells you at a glance what it does.',
+    recommendation: 'safe-default',
+    articleId: 'scheduler-overview',
+  },
+  frequency: {
+    description: 'How often the simple builder fires this task: every hour, every few hours, or once a day at a specific time.',
+    context: 'Switch to the Advanced (Cron) tab for schedules this builder cannot express, such as specific weekdays.',
+    recommendation: 'safe-default',
+    articleId: 'common-schedules',
+  },
+  cronExpression: {
+    description: 'Raw 5-field cron expression: minute, hour, day, month, weekday.',
+    context: 'A malformed expression is rejected on save. Use the Simple Builder tab unless you need a schedule it cannot express.',
+    recommendation: 'advanced',
+    articleId: 'common-schedules',
+  },
+  command: {
+    description: 'The action this task runs when it fires — a raw RCON command or a PanelBridge action.',
+    context: 'Destructive actions like restart run immediately with no in-game warning, unlike the countdown-based restart tools above.',
+    recommendation: 'must-configure',
+    articleId: 'scheduler-overview',
+  },
+  targetServer: {
+    description: 'Which server instance this task runs against when it fires.',
+    context: 'The task always targets this server, even if a different instance is active in the panel at fire time — useful for multi-server setups.',
+    recommendation: 'must-configure',
+    articleId: 'scheduler-overview',
+  },
+  restartCountdown: {
+    description: 'Minutes of warning players get before the server restarts.',
+    context: 'Countdowns under 5 minutes can catch players mid-fight or mid-drive — the panel asks for confirmation below that threshold.',
+    recommendation: 'safe-default',
+    articleId: 'common-schedules',
+  },
+  modUpdateRestart: {
+    description: 'Whether a restart is currently queued because an installed mod has an available update.',
+    context: 'This tile only reports status — configure whether mod updates trigger an automatic restart from the Mods page.',
+    recommendation: 'advanced',
+  },
+}
 
 export default function Scheduler() {
   const [tasks, setTasks] = useState<ScheduledTask[]>([])
@@ -535,7 +583,10 @@ export default function Scheduler() {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Task Name</Label>
+                <Label className="flex items-center gap-1.5">
+                  Task Name
+                  <FieldHelp {...FIELD_HELP.taskName} />
+                </Label>
                 <Input
                   value={newTaskName}
                   onChange={(e) => setNewTaskName(e.target.value)}
@@ -553,7 +604,10 @@ export default function Scheduler() {
 
                   <TabsContent value="simple" className="space-y-4 pt-4 border rounded-md p-4 mt-0 border-t-0 rounded-t-none">
                     <div className="space-y-2">
-                      <Label>Frequency</Label>
+                      <Label className="flex items-center gap-1.5">
+                        Frequency
+                        <FieldHelp {...FIELD_HELP.frequency} />
+                      </Label>
                       <Select value={simpleIntervalType} onValueChange={(v) => setSimpleIntervalType(v as 'hourly' | 'daily' | 'interval')}>
                         <SelectTrigger>
                           <SelectValue />
@@ -631,7 +685,10 @@ export default function Scheduler() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Custom Expression</Label>
+                      <Label className="flex items-center gap-1.5">
+                        Custom Expression
+                        <FieldHelp {...FIELD_HELP.cronExpression} />
+                      </Label>
                       <Input
                         value={newTaskCron}
                         onChange={(e) => setNewTaskCron(e.target.value)}
@@ -649,7 +706,10 @@ export default function Scheduler() {
                 </Tabs>
               </div>
               <div>
-                <Label>Command</Label>
+                <Label className="flex items-center gap-1.5">
+                  Command
+                  <FieldHelp {...FIELD_HELP.command} />
+                </Label>
                 <Select onValueChange={(value) => setNewTaskCommand(value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select common command..." />
@@ -678,7 +738,10 @@ export default function Scheduler() {
                 )}
               </div>
               <div>
-                <Label>Target Server</Label>
+                <Label className="flex items-center gap-1.5">
+                  Target Server
+                  <FieldHelp {...FIELD_HELP.targetServer} />
+                </Label>
                 <Select value={newTaskServerId} onValueChange={setNewTaskServerId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a server..." />
@@ -752,7 +815,10 @@ export default function Scheduler() {
                       {t.icon}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t.label}</p>
+                      <p className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t.label}
+                        {t.label === 'Mod Update Restart' && <FieldHelp {...FIELD_HELP.modUpdateRestart} />}
+                      </p>
                       <p className={`text-xl font-semibold leading-tight mt-0.5 ${cls.value}`}>{t.value}</p>
                       <p className="text-[11px] text-muted-foreground/80 mt-0.5 truncate">{t.sub}</p>
                     </div>
@@ -845,7 +911,10 @@ export default function Scheduler() {
           {/* Custom Time */}
           <div className="flex items-end gap-4">
             <div className="flex-1 max-w-xs">
-              <Label>Custom countdown (minutes)</Label>
+              <Label className="flex items-center gap-1.5">
+                Custom countdown (minutes)
+                <FieldHelp {...FIELD_HELP.restartCountdown} />
+              </Label>
               <Input
                 type="number"
                 value={restartMinutes}

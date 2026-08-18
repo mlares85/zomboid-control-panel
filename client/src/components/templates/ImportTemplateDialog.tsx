@@ -9,10 +9,22 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useToast } from '@/components/ui/use-toast'
 import { templatesApi } from '@/lib/api'
+import { FieldHelp } from '@/components/FieldHelp'
+import type { FieldHelpData } from '@/lib/wiki/types'
+
+const FIELD_HELP: Record<string, FieldHelpData> = {
+  templateJson: {
+    description: 'The contents of a .pztemplate.json file exported from this panel.',
+    context: 'Invalid JSON or a file missing required fields is rejected before anything is written to your templates.',
+    recommendation: 'must-configure',
+    articleId: 'creating-templates',
+  },
+}
 
 interface ImportTemplateDialogProps {
   open: boolean
@@ -72,7 +84,12 @@ export function ImportTemplateDialog({ open, onClose, onImported }: ImportTempla
             <Upload className="h-4 w-4" />
             Choose File
           </Button>
+          <Label htmlFor="template-import-json" className="flex items-center gap-1.5 text-sm">
+            Template JSON
+            <FieldHelp {...FIELD_HELP.templateJson} />
+          </Label>
           <Textarea
+            id="template-import-json"
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Paste template JSON here"

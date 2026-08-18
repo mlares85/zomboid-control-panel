@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   RefreshCw,
   ShieldCheck,
-  Info,
   Globe,
   Wifi,
   HardDrive,
@@ -60,11 +59,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -76,6 +70,7 @@ import { SocketContext } from '@/contexts/SocketContext'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
 import { AddServerFlow } from '@/components/addServer/AddServerFlow'
+import { FieldHelp } from '@/components/FieldHelp'
 
 export default function Servers() {
   const [servers, setServers] = useState<ServerInstance[]>([])
@@ -1050,7 +1045,15 @@ export default function Servers() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Display Name</Label>
+                  <Label className="flex items-center gap-1.5">
+                    Display Name
+                    <FieldHelp
+                      description="Label shown for this server throughout the panel's UI."
+                      context="Purely cosmetic — it doesn't affect the running server, its config, or its save files."
+                      recommendation="safe-default"
+                      articleId="adding-servers"
+                    />
+                  </Label>
                   <Input
                     value={editingServer.name}
                     onChange={e => setEditingServer({ ...editingServer, name: e.target.value })}
@@ -1058,7 +1061,15 @@ export default function Servers() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Server Name</Label>
+                  <Label className="flex items-center gap-1.5">
+                    Server Name
+                    <FieldHelp
+                      description="Internal Project Zomboid server identifier used for its config and save folder names."
+                      context="Changing this after the server has run points it at a different (new) set of config/save files — the existing world won't carry over automatically."
+                      recommendation="advanced"
+                      articleId="adding-servers"
+                    />
+                  </Label>
                   <Input
                     value={editingServer.serverName}
                     onChange={e => setEditingServer({ ...editingServer, serverName: e.target.value })}
@@ -1070,7 +1081,15 @@ export default function Servers() {
               {!editingServer.isRemote && (
               <>
               <div className="space-y-2">
-                <Label>Install Path</Label>
+                <Label className="flex items-center gap-1.5">
+                  Install Path
+                  <FieldHelp
+                    description="Folder on disk where the server's Java/game files live."
+                    context="Must match where the game files actually are — an incorrect path breaks start/stop and file browsing for this server."
+                    recommendation="must-configure"
+                    articleId="adding-servers"
+                  />
+                </Label>
                 <Input
                   value={editingServer.installPath}
                   onChange={e => setEditingServer({ ...editingServer, installPath: e.target.value })}
@@ -1079,7 +1098,15 @@ export default function Servers() {
               </div>
 
               <div className="space-y-2">
-                <Label>Zomboid Data Path</Label>
+                <Label className="flex items-center gap-1.5">
+                  Zomboid Data Path
+                  <FieldHelp
+                    description="Folder containing the server's save games, config, and logs."
+                    context="Leave empty to use the default per-user Zomboid folder. Only change this if your saves live somewhere non-standard."
+                    recommendation="safe-default"
+                    articleId="adding-servers"
+                  />
+                </Label>
                 <Input
                   value={editingServer.zomboidDataPath || ''}
                   onChange={e => setEditingServer({ ...editingServer, zomboidDataPath: e.target.value })}
@@ -1091,14 +1118,12 @@ export default function Servers() {
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   Custom Start Command
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[280px]">
-                      <p className="text-xs">Override the default startup script with a custom command. Supports arguments. Leave empty to use the default bat/sh file detection.</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <FieldHelp
+                    description="Override the default startup script with a custom command."
+                    context="Leave empty to use the default bat/sh file detection. Supports arguments, but disallowed shell characters (&|;<>`${}()![]) are rejected."
+                    recommendation="advanced"
+                    articleId="adding-servers"
+                  />
                 </Label>
                 <Input
                   value={editingServer.startCommand || ''}
@@ -1118,14 +1143,12 @@ export default function Servers() {
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1.5">
                     RCON Host
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-[200px]">
-                        <p className="text-xs">Leave as 127.0.0.1 if the panel runs on the same machine as the game server</p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <FieldHelp
+                      description="Address the panel connects to for RCON commands."
+                      context="Leave as 127.0.0.1 if the panel runs on the same machine as the game server; use the server's LAN/remote IP otherwise."
+                      recommendation="safe-default"
+                      articleId="rcon-setup"
+                    />
                   </Label>
                   <Input
                     value={editingServer.rconHost}
@@ -1133,7 +1156,15 @@ export default function Servers() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>RCON Port</Label>
+                  <Label className="flex items-center gap-1.5">
+                    RCON Port
+                    <FieldHelp
+                      description="TCP port the game server's RCON listener is on."
+                      context="Must match the RCON port set in the server's own config — a mismatch makes every panel action fail with a connection error."
+                      recommendation="must-configure"
+                      articleId="rcon-setup"
+                    />
+                  </Label>
                   <Input
                     type="number"
                     min={1}
@@ -1149,7 +1180,15 @@ export default function Servers() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>RCON Password</Label>
+                  <Label className="flex items-center gap-1.5">
+                    RCON Password
+                    <FieldHelp
+                      description="Password the panel uses to authenticate its RCON connection."
+                      context="Must exactly match the RCON password configured on the server itself. This is not the in-game admin password."
+                      recommendation="must-configure"
+                      articleId="rcon-setup"
+                    />
+                  </Label>
                   <Input
                     type="password"
                     value={editingServer.rconPassword}
@@ -1160,14 +1199,12 @@ export default function Servers() {
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1.5">
                     Admin Password
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-[240px]">
-                        <p className="text-xs">Server admin password passed as -adminpassword launch argument. Takes effect on next server start.</p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <FieldHelp
+                      description="Server admin password passed as the -adminpassword launch argument."
+                      context="Takes effect on the next server start, not immediately. This is separate from the RCON password above."
+                      recommendation="advanced"
+                      articleId="rcon-setup"
+                    />
                   </Label>
                   <Input
                     type="password"
@@ -1181,7 +1218,15 @@ export default function Servers() {
 
               <div className={editingServer.isRemote ? "grid grid-cols-1 gap-4" : "grid grid-cols-1 sm:grid-cols-3 gap-4"}>
                 <div className="space-y-2">
-                  <Label>Game Port</Label>
+                  <Label className="flex items-center gap-1.5">
+                    Game Port
+                    <FieldHelp
+                      description="UDP port players connect to in-game."
+                      context="Must be forwarded/open on your router or firewall for players outside your LAN to join."
+                      recommendation="must-configure"
+                      articleId="adding-servers"
+                    />
+                  </Label>
                   <Input
                     type="number"
                     value={editingServer.serverPort}
@@ -1191,7 +1236,15 @@ export default function Servers() {
                 {!editingServer.isRemote && (
                 <>
                 <div className="space-y-2">
-                  <Label>Min Memory (GB)</Label>
+                  <Label className="flex items-center gap-1.5">
+                    Min Memory (GB)
+                    <FieldHelp
+                      description="Minimum heap size (-Xms) passed to the server's Java process."
+                      context="Setting this close to Max Memory reduces GC pauses but reserves that RAM immediately, even at low player counts."
+                      recommendation="safe-default"
+                      articleId="adding-servers"
+                    />
+                  </Label>
                   <Input
                     type="number"
                     min={1}
@@ -1201,7 +1254,15 @@ export default function Servers() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Max Memory (GB)</Label>
+                  <Label className="flex items-center gap-1.5">
+                    Max Memory (GB)
+                    <FieldHelp
+                      description="Maximum heap size (-Xmx) passed to the server's Java process."
+                      context="Too low causes crashes/lag as the world grows; too high can starve the host machine of RAM for other processes."
+                      recommendation="safe-default"
+                      articleId="adding-servers"
+                    />
+                  </Label>
                   <Input
                     type="number"
                     min={1}
@@ -1354,7 +1415,15 @@ export default function Servers() {
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>SteamCMD Path *</Label>
+              <Label className="flex items-center gap-1.5">
+                SteamCMD Path *
+                <FieldHelp
+                  description="Folder containing the SteamCMD executable used to download and update this server."
+                  context="Shared across all servers on this machine — only change this if you moved or reinstalled SteamCMD."
+                  recommendation="safe-default"
+                  articleId="adding-servers"
+                />
+              </Label>
               <Input
                 value={steamcmdPath}
                 onChange={e => setSteamcmdPath(e.target.value)}
@@ -1392,7 +1461,15 @@ export default function Servers() {
             </div>
 
             <div className="space-y-2">
-              <Label>Steam Branch {loadingBranches && <Loader2 className="inline-block w-3 h-3 ml-1 animate-spin" />}</Label>
+              <Label className="flex items-center gap-1.5">
+                Steam Branch {loadingBranches && <Loader2 className="inline-block w-3 h-3 ml-1 animate-spin" />}
+                <FieldHelp
+                  description="Steam branch/build to download or update to."
+                  context="Stick to the public (stable) branch unless you specifically need a beta/test build — mismatched client/server versions can't connect to each other."
+                  recommendation="safe-default"
+                  articleId="adding-servers"
+                />
+              </Label>
               <Select
                 value={steamOperation?.branch || 'public'}
                 onValueChange={(value) => steamOperation && setSteamOperation({ ...steamOperation, branch: value })}

@@ -4,6 +4,23 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { SimTemplateApplyResult } from '@/lib/api'
+import { FieldHelp } from '@/components/FieldHelp'
+import type { FieldHelpData } from '@/lib/wiki/types'
+
+const FIELD_HELP: Record<string, FieldHelpData> = {
+  scopeSandbox: {
+    description: 'Apply this template\'s sandbox variable changes (difficulty, loot, zombie settings, etc).',
+    context: 'Unchecking this applies only the server.ini changes below, leaving sandbox settings as they are.',
+    recommendation: 'safe-default',
+    articleId: 'template-diff-preview',
+  },
+  scopeIni: {
+    description: 'Apply this template\'s server.ini changes (server-level settings, not gameplay sandbox vars).',
+    context: 'Unchecking this applies only the sandbox changes above, leaving server.ini as it is.',
+    recommendation: 'safe-default',
+    articleId: 'template-diff-preview',
+  },
+}
 
 interface TemplateApplyPanelProps {
   running: boolean
@@ -66,11 +83,17 @@ export function TemplateApplyPanel({
       <div className="flex flex-wrap items-center gap-5">
         <div className="flex items-center gap-2">
           <Checkbox id="scope-sandbox" checked={scopeSandbox} onCheckedChange={(v) => onScopeSandboxChange(v === true)} />
-          <Label htmlFor="scope-sandbox" className="text-sm font-normal">Apply sandbox changes</Label>
+          <Label htmlFor="scope-sandbox" className="flex items-center gap-1.5 text-sm font-normal">
+            Apply sandbox changes
+            <FieldHelp {...FIELD_HELP.scopeSandbox} />
+          </Label>
         </div>
         <div className="flex items-center gap-2">
           <Checkbox id="scope-ini" checked={scopeIni} onCheckedChange={(v) => onScopeIniChange(v === true)} />
-          <Label htmlFor="scope-ini" className="text-sm font-normal">Apply server.ini changes</Label>
+          <Label htmlFor="scope-ini" className="flex items-center gap-1.5 text-sm font-normal">
+            Apply server.ini changes
+            <FieldHelp {...FIELD_HELP.scopeIni} />
+          </Label>
         </div>
       </div>
 

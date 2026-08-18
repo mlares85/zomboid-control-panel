@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { FieldHelp } from "@/components/FieldHelp";
 import { AppSettings } from "@/lib/settingsTypes";
 
 interface HttpsSettingsProps {
@@ -81,7 +82,15 @@ export function HttpsSettings({
             aria-label="Enable HTTPS"
           />
           <div>
-            <Label className="text-base">Enable HTTPS</Label>
+            <div className="flex items-center gap-1.5">
+              <Label className="text-base">Enable HTTPS</Label>
+              <FieldHelp
+                description="Serves the panel's web interface over encrypted HTTPS instead of plain HTTP."
+                context="Recommended for most setups, especially if you access the panel outside your local network. Leave certificate paths empty to use an auto-generated self-signed cert."
+                recommendation="safe-default"
+                articleId="welcome-tour"
+              />
+            </div>
             <p className="text-sm text-muted-foreground">
               Serve the panel over HTTPS.
             </p>
@@ -102,7 +111,15 @@ export function HttpsSettings({
         {settings.httpsEnabled && (
           <div className="ml-2 space-y-4 border-l-2 border-primary/20 pl-2">
             <div className="max-w-xs">
-              <Label htmlFor="https-port">HTTPS Port</Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="https-port">HTTPS Port</Label>
+                <FieldHelp
+                  description="The port the panel listens on for HTTPS connections."
+                  context="3443 is fine for most setups. Change it only if that port is already in use or your reverse proxy expects a different port."
+                  recommendation="safe-default"
+                  articleId="welcome-tour"
+                />
+              </div>
               <Input
                 id="https-port"
                 type="number"
@@ -119,12 +136,20 @@ export function HttpsSettings({
               </p>
             </div>
             <div className="max-w-md">
-              <Label htmlFor="https-cert-path">
-                Custom Certificate Path{" "}
-                <span className="text-muted-foreground font-normal">
-                  (optional)
-                </span>
-              </Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="https-cert-path">
+                  Custom Certificate Path{" "}
+                  <span className="text-muted-foreground font-normal">
+                    (optional)
+                  </span>
+                </Label>
+                <FieldHelp
+                  description="Path to your own TLS certificate file, if you have one from a CA like Let's Encrypt."
+                  context="Only needed if you don't want the panel's auto-generated self-signed cert (which browsers flag as untrusted). Must be paired with a matching key path."
+                  recommendation="advanced"
+                  articleId="server-config-deep-dive"
+                />
+              </div>
               <Input
                 id="https-cert-path"
                 value={settings.httpsCertPath}
@@ -139,12 +164,20 @@ export function HttpsSettings({
               </p>
             </div>
             <div className="max-w-md">
-              <Label htmlFor="https-key-path">
-                Custom Key Path{" "}
-                <span className="text-muted-foreground font-normal">
-                  (optional)
-                </span>
-              </Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="https-key-path">
+                  Custom Key Path{" "}
+                  <span className="text-muted-foreground font-normal">
+                    (optional)
+                  </span>
+                </Label>
+                <FieldHelp
+                  description="Path to the private key file that matches your custom certificate."
+                  context="Must be set together with Custom Certificate Path — leave both empty to use the panel's auto-generated certificate instead."
+                  recommendation="advanced"
+                  articleId="server-config-deep-dive"
+                />
+              </div>
               <Input
                 id="https-key-path"
                 value={settings.httpsKeyPath}

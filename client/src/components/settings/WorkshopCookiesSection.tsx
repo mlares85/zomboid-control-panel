@@ -2,6 +2,7 @@ import { Check, Eye, EyeOff, RefreshCw, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldHelp } from "@/components/FieldHelp";
 import { modsApi } from "@/lib/api";
 import { AppSettings } from "@/lib/settingsTypes";
 import { WorkshopCookiePasteHelper } from "./WorkshopCookiePasteHelper";
@@ -86,9 +87,17 @@ export function WorkshopCookiesSection({
       </p>
       <div className="grid gap-3 sm:grid-cols-2 max-w-3xl">
         <div className="space-y-1">
-          <Label htmlFor="ws-sessionid" className="text-xs text-muted-foreground">
-            sessionid
-          </Label>
+          <span className="inline-flex items-center gap-1.5">
+            <Label htmlFor="ws-sessionid" className="text-xs text-muted-foreground">
+              sessionid
+            </Label>
+            <FieldHelp
+              description="The `sessionid` cookie value from an active, logged-in steamcommunity.com session."
+              context="Required only if you want the panel to write changes to your Workshop collection. Reading the collection works without it."
+              recommendation="must-configure"
+              articleId="mod-manager-basics"
+            />
+          </span>
           <Input
             id="ws-sessionid"
             type={showCookies ? "text" : "password"}
@@ -102,9 +111,17 @@ export function WorkshopCookiesSection({
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="ws-loginsecure" className="text-xs text-muted-foreground">
-            steamLoginSecure
-          </Label>
+          <span className="inline-flex items-center gap-1.5">
+            <Label htmlFor="ws-loginsecure" className="text-xs text-muted-foreground">
+              steamLoginSecure
+            </Label>
+            <FieldHelp
+              description="The `steamLoginSecure` cookie value from the same logged-in Steam session."
+              context="Paired with sessionid to authenticate collection writes. Steam rotates this token every few weeks, so you'll need to refresh it periodically."
+              recommendation="must-configure"
+              articleId="mod-manager-basics"
+            />
+          </span>
           <Input
             id="ws-loginsecure"
             type={showCookies ? "text" : "password"}

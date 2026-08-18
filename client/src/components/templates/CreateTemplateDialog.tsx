@@ -16,6 +16,29 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useToast } from '@/components/ui/use-toast'
 import { serverFilesApi, templatesApi } from '@/lib/api'
 import { buildTemplateCapture, TemplateCapture } from '@/lib/templateBuilder'
+import { FieldHelp } from '@/components/FieldHelp'
+import type { FieldHelpData } from '@/lib/wiki/types'
+
+const FIELD_HELP: Record<string, FieldHelpData> = {
+  name: {
+    description: 'The name shown for this template in your template library.',
+    context: 'Also used to build the suggested filename when exporting — pick something that distinguishes it from your other saved templates.',
+    recommendation: 'must-configure',
+    articleId: 'creating-templates',
+  },
+  description: {
+    description: 'A short summary of what this template changes or is meant for.',
+    context: 'Shown on the template card and in the preview dialog — helps you tell templates apart later without opening the diff.',
+    recommendation: 'safe-default',
+    articleId: 'creating-templates',
+  },
+  tags: {
+    description: 'Comma-separated labels for filtering and organizing templates.',
+    context: 'Purely organizational — has no effect on what settings the template applies.',
+    recommendation: 'safe-default',
+    articleId: 'creating-templates',
+  },
+}
 
 interface CreateTemplateDialogProps {
   open: boolean
@@ -83,15 +106,24 @@ export function CreateTemplateDialog({ open, onClose, onCreated }: CreateTemplat
         ) : (
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="template-name">Name</Label>
+              <Label htmlFor="template-name" className="flex items-center gap-1.5">
+                Name
+                <FieldHelp {...FIELD_HELP.name} />
+              </Label>
               <Input id="template-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="My Ruleset" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="template-description">Description</Label>
+              <Label htmlFor="template-description" className="flex items-center gap-1.5">
+                Description
+                <FieldHelp {...FIELD_HELP.description} />
+              </Label>
               <Textarea id="template-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="template-tags">Tags (comma separated)</Label>
+              <Label htmlFor="template-tags" className="flex items-center gap-1.5">
+                Tags (comma separated)
+                <FieldHelp {...FIELD_HELP.tags} />
+              </Label>
               <Input id="template-tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="hardcore, pvp" />
             </div>
             {capture && (

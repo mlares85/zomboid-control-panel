@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/PageHeader'
 import { BackupFormatId } from '@/lib/api'
+import { FieldHelp } from '@/components/FieldHelp'
 
 interface BackupPageHeaderProps {
   backupFormat: BackupFormatId
@@ -55,16 +56,24 @@ export function BackupPageHeader({
       icon={<Archive className="w-5 h-5 text-primary" />}
       actions={
         <div className="flex items-center gap-2">
-          <Select value={backupFormat} onValueChange={(v) => onFormatChange(v as BackupFormatId)}>
-            <SelectTrigger className="w-28" aria-label="Backup format" disabled={creatingBackup}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="zip">.zip</SelectItem>
-              <SelectItem value="tar.gz">.tar.gz</SelectItem>
-              <SelectItem value="tar.zst">.tar.zst</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-1">
+            <Select value={backupFormat} onValueChange={(v) => onFormatChange(v as BackupFormatId)}>
+              <SelectTrigger className="w-28" aria-label="Backup format" disabled={creatingBackup}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="zip">.zip</SelectItem>
+                <SelectItem value="tar.gz">.tar.gz</SelectItem>
+                <SelectItem value="tar.zst">.tar.zst</SelectItem>
+              </SelectContent>
+            </Select>
+            <FieldHelp
+              description="Compression format used for manually created backups."
+              context=".zip is the most compatible everywhere. .tar.gz and .tar.zst produce smaller files but need standard Linux tools (tar) to extract."
+              recommendation="safe-default"
+              articleId="backups-overview"
+            />
+          </div>
           <Button
             onClick={onCreateBackup}
             disabled={creatingBackup || restoringBackup !== null || !savesExists || activeServerRemote}

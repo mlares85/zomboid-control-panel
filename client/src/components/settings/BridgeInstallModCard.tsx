@@ -8,6 +8,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ServerInstance } from "@/lib/api";
+import { FieldHelp } from "@/components/FieldHelp";
+import { Label } from "@/components/ui/label";
 
 interface BridgeInstallModCardProps {
   servers: ServerInstance[];
@@ -30,8 +32,19 @@ export function BridgeInstallModCard({
 }: BridgeInstallModCardProps) {
   return (
     <div className="p-4 bg-muted rounded-xl space-y-3">
-      <p className="text-sm font-medium">Install PanelBridge.lua</p>
+      <div className="flex items-center gap-1.5">
+        <p className="text-sm font-medium">Install PanelBridge.lua</p>
+        <FieldHelp
+          description="Copies the bundled PanelBridge.lua mod file into the selected server's media/lua folder."
+          context="Required for PanelBridge (in-world actions, live chat, weather) to work at all — pick the target server and install before starting the bridge watcher."
+          recommendation="must-configure"
+          articleId="panelbridge-internals"
+        />
+      </div>
       <div className="flex flex-wrap gap-3 items-center">
+        <Label htmlFor="bridge-install-server" className="sr-only">
+          Target server
+        </Label>
         <Select
           value={selectedInstallServerId}
           onValueChange={setSelectedInstallServerId}

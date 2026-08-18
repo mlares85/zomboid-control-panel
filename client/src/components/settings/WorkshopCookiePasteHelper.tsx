@@ -1,6 +1,8 @@
 import { AlertTriangle, Check, Cloud, ExternalLink, RefreshCw, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldHelp } from "@/components/FieldHelp";
+import { Label } from "@/components/ui/label";
 
 interface WorkshopCookiePasteHelperProps {
   savingCookies: boolean;
@@ -96,7 +98,19 @@ export function WorkshopCookiePasteHelper({
         </div>
       ) : (
         <div className="space-y-2">
+          <span className="inline-flex items-center gap-1.5">
+            <Label htmlFor="ws-paste-cookies" className="text-xs text-muted-foreground">
+              Steam request to parse
+            </Label>
+            <FieldHelp
+              description="Paste captured Steam request data (a cURL command, Cookie header, or cookies.txt export) here to extract session cookies automatically."
+              context="The panel parses out sessionid and steamLoginSecure from whatever format you paste — no need to copy them individually."
+              recommendation="advanced"
+              articleId="mod-manager-basics"
+            />
+          </span>
           <Textarea
+            id="ws-paste-cookies"
             value={pasteText}
             onChange={(e) => {
               setPasteText(e.target.value);

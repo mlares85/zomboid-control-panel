@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BridgeStatusBadge } from "@/components/BridgeStatusBadge";
+import { FieldHelp } from "@/components/FieldHelp";
 import { AppSettings } from "@/lib/settingsTypes";
 import { useBridgeStatus } from "@/hooks/settings/useBridgeStatus";
 import { useBridgeRemote } from "@/hooks/settings/useBridgeRemote";
@@ -229,9 +230,17 @@ export function BridgeSettings({
         {/* Auto-update toggle */}
         <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/25 p-4">
           <div>
-            <Label className="text-sm font-medium">
-              Auto-update mod on panel startup
-            </Label>
+            <div className="flex items-center gap-1.5">
+              <Label className="text-sm font-medium">
+                Auto-update mod on panel startup
+              </Label>
+              <FieldHelp
+                description="Copies the latest bundled PanelBridge.lua to your PZ server automatically whenever the panel starts, if the installed version is out of date."
+                context="Keeps the bridge mod in sync with panel updates without a manual reinstall step. Safe to leave on for most setups."
+                recommendation="safe-default"
+                articleId="panelbridge-internals"
+              />
+            </div>
             <p className="text-xs text-muted-foreground">
               When the panel starts, automatically copy the latest bundled
               PanelBridge.lua to the PZ server if versions differ.

@@ -68,6 +68,7 @@ import {
 } from "@/components/ui/accordion";
 import { FolderBrowser } from "@/components/FolderBrowser";
 import { DockerSetup } from "@/components/addServer/DockerSetup";
+import { FieldHelp } from "@/components/FieldHelp";
 
 interface InstallLog {
   type: "info" | "success" | "error" | "command" | "stdout" | "stderr";
@@ -822,7 +823,15 @@ export default function ServerSetup() {
                   <div className="grid place-items-center w-11 h-11 rounded-md border border-primary/30 bg-primary/[0.08] text-primary mb-3 transition-colors group-hover:bg-primary/15">
                     <Download className="w-5 h-5" />
                   </div>
-                  <CardTitle className="text-lg">Fresh Install</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-1.5">
+                    Fresh Install
+                    <FieldHelp
+                      description="Downloads a new dedicated server via SteamCMD and manages it as a native process."
+                      context="Best if you want the panel to own the full install and don't need container isolation. Requires ~3GB free disk space and SteamCMD."
+                      recommendation="safe-default"
+                      articleId="first-run-checklist"
+                    />
+                  </CardTitle>
                   <CardDescription
                     id="full-setup-description"
                     className="text-xs"
@@ -879,7 +888,15 @@ export default function ServerSetup() {
                   <div className="grid place-items-center w-11 h-11 rounded-md border border-border/55 bg-muted/40 text-muted-foreground mb-3 transition-colors group-hover:border-primary/30 group-hover:bg-primary/[0.06] group-hover:text-primary">
                     <Plus className="w-5 h-5" />
                   </div>
-                  <CardTitle className="text-lg">Use Existing Files</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-1.5">
+                    Use Existing Files
+                    <FieldHelp
+                      description="Registers a server folder you already downloaded/installed outside the panel."
+                      context="Use this if you migrated files from another tool or already ran SteamCMD manually — no new download happens."
+                      recommendation="safe-default"
+                      articleId="adding-servers"
+                    />
+                  </CardTitle>
                   <CardDescription
                     id="quick-setup-description"
                     className="text-xs"
@@ -928,7 +945,15 @@ export default function ServerSetup() {
                   <div className="grid place-items-center w-11 h-11 rounded-md border border-border/55 bg-muted/40 text-muted-foreground mb-3 transition-colors group-hover:border-primary/30 group-hover:bg-primary/[0.06] group-hover:text-primary">
                     <Container className="w-5 h-5" />
                   </div>
-                  <CardTitle className="text-lg">Docker Server</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-1.5">
+                    Docker Server
+                    <FieldHelp
+                      description="Panel creates and manages this server inside a Docker container instead of a native process."
+                      context="Good for isolating multiple servers with shared base game files, but requires Docker (or OrbStack on macOS) installed and running first."
+                      recommendation="advanced"
+                      articleId="docker-overview"
+                    />
+                  </CardTitle>
                   <CardDescription
                     id="docker-setup-description"
                     className="text-xs"
@@ -1065,7 +1090,15 @@ export default function ServerSetup() {
   const renderFullStep1 = () => (
     <div className="space-y-6">
       <div className="text-center space-y-2 pb-6 border-b">
-        <h2 className="text-2xl font-semibold">Set Up SteamCMD</h2>
+        <h2 className="text-2xl font-semibold flex items-center justify-center gap-1.5">
+          Set Up SteamCMD
+          <FieldHelp
+            description="Path to the SteamCMD folder used to download and update dedicated server files."
+            context="One-Click Setup installs it for you. If you already have SteamCMD, point at the existing folder instead of downloading a second copy."
+            recommendation="safe-default"
+            articleId="first-run-checklist"
+          />
+        </h2>
         <p className="text-muted-foreground">
           SteamCMD is required to download and update Project Zomboid dedicated
           server files.
@@ -1264,7 +1297,15 @@ export default function ServerSetup() {
         {/* Installation Path */}
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <Label className="text-base">Install Folder</Label>
+            <Label className="text-base flex items-center gap-1.5">
+              Install Folder
+              <FieldHelp
+                description="Folder where SteamCMD downloads and installs the dedicated server files."
+                context="SteamCMD writes ~3GB here. The panel process must have write access, or the install step fails partway through."
+                recommendation="must-configure"
+                articleId="adding-servers"
+              />
+            </Label>
             <Button
               type="button"
               variant="ghost"
@@ -1331,7 +1372,15 @@ export default function ServerSetup() {
 
         {/* Server Name */}
         <div className="space-y-2">
-          <Label className="text-base">Server Name</Label>
+          <Label className="text-base flex items-center gap-1.5">
+            Server Name
+            <FieldHelp
+              description="Internal server identifier used for Project Zomboid's config/save file names."
+              context="Alphanumeric and underscores only — this becomes part of file names on disk, so it can't be changed later without losing the link to existing saves."
+              recommendation="must-configure"
+              articleId="adding-servers"
+            />
+          </Label>
           <Input
             value={serverName}
             onChange={(e) =>
@@ -1348,7 +1397,15 @@ export default function ServerSetup() {
 
         {/* Branch Selection */}
         <div className="space-y-2">
-          <Label className="text-base">Game Version</Label>
+          <Label className="text-base flex items-center gap-1.5">
+            Game Version
+            <FieldHelp
+              description="Steam branch/build of the dedicated server to install."
+              context="Stick to the default stable branch unless you specifically need a beta/test build — mismatched client/server versions can't connect to each other."
+              recommendation="safe-default"
+              articleId="adding-servers"
+            />
+          </Label>
           <Select
             value={branch}
             onValueChange={setBranch}
@@ -1410,7 +1467,15 @@ export default function ServerSetup() {
                     checked={useCustomDataPath}
                     onCheckedChange={setUseCustomDataPath}
                   />
-                  <Label>Use custom location</Label>
+                  <Label className="flex items-center gap-1.5">
+                    Use custom location
+                    <FieldHelp
+                      description="Points the server's save/config data at a folder outside the default Zomboid data directory."
+                      context="Useful for Docker bind mounts or keeping saves on a different disk. Leave off to use the default location beside the install folder."
+                      recommendation="advanced"
+                      articleId="adding-servers"
+                    />
+                  </Label>
                 </div>
                 {useCustomDataPath && (
                   <div className="flex gap-2">
@@ -1470,7 +1535,15 @@ export default function ServerSetup() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>RCON Password</Label>
+              <Label className="flex items-center gap-1.5">
+                RCON Password
+                <FieldHelp
+                  description="Password the panel uses to control this server over RCON."
+                  context="Auto-generated for you — the panel writes this into the server's config, so the built-in Regenerate button is the safe way to change it."
+                  recommendation="safe-default"
+                  articleId="rcon-setup"
+                />
+              </Label>
               <div className="flex gap-1">
                 <div className="relative flex-1">
                   <Input
@@ -1539,7 +1612,15 @@ export default function ServerSetup() {
             </div>
 
             <div className="space-y-2">
-              <Label>RCON Port</Label>
+              <Label className="flex items-center gap-1.5">
+                RCON Port
+                <FieldHelp
+                  description="Port the RCON listener runs on."
+                  context="Must stay unique per server if you run more than one on the same machine — the panel fails to connect if two servers share a port."
+                  recommendation="safe-default"
+                  articleId="rcon-setup"
+                />
+              </Label>
               <Input
                 type="number"
                 value={rconPort}
@@ -1576,7 +1657,15 @@ export default function ServerSetup() {
           <div className="grid gap-6 sm:grid-cols-2">
             <div className="space-y-3">
               <div className="flex justify-between">
-                <Label>Minimum RAM</Label>
+                <Label className="flex items-center gap-1.5">
+                  Minimum RAM
+                  <FieldHelp
+                    description="Minimum Java heap (-Xms) reserved for the server process."
+                    context="The panel pre-selects sane values based on your detected system RAM — raise it only if you know your player count needs more headroom."
+                    recommendation="safe-default"
+                    articleId="first-run-checklist"
+                  />
+                </Label>
                 <span className="font-mono font-medium">{minMemory}GB</span>
               </div>
               <Slider
@@ -1594,7 +1683,15 @@ export default function ServerSetup() {
 
             <div className="space-y-3">
               <div className="flex justify-between">
-                <Label>Maximum RAM</Label>
+                <Label className="flex items-center gap-1.5">
+                  Maximum RAM
+                  <FieldHelp
+                    description="Maximum Java heap (-Xmx) the server process can use."
+                    context="Setting this above your available system RAM causes crashes under load; too low causes lag/OOM as the world and player count grow."
+                    recommendation="safe-default"
+                    articleId="first-run-checklist"
+                  />
+                </Label>
                 <span className="font-mono font-medium">{maxMemory}GB</span>
               </div>
               <Slider
@@ -1625,7 +1722,15 @@ export default function ServerSetup() {
           <AccordionContent className="px-4 pb-4 space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Game Port</Label>
+                <Label className="flex items-center gap-1.5">
+                  Game Port
+                  <FieldHelp
+                    description="UDP port players connect to."
+                    context="Change this only if 16261 is already used by another server on this machine — remember to forward the new port on your router."
+                    recommendation="advanced"
+                    articleId="adding-servers"
+                  />
+                </Label>
                 <Input
                   type="number"
                   value={serverPort}
@@ -1640,8 +1745,14 @@ export default function ServerSetup() {
               </div>
 
               <div className="space-y-2">
-                <Label>
+                <Label className="flex items-center gap-1.5">
                   Admin Password <span className="text-destructive">*</span>
+                  <FieldHelp
+                    description="In-game admin password, passed as the server's -adminpassword launch argument."
+                    context="Required before the server can start for the first time. This is different from the RCON password above and is used to log in as admin in-game."
+                    recommendation="must-configure"
+                    articleId="first-run-checklist"
+                  />
                 </Label>
                 <div className="relative">
                   <Input
@@ -1977,7 +2088,15 @@ export default function ServerSetup() {
       </Card>
 
       <div className="space-y-2">
-        <Label className="text-base">Server Files Location</Label>
+        <Label className="text-base flex items-center gap-1.5">
+          Server Files Location
+          <FieldHelp
+            description="Path to an existing Project Zomboid dedicated server folder."
+            context="Must already contain the server's start script and java folder — this flow registers existing files rather than downloading new ones."
+            recommendation="must-configure"
+            articleId="adding-servers"
+          />
+        </Label>
         <div className="flex gap-2">
           <Input
             value={installPath}
@@ -2029,7 +2148,15 @@ export default function ServerSetup() {
       <div className="grid gap-6">
         {/* Server Name */}
         <div className="space-y-2">
-          <Label className="text-base">Server Name</Label>
+          <Label className="text-base flex items-center gap-1.5">
+            Server Name
+            <FieldHelp
+              description="Internal server identifier used for Project Zomboid's config/save file names."
+              context="Alphanumeric and underscores only — this becomes part of file names on disk, so it can't be changed later without losing the link to existing saves."
+              recommendation="must-configure"
+              articleId="adding-servers"
+            />
+          </Label>
           <Input
             value={serverName}
             onChange={(e) =>
@@ -2056,7 +2183,15 @@ export default function ServerSetup() {
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>RCON Password</Label>
+                <Label className="flex items-center gap-1.5">
+                  RCON Password
+                  <FieldHelp
+                    description="Password the panel uses to control this server over RCON."
+                    context="Auto-generated for you — the panel writes this into the server's config, so the built-in Regenerate button is the safe way to change it."
+                    recommendation="safe-default"
+                    articleId="rcon-setup"
+                  />
+                </Label>
                 <div className="flex gap-1">
                   <div className="relative flex-1">
                     <Input
@@ -2128,7 +2263,15 @@ export default function ServerSetup() {
               </div>
 
               <div className="space-y-2">
-                <Label>RCON Port</Label>
+                <Label className="flex items-center gap-1.5">
+                  RCON Port
+                  <FieldHelp
+                    description="Port the RCON listener runs on."
+                    context="Must stay unique per server if you run more than one on the same machine — the panel fails to connect if two servers share a port."
+                    recommendation="safe-default"
+                    articleId="rcon-setup"
+                  />
+                </Label>
                 <Input
                   type="number"
                   value={rconPort}
@@ -2170,7 +2313,15 @@ export default function ServerSetup() {
             <div className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <Label>Minimum RAM</Label>
+                  <Label className="flex items-center gap-1.5">
+                    Minimum RAM
+                    <FieldHelp
+                      description="Minimum Java heap (-Xms) reserved for the server process."
+                      context="The panel pre-selects sane values based on your detected system RAM — raise it only if you know your player count needs more headroom."
+                      recommendation="safe-default"
+                      articleId="first-run-checklist"
+                    />
+                  </Label>
                   <span className="font-mono">{minMemory}GB</span>
                 </div>
                 <Slider
@@ -2188,7 +2339,15 @@ export default function ServerSetup() {
 
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <Label>Maximum RAM</Label>
+                  <Label className="flex items-center gap-1.5">
+                    Maximum RAM
+                    <FieldHelp
+                      description="Maximum Java heap (-Xmx) the server process can use."
+                      context="Setting this above your available system RAM causes crashes under load; too low causes lag/OOM as the world and player count grow."
+                      recommendation="safe-default"
+                      articleId="first-run-checklist"
+                    />
+                  </Label>
                   <span className="font-mono">{maxMemory}GB</span>
                 </div>
                 <Slider
@@ -2222,7 +2381,15 @@ export default function ServerSetup() {
                   checked={useCustomDataPath}
                   onCheckedChange={setUseCustomDataPath}
                 />
-                <Label>Custom config location</Label>
+                <Label className="flex items-center gap-1.5">
+                  Custom config location
+                  <FieldHelp
+                    description="Points the server's save/config data at a folder outside the default Zomboid data directory."
+                    context="Useful for Docker bind mounts or keeping saves on a different disk. Leave off to use the default location beside the install folder."
+                    recommendation="advanced"
+                    articleId="adding-servers"
+                  />
+                </Label>
               </div>
               {useCustomDataPath && (
                 <div className="flex gap-2">
@@ -2252,7 +2419,15 @@ export default function ServerSetup() {
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Game Port</Label>
+                  <Label className="flex items-center gap-1.5">
+                    Game Port
+                    <FieldHelp
+                      description="UDP port players connect to."
+                      context="Change this only if 16261 is already used by another server on this machine — remember to forward the new port on your router."
+                      recommendation="advanced"
+                      articleId="adding-servers"
+                    />
+                  </Label>
                   <Input
                     type="number"
                     value={serverPort}
@@ -2266,8 +2441,14 @@ export default function ServerSetup() {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label>
+                  <Label className="flex items-center gap-1.5">
                     Admin Password <span className="text-destructive">*</span>
+                    <FieldHelp
+                      description="In-game admin password, passed as the server's -adminpassword launch argument."
+                      context="Required before the server can start for the first time. This is different from the RCON password above and is used to log in as admin in-game."
+                      recommendation="must-configure"
+                      articleId="first-run-checklist"
+                    />
                   </Label>
                   <div className="relative">
                     <Input

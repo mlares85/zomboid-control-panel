@@ -10,6 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { FieldHelp } from "@/components/FieldHelp";
 import { configApi } from "@/lib/api";
 import { AppSettings } from "@/lib/settingsTypes";
 import { WorkshopCollectionSyncCard } from "./WorkshopCollectionSyncCard";
@@ -48,9 +49,17 @@ export function ModsSettings({
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="max-w-xs space-y-2">
-            <Label htmlFor="mod-check-interval" className="text-base">
-              Check Interval (minutes)
-            </Label>
+            <span className="inline-flex items-center gap-1.5">
+              <Label htmlFor="mod-check-interval" className="text-base">
+                Check Interval (minutes)
+              </Label>
+              <FieldHelp
+                description="How often the panel polls Steam Workshop for updates to your tracked mods."
+                context="Shorter intervals catch updates faster but add more Steam API calls. 15-30 minutes works well for most servers."
+                recommendation="safe-default"
+                articleId="mod-updates"
+              />
+            </span>
             <Input
               id="mod-check-interval"
               type="number"
@@ -75,9 +84,17 @@ export function ModsSettings({
               aria-label="Auto-restart server when mods update"
             />
             <div>
-              <Label className="text-base">
-                Auto-restart server when mods update
-              </Label>
+              <span className="inline-flex items-center gap-1.5">
+                <Label className="text-base">
+                  Auto-restart server when mods update
+                </Label>
+                <FieldHelp
+                  description="Automatically restarts the game server when a tracked mod has an update available."
+                  context="Turn this on for hands-off maintenance. Leave it off if you'd rather review changelogs before restarting, since restarts disconnect players."
+                  recommendation="safe-default"
+                  articleId="mod-updates"
+                />
+              </span>
               <p className="text-sm text-muted-foreground">
                 Automatically restart the server when mod updates are
                 detected
@@ -86,9 +103,17 @@ export function ModsSettings({
           </div>
           {settings.modAutoRestart && (
             <div className="max-w-xs space-y-2 pl-4 border-l-2 border-primary/30">
-              <Label htmlFor="mod-restart-delay" className="text-base">
-                Restart Delay (minutes)
-              </Label>
+              <span className="inline-flex items-center gap-1.5">
+                <Label htmlFor="mod-restart-delay" className="text-base">
+                  Restart Delay (minutes)
+                </Label>
+                <FieldHelp
+                  description="How long players are warned before an auto-restart triggered by a mod update."
+                  context="Longer delays give players more time to reach safety in-game."
+                  recommendation="safe-default"
+                  articleId="mod-updates"
+                />
+              </span>
               <Input
                 id="mod-restart-delay"
                 type="number"
@@ -117,9 +142,17 @@ export function ModsSettings({
                 aria-label="Automatically update the server when a new build is detected"
               />
               <div>
-                <Label className="text-base">
-                  Automatically update the game server
-                </Label>
+                <span className="inline-flex items-center gap-1.5">
+                  <Label className="text-base">
+                    Automatically update the game server
+                  </Label>
+                  <FieldHelp
+                    description="Automatically stops the server, updates it through SteamCMD, and restarts it when a new game build is detected."
+                    context="Convenient but can update the server before mods have caught up to a new build, breaking compatibility. Enable only if you're comfortable with occasional mod breakage."
+                    recommendation="advanced"
+                    articleId="mod-updates"
+                  />
+                </span>
                 <p className="text-sm text-muted-foreground">
                   Save, stop, update through SteamCMD, then start again when
                   a new build is detected.
@@ -127,9 +160,17 @@ export function ModsSettings({
               </div>
             </div>
             <div className="max-w-md space-y-2 pl-4 pt-4 border-l-2 border-primary/30">
-              <Label htmlFor="steam-update-account" className="text-base">
-                SteamCMD update account
-              </Label>
+              <span className="inline-flex items-center gap-1.5">
+                <Label htmlFor="steam-update-account" className="text-base">
+                  SteamCMD update account
+                </Label>
+                <FieldHelp
+                  description="The Steam account name SteamCMD uses to check for and download server updates."
+                  context="Leave blank for anonymous login, which works for the base dedicated server. Only needed if anonymous updates fail to access a required depot."
+                  recommendation="advanced"
+                  articleId="mod-updates"
+                />
+              </span>
               <Input
                 id="steam-update-account"
                 value={settings.steamUpdateAccount}
@@ -149,12 +190,20 @@ export function ModsSettings({
             </div>
             {settings.serverAutoUpdate && (
               <div className="max-w-md space-y-2 pl-4 pt-4 border-l-2 border-primary/30">
-                <Label
-                  htmlFor="server-update-warning-minutes"
-                  className="text-base"
-                >
-                  Player warning (minutes)
-                </Label>
+                <span className="inline-flex items-center gap-1.5">
+                  <Label
+                    htmlFor="server-update-warning-minutes"
+                    className="text-base"
+                  >
+                    Player warning (minutes)
+                  </Label>
+                  <FieldHelp
+                    description="How long players are warned in-game before an automatic server update begins."
+                    context="Defaults to 15 minutes. Set to 0 to update immediately whenever no players are online."
+                    recommendation="safe-default"
+                    articleId="mod-updates"
+                  />
+                </span>
                 <Input
                   id="server-update-warning-minutes"
                   type="number"

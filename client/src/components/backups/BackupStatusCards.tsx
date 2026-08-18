@@ -4,6 +4,7 @@ import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { formatBytes, formatDate, describeSchedule } from '@/components/backup/formatUtils'
 import type { BackupFile, BackupStatus } from '@/lib/api'
+import { FieldHelp } from '@/components/FieldHelp'
 
 interface BackupStatusCardsProps {
   backups: BackupFile[]
@@ -69,7 +70,15 @@ export function BackupStatusCards({ backups, backupStatus, totalSize, onToggleEn
             <Clock className="w-4 h-4" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Auto-Backup</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+              Auto-Backup
+              <FieldHelp
+                description="Enables the scheduled backup job configured in Backup Settings."
+                context="When off, backups only happen when you click Create Backup manually — turn this on if you want protection without remembering to do it yourself."
+                recommendation="must-configure"
+                articleId="scheduled-backups"
+              />
+            </p>
             <p className={cn('text-sm font-semibold leading-tight mt-0.5 truncate', backupStatus?.enabled ? 'text-foreground' : 'text-muted-foreground')}>
               {backupStatus?.enabled ? 'On' : 'Off'}
             </p>

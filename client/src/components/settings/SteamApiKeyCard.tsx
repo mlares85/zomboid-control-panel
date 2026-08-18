@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldHelp } from "@/components/FieldHelp";
 import { AppSettings } from "@/lib/settingsTypes";
 
 interface SteamApiKeyCardProps {
@@ -39,6 +40,12 @@ export function SteamApiKeyCard({ settings, updateSetting }: SteamApiKeyCardProp
             <Label htmlFor="steam-api-key" className="text-base">
               Steam Web API Key
             </Label>
+            <FieldHelp
+              description="Your personal Steam Web API key, used for Workshop mod lookups and the server finder."
+              context="Required for the panel to fetch mod names, previews, and update info from Steam. Get a free key from your Steam account — it never expires unless you regenerate it."
+              recommendation="must-configure"
+              articleId="mod-manager-basics"
+            />
             {/* Configured indicator — the API masks the value as
             "••••••••XXXX" when set, so the presence of the bullets is a
             reliable signal that a key is stored on the server. */}
