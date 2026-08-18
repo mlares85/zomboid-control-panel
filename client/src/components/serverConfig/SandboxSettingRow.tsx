@@ -9,6 +9,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Undo2 } from 'lucide-react'
 import { SandboxSetting } from '@/lib/serverConfigSchema'
 import { SandboxScalar } from '@/lib/serverConfigTypes'
+import { FieldHelp } from '@/components/FieldHelp'
+import { getServerConfigHelp } from '@/lib/wiki/serverConfigHelp'
 
 export const SandboxSettingRow = memo(({
   setting,
@@ -25,6 +27,7 @@ export const SandboxSettingRow = memo(({
 }) => {
   const isModified = originalValue !== undefined && JSON.stringify(value) !== JSON.stringify(originalValue)
   const isDifferentFromDefault = setting.default !== undefined && JSON.stringify(value) !== JSON.stringify(setting.default)
+  const help = getServerConfigHelp(setting.key, setting.section)
 
   return (
     <div className={`perf-content-auto grid gap-2 rounded-md border-b py-3 pl-3 pr-4 transition-colors last:border-0 ${
@@ -34,6 +37,7 @@ export const SandboxSettingRow = memo(({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Label className="text-sm font-medium">{setting.label}</Label>
+            {help && <FieldHelp {...help} />}
             {isModified && (
               <Badge variant="warning" className="h-5 text-xs">modified</Badge>
             )}

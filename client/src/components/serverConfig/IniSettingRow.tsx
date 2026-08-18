@@ -10,6 +10,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { FolderOpen, Undo2, X } from 'lucide-react'
 import { IniSetting } from '@/lib/serverConfigSchema'
 import { AuthImage } from './AuthImage'
+import { FieldHelp } from '@/components/FieldHelp'
+import { getServerConfigHelp } from '@/lib/wiki/serverConfigHelp'
 
 export const IniSettingRow = memo(({
   setting,
@@ -28,6 +30,7 @@ export const IniSettingRow = memo(({
 }) => {
   const isModified = originalValue !== undefined && value !== originalValue
   const isDifferentFromDefault = setting.default !== undefined && String(value) !== String(setting.default)
+  const help = getServerConfigHelp(setting.key)
 
   // Multiline settings
   if (setting.type === 'multiline') {
@@ -37,7 +40,10 @@ export const IniSettingRow = memo(({
       }`}>
         <div className="flex items-center justify-between">
           <div>
-            <Label className="text-sm font-medium">{setting.label}</Label>
+            <div className="flex items-center gap-1.5">
+              <Label className="text-sm font-medium">{setting.label}</Label>
+              {help && <FieldHelp {...help} />}
+            </div>
             <p className="text-xs text-muted-foreground mt-0.5">{setting.description}</p>
           </div>
           {isModified && onReset && (
@@ -70,6 +76,7 @@ export const IniSettingRow = memo(({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <Label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{setting.label}</Label>
+            {help && <FieldHelp {...help} />}
             {isModified && (
               <Badge variant="warning" className="h-5 text-xs">modified</Badge>
             )}

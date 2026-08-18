@@ -96,7 +96,7 @@ export function mirroredFileNames(serverName) {
   ].map(assertConfigFileName);
 }
 
-async function withClient(config, handler) {
+export async function withClient(config, handler) {
   const client = new SftpClient("RemoteConfigFiles");
   try {
     await client.connect({
