@@ -74,6 +74,38 @@ Playwright (`@playwright/test`) with chromium. `e2e/auth.setup.ts` handles both 
 
 On Node versions that ship a built-in global `localStorage` (22+), that global shadows jsdom's Storage implementation in Vitest and every call throws `TypeError: ... is not a function` unless `--localstorage-file` is set. `client/src/test-setup.ts` overrides `globalThis.localStorage` with a minimal in-memory `Storage` for the test environment only — needed by any component test exercising a dismiss-to-localStorage pattern (`MountDiscoveryBanner`, `PlatformGuidanceCard`, etc.).
 
+## Server provider abstraction (in progress)
+
+Server management is being decomposed from the `ServerManager` monolith (1,600+ lines) into a composition-of-capabilities model. Each server record's `provider` field (`native`, `docker-local`, `docker-managed`, `remote-sftp`) maps to a set of capability objects:
+
+```
+provider.lifecycle  // launch(), terminate() — null for remote-sftp
+provider.files      // readFile(), writeFile(), withSession() — always present
+provider.installer  // install(), update() via SteamCMD — null unless installable
+provider.stats      // getStats() — null unless containerized
+```
+
+Design principles (from Fable 5 review):
+- **Composition over fat interface.** Absent capabilities (`lifecycle: null`) are the signal — no stub methods.
+- **Orchestration stays in ServerManager.** Restart (RCON warning → save → stop → start), graceful shutdown, INI parsing — all provider-agnostic. Providers expose only `terminate()`.
+- **File access is session-aware.** SFTP uses pull-mirror-edit-push with a mirror lock; `withSession(fn)` + `sync()`/`flush()` express this. Local impl makes sessions a no-op.
+- **SteamCMD is a separate Installer port**, not a provider method. Base volume population is panel-level state (shared across managed containers), not per-instance. Two adapters: `NativeSteamCmdInstaller` (child process) and `ContainerSteamCmdInstaller` (Docker).
+- **Static registry**, not dynamic plugin loading. Each entry declares `isAvailable(env)`, `validateConfig`, and `create(deps, cfg)`.
+- **Contract test suite = the interface** (no TS compile-time enforcement in this codebase).
+
+Platform support matrix:
+| Platform | Install Method | Lifecycle | File Access |
+|----------|---------------|-----------|-------------|
+| Windows  | Local steamcmd.exe | Child process (tasklist/taskkill /T) | Direct fs |
+| Linux    | Local steamcmd.sh  | Child process (pgrep/kill)           | Direct fs |
+| macOS    | Docker via OrbStack | Docker API                          | Volume mounts |
+| Any      | Docker managed      | Docker API                          | Volume mounts |
+| Any      | Remote server       | None (null lifecycle)               | SFTP mirror |
+
+Migration sequence (strangler fig): (1) characterization tests, (2) extract file access, (3) extract detection, (4) extract lifecycle, (5) SteamCMD/installer last — build new Windows/Linux local-install only on the new interface. Deletion gate: when `_isDockerBacked()` has zero callers, phase 4 is done.
+
+Top risks: SFTP mirror lock semantics, losing RCON-save-before-kill during extraction, stale provider instances on server-switch, Windows process tree termination (`.bat` → Java child).
+
 ## Deferred decisions
 
 ### Docker socket integration
