@@ -4076,12 +4076,19 @@ export default function Mods() {
                             </details>
                           </div>
                           <div className="flex w-full shrink-0 flex-col gap-2 lg:w-auto lg:items-end">
-                            <div className="relative w-full lg:w-72">
-                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                              <Input value={modManagerSearch} onChange={e => handleModManagerSearchChange(e.target.value)} placeholder="Filter active mods..." aria-label="Filter active mods" className="h-9 text-xs pl-8 bg-background/60" />
-                              {modManagerSearch && (
-                                <button onClick={() => { handleModManagerSearchChange('') }} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 rounded">✕</button>
-                              )}
+                            <div className="flex w-full items-center gap-1.5">
+                              <div className="relative w-full lg:w-72">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                                <Input value={modManagerSearch} onChange={e => handleModManagerSearchChange(e.target.value)} placeholder="Filter active mods..." aria-label="Filter active mods" className="h-9 text-xs pl-8 bg-background/60" />
+                                {modManagerSearch && (
+                                  <button onClick={() => { handleModManagerSearchChange('') }} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 rounded">✕</button>
+                                )}
+                              </div>
+                              <FieldHelp
+                                description="Filters the active-mods list by mod ID or display name."
+                                context="Display-only — it narrows what's shown here and in the load-order list below, without changing anything in the server config."
+                                recommendation="safe-default"
+                              />
                             </div>
                             <div className="inline-flex items-center gap-1 rounded-md border border-border/45 bg-muted/20 p-0.5" role="group" aria-label="List density">
                               {(['compact', 'detailed'] as const).map(d => (
@@ -4773,16 +4780,24 @@ export default function Mods() {
                     <>
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <p className="text-xs text-muted-foreground">Drag to reorder. Changes are not saved until you click Save.</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={handleAutoSort}
-                        disabled={savingModOrder || !!autoSortPreview}
-                      >
-                        <Wand2 className="w-3 h-3 mr-1" />
-                        Auto-sort by dependencies
-                      </Button>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={handleAutoSort}
+                          disabled={savingModOrder || !!autoSortPreview}
+                        >
+                          <Wand2 className="w-3 h-3 mr-1" />
+                          Auto-sort by dependencies
+                        </Button>
+                        <FieldHelp
+                          description="Proposes a load order based on 'requires' declarations in each mod's mod.info file."
+                          context="Load order matters when mods conflict or one depends on another — a mod that requires another must load after it. This only proposes a new order; nothing changes until you click Apply."
+                          recommendation="advanced"
+                          articleId="mod-conflicts"
+                        />
+                      </div>
                     </div>
 
                     {autoSortPreview && (

@@ -2179,7 +2179,15 @@ export default function Events() {
                 </p>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-foreground/85">multiplier</Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs font-medium text-foreground/85">multiplier</Label>
+                      <FieldHelp
+                        description="Sends a raw setTimeSpeed RCON command with this multiplier."
+                        context="B42's effective server clock speed is driven by this RCON command, not the PanelBridge game-time multiplier — so this is the control that actually changes clock pace. Resets to 1x on server restart."
+                        recommendation="advanced"
+                        articleId="rcon-setup"
+                      />
+                    </div>
                     <span className="font-mono text-[11px] tabular-nums text-primary">{timeSpeed}x</span>
                   </div>
                   <Slider aria-label="Time speed" value={[timeSpeed]} onValueChange={([val]) => setTimeSpeed(val)} min={1} max={100} step={1} />
@@ -2205,11 +2213,20 @@ export default function Events() {
               sublabel="power & water grid"
               icon={Zap}
               tone={bridgeConnected ? 'primary' : 'warning'}
-              action={bridgeConnected ? (
-                <Button variant="ghost" size="sm" onClick={() => checkBridgeStatus()} className="h-6 px-2 gap-1 text-xs font-medium">
-                  <RefreshCw className="w-3 h-3" /> refresh
-                </Button>
-              ) : undefined}
+              action={
+                <>
+                  {bridgeConnected && (
+                    <Button variant="ghost" size="sm" onClick={() => checkBridgeStatus()} className="h-6 px-2 gap-1 text-xs font-medium">
+                      <RefreshCw className="w-3 h-3" /> refresh
+                    </Button>
+                  )}
+                  <FieldHelp
+                    description="Restores or shuts off power and water for the whole map."
+                    context="Requires the PanelBridge connection. In B42 multiplayer, sandbox utility changes don't propagate to already-connected clients right away — see the warning banner below."
+                    recommendation="must-configure"
+                  />
+                </>
+              }
             />
             <div className="p-4 space-y-4">
               <div className="flex items-start gap-2 rounded border border-amber-400/25 bg-amber-400/[0.05] px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-wide text-amber-400/85">
@@ -2408,9 +2425,16 @@ export default function Events() {
               <div className="p-4 space-y-3">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
-                      <Skull className="w-3.5 h-3.5 text-destructive" /> count
-                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
+                        <Skull className="w-3.5 h-3.5 text-destructive" /> count
+                      </Label>
+                      <FieldHelp
+                        description="How many zombies to spawn in a single horde."
+                        context="Only spawns in loaded cells near the target, but large counts (300+) can hit client/server performance hard. Requires the PanelBridge connection."
+                        recommendation="advanced"
+                      />
+                    </div>
                     <span className="font-mono text-[11px] tabular-nums text-destructive">{hordeCount}</span>
                   </div>
                   <Slider aria-label="Horde size" value={[hordeCount]} onValueChange={([val]) => setHordeCount(val)} min={10} max={500} step={10} />
@@ -2503,8 +2527,16 @@ export default function Events() {
               </div>
 
               <div className="space-y-3">
-                <div className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
-                  <Navigation className="w-3 h-3 text-info" /> to coordinates
+                <div className="flex items-center gap-1.5">
+                  <div className="text-xs font-medium text-foreground/85 flex items-center gap-1.5">
+                    <Navigation className="w-3 h-3 text-info" /> to coordinates
+                  </div>
+                  <FieldHelp
+                    description="World X/Y/Z coordinates to teleport to."
+                    context="Raw RCON teleport — B42 multiplayer, so the move may not sync cleanly to other connected clients right away. Double check coordinates; there's no undo besides teleporting back."
+                    recommendation="advanced"
+                    articleId="rcon-setup"
+                  />
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-1">
@@ -2544,7 +2576,14 @@ export default function Events() {
             <div className="p-4 space-y-3">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="announcement-message" className="text-xs font-medium text-muted-foreground">message</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="announcement-message" className="text-xs font-medium text-muted-foreground">message</Label>
+                    <FieldHelp
+                      description="Server-wide announcement, broadcast to every connected player's screen."
+                      context="Sent instantly via RCON — there's no confirmation step, so double-check wording before sending. Safe to send repeatedly; each message just replaces the last one shown."
+                      recommendation="safe-default"
+                    />
+                  </div>
                   <span className={cn(
                     'font-mono text-[10px] tabular-nums',
                     announcement.length > 450 ? 'text-amber-400' : 'text-muted-foreground/65'
@@ -2596,7 +2635,15 @@ export default function Events() {
                       <div className="space-y-4">
                         <div className="rounded-lg border border-border/70 bg-muted/25 p-4">
                           <div className="space-y-2">
-                            <Label htmlFor="bridge-operation-select">Operation</Label>
+                            <div className="flex items-center gap-1.5">
+                              <Label htmlFor="bridge-operation-select">Operation</Label>
+                              <FieldHelp
+                                description="Privileged bridge operation to run — safehouses, factions, vehicles, and moderation."
+                                context="These call directly into the Lua bridge with admin-level access. Read each operation's description below before running it; some (like removeFaction) are not reversible."
+                                recommendation="advanced"
+                                articleId="rcon-setup"
+                              />
+                            </div>
                             <p className="text-xs leading-5 text-muted-foreground">
                               Choose an operation, fill in the required fields, and run it.
                             </p>
@@ -2695,7 +2742,14 @@ export default function Events() {
                       <div className="rounded-lg border border-border/70 bg-card/60 p-4">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                           <div>
-                            <Label>Operation Inputs</Label>
+                            <div className="flex items-center gap-1.5">
+                              <Label>Operation Inputs</Label>
+                              <FieldHelp
+                                description="Arguments sent with the selected bridge operation."
+                                context="Field names and types come straight from the operation's schema — an incorrect player name, faction name, or ID here fails at the server, not before you click Run."
+                                recommendation="advanced"
+                              />
+                            </div>
                             <p id="bridge-args-help" className="mt-1 text-xs leading-5 text-muted-foreground">
                               Fill in the required fields. The panel validates your inputs before sending.
                             </p>
