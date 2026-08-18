@@ -2364,6 +2364,11 @@ export default function ChunkCleaner() {
                         ({chunkSafehouses.length})
                       </span>
                     )}
+                    <FieldHelp
+                      description="Shows or hides player safehouse boundaries overlaid on the map."
+                      context="Display-only — use it to spot safehouses before deleting chunks, since deleting a chunk under a safehouse can remove player-claimed structures."
+                      recommendation="safe-default"
+                    />
                   </Label>
                   <Switch
                     checked={showSafehouses}
@@ -2855,7 +2860,14 @@ export default function ChunkCleaner() {
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
                 <div>
-                  <Label>Create safety backup</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label>Create safety backup</Label>
+                    <FieldHelp
+                      description="Saves a copy of the selected chunk files before they are deleted."
+                      context="Chunk deletion is otherwise permanent — the game only regenerates terrain, it does not restore player structures or loot. Keep this on unless you're certain you don't need to undo the delete."
+                      recommendation="safe-default"
+                    />
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Save a copy of the selected chunks before deleting them.
                   </p>
@@ -2890,6 +2902,11 @@ export default function ChunkCleaner() {
                       <Label className="flex items-center gap-1.5">
                         <Car className="w-3.5 h-3.5" />
                         Remove vehicles from save database
+                        <FieldHelp
+                          description="Deletes vehicle records from vehicles.db for vehicles located in the chunks you're about to delete."
+                          context="Without this, vehicles parked in a deleted chunk keep existing in the save database and can reappear when the area regenerates. This deletion is permanent and not covered by the chunk backup toggle above."
+                          recommendation="must-configure"
+                        />
                       </Label>
                       <p className="text-xs text-muted-foreground">
                         {loadedCount > 0
