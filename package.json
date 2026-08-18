@@ -19,7 +19,10 @@
     "test:watch": "vitest server/tests",
     "test:server": "vitest run server/tests",
     "test:client": "cd client && npx vitest run",
-    "lint:server": "eslint server eslint-rules --max-warnings=0"
+    "lint:server": "eslint server eslint-rules --max-warnings=0",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
     "archiver": "^7.0.1",
@@ -46,6 +49,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.62.1",
     "@yao-pkg/pkg": "^6.19.0",
     "concurrently": "^9.1.0",
     "esbuild": "^0.28.1",

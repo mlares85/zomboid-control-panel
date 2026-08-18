@@ -53,3 +53,9 @@ release-notes-*.md
 lh-*.json
 _artifacts/
 .claude/worktrees/
+
+# Playwright E2E
+e2e/test-results/
+e2e/html-report/
+e2e/.auth/
+/playwright-report/
