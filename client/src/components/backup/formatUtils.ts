@@ -33,3 +33,25 @@ export const DESTINATION_TYPE_LABELS: Record<string, string> = {
   ftp: 'FTP',
   rsync: 'Rsync',
 }
+
+// Translate the small set of cron presets we expose into a human label.
+// Falls back to the raw cron string for anything custom so the user
+// still gets meaningful information without us shipping a full parser.
+export function describeSchedule(cron: string | undefined): string {
+  if (!cron) return 'No schedule'
+  const map: Record<string, string> = {
+    '*/15 * * * *': 'every 15 minutes',
+    '*/30 * * * *': 'every 30 minutes',
+    '0 * * * *': 'every hour',
+    '0 */2 * * *': 'every 2 hours',
+    '0 */4 * * *': 'every 4 hours',
+    '0 */6 * * *': 'every 6 hours',
+    '0 */8 * * *': 'every 8 hours',
+    '0 */12 * * *': 'every 12 hours',
+    '0 0 * * *': 'daily at midnight',
+    '0 6 * * *': 'daily at 6 AM',
+    '0 12 * * *': 'daily at noon',
+    '0 18 * * *': 'daily at 6 PM',
+  }
+  return map[cron] || cron
+}
