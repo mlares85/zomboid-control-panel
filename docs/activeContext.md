@@ -1,19 +1,21 @@
 # Active Context
 
 ## Current Focus
-Dashboard decomposed, E2E framework added, upstream ports complete.
-Next: decompose Backups.tsx, then validate PZ in managed container.
+Server provider extraction in progress (Phase 2: file access). FileAccess
+interface + LocalFiles implementation landed, templateService.js migrated as
+first consumer. E2E suite covers all pages + Docker integration framework.
 
 ## Recent Decisions
+- Backups decomposition follows Dashboard pattern: `useBackupsData` hook
+  returns flat bag of state + handlers; shell (160 lines) keeps dialog
+  state and layout. 7 extracted components in `components/backups/`.
+  `describeSchedule` moved to `formatUtils.ts` alongside formatBytes/formatDate.
 - Dashboard hook pattern: `useDashboardData` returns a flat bag of
   state + handlers; the shell destructures and passes props to each
   component. Keeps data flow explicit without context overhead.
 - E2E uses Playwright (not Cypress) — lighter, better multi-tab/auth
   support, native Vite webServer integration. Auth setup handles both
   first-run and login flows, saving state for reuse across specs.
-- Upstream sync: compared fork against origin/main v1.1.42–v1.1.47,
-  ported 4 fixes (security, Docker lifecycle, backup race, UX). The
-  rest we already had equivalent or better implementations of.
 
 ## Blockers / Open Questions
 - PZ server hasn't been validated running in the managed container.
@@ -23,6 +25,7 @@ Next: decompose Backups.tsx, then validate PZ in managed container.
 - WorldMap.tsx version selector frontend not yet wired (backend ready).
 
 ## Next Steps
-1. Decompose Backups.tsx (1,060+ lines).
-2. Test managed container actually running PZ — fix runtime issues.
-3. Wire WorldMap.tsx version selector to /api/map/versions.
+1. Continue FileAccess migration: Tier 1 remaining (auth tokens, backupDestinations/local, debug routes), then Tier 2 (logTailer, modChecker, mod INI routes).
+2. Fix remaining 14 E2E test failures (selector mismatches, timeouts).
+3. Test managed container actually running PZ — fix runtime issues.
+4. Wire WorldMap.tsx version selector to /api/map/versions.
