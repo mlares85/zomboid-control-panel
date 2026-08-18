@@ -25,33 +25,33 @@ afterEach(() => {
 const localServer = () => ({ id: 's1', installPath: tmpDir, isRemote: false });
 
 describe('canAutoInstall', () => {
-  it('is true for a local server with a writable install path', () => {
-    expect(canAutoInstall(localServer())).toBe(true);
+  it('is true for a local server with a writable install path', async () => {
+    expect(await canAutoInstall(localServer())).toBe(true);
   });
 
-  it('is false for a remote/SFTP server', () => {
-    expect(canAutoInstall({ ...localServer(), isRemote: true })).toBe(false);
+  it('is false for a remote/SFTP server', async () => {
+    expect(await canAutoInstall({ ...localServer(), isRemote: true })).toBe(false);
   });
 
-  it('is false when installPath is missing', () => {
-    expect(canAutoInstall({ id: 's1', isRemote: false })).toBe(false);
+  it('is false when installPath is missing', async () => {
+    expect(await canAutoInstall({ id: 's1', isRemote: false })).toBe(false);
   });
 
-  it('is false when installPath does not exist on disk', () => {
+  it('is false when installPath does not exist on disk', async () => {
     const missing = path.join(tmpDir, 'does-not-exist');
-    expect(canAutoInstall({ installPath: missing, isRemote: false })).toBe(false);
+    expect(await canAutoInstall({ installPath: missing, isRemote: false })).toBe(false);
   });
 
-  it('resolves a launch-script installPath (.sh) to its parent directory', () => {
+  it('resolves a launch-script installPath (.sh) to its parent directory', async () => {
     const scriptPath = path.join(tmpDir, 'start-server.sh');
-    expect(canAutoInstall({ installPath: scriptPath, isRemote: false })).toBe(true);
+    expect(await canAutoInstall({ installPath: scriptPath, isRemote: false })).toBe(true);
   });
 
-  it('is false when the install directory is not writable', () => {
+  it('is false when the install directory is not writable', async () => {
     if (process.getuid && process.getuid() === 0) return; // root bypasses permission bits
     fs.chmodSync(tmpDir, 0o555);
     try {
-      expect(canAutoInstall(localServer())).toBe(false);
+      expect(await canAutoInstall(localServer())).toBe(false);
     } finally {
       fs.chmodSync(tmpDir, 0o755);
     }
@@ -59,25 +59,25 @@ describe('canAutoInstall', () => {
 });
 
 describe('checkBridgeInstalled', () => {
-  it('reports not installed when the mod file is absent', () => {
-    const status = checkBridgeInstalled(localServer());
+  it('reports not installed when the mod file is absent', async () => {
+    const status = await checkBridgeInstalled(localServer());
     expect(status.installed).toBe(false);
     expect(status.needsUpdate).toBe(false);
-    expect(status.sourcePath).toBe(resolveSourcePath());
+    expect(status.sourcePath).toBe(await resolveSourcePath());
     expect(status.targetPath).toBe(
       path.join(tmpDir, 'media', 'lua', 'server', 'PanelBridge.lua'),
     );
   });
 
-  it('reports installed with no update needed once freshly installed', () => {
-    installBridge(localServer());
-    const status = checkBridgeInstalled(localServer());
+  it('reports installed with no update needed once freshly installed', async () => {
+    await installBridge(localServer());
+    const status = await checkBridgeInstalled(localServer());
     expect(status.installed).toBe(true);
     expect(status.needsUpdate).toBe(false);
     expect(status.version).toBeTruthy();
   });
 
-  it('flags an update when the installed version is older than the source', () => {
+  it('flags an update when the installed version is older than the source', async () => {
     const targetDir = path.join(tmpDir, 'media', 'lua', 'server');
     fs.mkdirSync(targetDir, { recursive: true });
     fs.writeFileSync(
@@ -85,16 +85,16 @@ describe('checkBridgeInstalled', () => {
       'local VERSION = "0.0.1"\n',
     );
 
-    const status = checkBridgeInstalled(localServer());
+    const status = await checkBridgeInstalled(localServer());
     expect(status.installed).toBe(true);
     expect(status.needsUpdate).toBe(true);
   });
 });
 
 describe('installBridge', () => {
-  it('copies the mod file to the target path unchanged', () => {
-    const sourceContent = fs.readFileSync(resolveSourcePath(), 'utf8');
-    const result = installBridge(localServer());
+  it('copies the mod file to the target path unchanged', async () => {
+    const sourceContent = fs.readFileSync(await resolveSourcePath(), 'utf8');
+    const result = await installBridge(localServer());
 
     expect(result.success).toBe(true);
     expect(fs.existsSync(result.targetPath)).toBe(true);
@@ -102,23 +102,23 @@ describe('installBridge', () => {
     expect(result.version).toBeTruthy();
   });
 
-  it('creates the media/lua/server directory tree if missing', () => {
+  it('creates the media/lua/server directory tree if missing', async () => {
     const target = path.join(tmpDir, 'media', 'lua', 'server', 'PanelBridge.lua');
     expect(fs.existsSync(target)).toBe(false);
-    installBridge(localServer());
+    await installBridge(localServer());
     expect(fs.existsSync(target)).toBe(true);
   });
 
-  it('fails cleanly when the install path is not configured', () => {
-    const result = installBridge({ id: 's1', isRemote: false });
+  it('fails cleanly when the install path is not configured', async () => {
+    const result = await installBridge({ id: 's1', isRemote: false });
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/install path/i);
   });
 
-  it('fails cleanly instead of throwing when the target cannot be created', () => {
-    // Make "media" a plain file so mkdirSync('media/lua/server') fails with ENOTDIR.
+  it('fails cleanly instead of throwing when the target cannot be created', async () => {
+    // Make "media" a plain file so mkdir('media/lua/server') fails with ENOTDIR.
     fs.writeFileSync(path.join(tmpDir, 'media'), 'not a directory');
-    const result = installBridge(localServer());
+    const result = await installBridge(localServer());
     expect(result.success).toBe(false);
     expect(result.error).toBeTruthy();
   });

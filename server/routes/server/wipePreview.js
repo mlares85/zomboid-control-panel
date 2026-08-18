@@ -1,6 +1,5 @@
 // Dry-run preview of what POST /wipe would delete.
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../utils/logger.js";
 import { sanitizeError } from "../../utils/sanitize.js";
 import {
@@ -12,12 +11,14 @@ import {
   WORLD_ROOT_FILES,
   countDir,
 } from "./wipeShared.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Server");
 
 export function registerWipePreviewRoute(router) {
   router.post("/wipe/preview", async (req, res) => {
     try {
+      const fileAccess = new LocalFiles();
       const serverManager = req.app.get("serverManager");
       await serverManager.loadConfig();
 
@@ -47,7 +48,7 @@ export function registerWipePreviewRoute(router) {
       }
 
       const saveDir = path.join(savePath, "Saves", "Multiplayer", serverName);
-      if (!fs.existsSync(saveDir)) {
+      if (!(await fileAccess.exists(saveDir))) {
         return res
           .status(404)
           .json({ error: `Save directory not found: ${serverName}` });
@@ -62,8 +63,8 @@ export function registerWipePreviewRoute(router) {
         let mapSize = 0;
         for (const dirName of MAP_DIRS) {
           const dir = path.join(saveDir, dirName);
-          if (fs.existsSync(dir)) {
-            const sub = countDir(dir);
+          if (await fileAccess.exists(dir)) {
+            const sub = await countDir(dir);
             mapFiles += sub.files;
             mapSize += sub.size;
           }
@@ -77,12 +78,13 @@ export function registerWipePreviewRoute(router) {
         let playerFiles = 0;
         let playerSize = 0;
         try {
-          const rootEntries = fs.readdirSync(saveDir, { withFileTypes: true });
+          const rootEntries = await fileAccess.readdir(saveDir, { withFileTypes: true });
           for (const entry of rootEntries) {
-            if (!entry.isDirectory() && PLAYER_ROOT_FILES.test(entry.name)) {
+            if (!entry.isDirectory && PLAYER_ROOT_FILES.test(entry.name)) {
               playerFiles++;
               try {
-                playerSize += fs.statSync(path.join(saveDir, entry.name)).size;
+                const stat = await fileAccess.stat(path.join(saveDir, entry.name));
+                if (stat) playerSize += stat.size;
               } catch (e) {
                 log.debug(
                   `Stat failed for player file ${entry.name}: ${e.message}`,
@@ -104,20 +106,21 @@ export function registerWipePreviewRoute(router) {
         // Count world directories
         for (const dirName of WORLD_DIRS) {
           const dir = path.join(saveDir, dirName);
-          if (fs.existsSync(dir)) {
-            const sub = countDir(dir);
+          if (await fileAccess.exists(dir)) {
+            const sub = await countDir(dir);
             worldFiles += sub.files;
             worldSize += sub.size;
           }
         }
         // Count world root files
         try {
-          const rootEntries = fs.readdirSync(saveDir, { withFileTypes: true });
+          const rootEntries = await fileAccess.readdir(saveDir, { withFileTypes: true });
           for (const entry of rootEntries) {
-            if (!entry.isDirectory() && WORLD_ROOT_FILES.test(entry.name)) {
+            if (!entry.isDirectory && WORLD_ROOT_FILES.test(entry.name)) {
               worldFiles++;
               try {
-                worldSize += fs.statSync(path.join(saveDir, entry.name)).size;
+                const stat = await fileAccess.stat(path.join(saveDir, entry.name));
+                if (stat) worldSize += stat.size;
               } catch (e) {
                 log.debug(
                   `Stat failed for world file ${entry.name}: ${e.message}`,
@@ -140,24 +143,25 @@ export function registerWipePreviewRoute(router) {
         let extraFiles = 0;
         let extraSize = 0;
         try {
-          for (const entry of fs.readdirSync(saveDir, { withFileTypes: true })) {
+          for (const entry of await fileAccess.readdir(saveDir, { withFileTypes: true })) {
             if (claimed.has(entry.name)) continue;
             if (
-              !entry.isDirectory() &&
+              !entry.isDirectory &&
               (PLAYER_ROOT_FILES.test(entry.name) ||
                 WORLD_ROOT_FILES.test(entry.name))
             ) {
               continue;
             }
             const fullPath = path.join(saveDir, entry.name);
-            if (entry.isDirectory()) {
-              const sub = countDir(fullPath);
+            if (entry.isDirectory) {
+              const sub = await countDir(fullPath);
               extraFiles += sub.files;
               extraSize += sub.size;
             } else {
               extraFiles++;
               try {
-                extraSize += fs.statSync(fullPath).size;
+                const stat = await fileAccess.stat(fullPath);
+                if (stat) extraSize += stat.size;
               } catch (e) {
                 log.debug(`Stat failed for ${entry.name}: ${e.message}`);
               }
@@ -176,10 +180,11 @@ export function registerWipePreviewRoute(router) {
         let accountSize = 0;
         for (const suffix of ["", "-journal", "-wal", "-shm"]) {
           const dbFile = path.join(savePath, "db", `${serverName}.db${suffix}`);
-          if (fs.existsSync(dbFile)) {
+          if (await fileAccess.exists(dbFile)) {
             accountFiles++;
             try {
-              accountSize += fs.statSync(dbFile).size;
+              const stat = await fileAccess.stat(dbFile);
+              if (stat) accountSize += stat.size;
             } catch (e) {
               log.debug(`Stat failed for ${dbFile}: ${e.message}`);
             }

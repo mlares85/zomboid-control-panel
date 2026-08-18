@@ -1,6 +1,5 @@
 // Quick Setup - Create new server config using existing files (no SteamCMD download)
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../utils/logger.js";
 import { setSetting, logServerEvent } from "../../database/init.js";
 import { sanitizeError } from "../../utils/sanitize.js";
@@ -15,12 +14,14 @@ import {
 } from "./shared.js";
 import { generateStartupScripts, writeStartupScriptFiles } from "./startupScripts.js";
 import { precreateRconIni, installPanelBridgeMod } from "./installHelpers.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Server");
 
 export function registerQuickSetupRoutes(router) {
   router.post("/quick-setup", async (req, res) => {
     try {
+      const fileAccess = new LocalFiles();
       const {
         installPath,
         serverName,
@@ -67,9 +68,9 @@ export function registerQuickSetupRoutes(router) {
       const javaFolder = path.join(installPath, "jre64");
 
       if (
-        !fs.existsSync(startServerBat) &&
-        !fs.existsSync(startServerSh) &&
-        !fs.existsSync(javaFolder)
+        !(await fileAccess.exists(startServerBat)) &&
+        !(await fileAccess.exists(startServerSh)) &&
+        !(await fileAccess.exists(javaFolder))
       ) {
         return res.status(400).json({
           error:
@@ -149,7 +150,7 @@ export function registerQuickSetupRoutes(router) {
       }
 
       // Generate custom startup scripts
-      const scripts = generateStartupScripts({
+      const scripts = await generateStartupScripts({
         installPath,
         serverName,
         minMemory: safeMinMemory,

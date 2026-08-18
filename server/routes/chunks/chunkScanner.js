@@ -1,7 +1,9 @@
-import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Chunks");
+import { LocalFiles } from "../../services/fileAccess/index.js";
+
+const fileAccess = new LocalFiles();
 
 export function createScanState() {
   return {
@@ -33,17 +35,17 @@ export function rememberChunkCoord(state, x, y) {
 // whether the save uses the B42 layout (numeric X subdirectories present).
 export async function scanMapDirectory(savePath, state, { onProgress } = {}) {
   const mapPath = path.join(savePath, "map");
-  const mapExists = fs.existsSync(mapPath);
+  const mapExists = await fileAccess.exists(mapPath);
 
   let mapContents = [];
   let xDirs = [];
   let flatBinFiles = [];
 
   if (mapExists) {
-    mapContents = await fs.promises.readdir(mapPath, { withFileTypes: true });
-    xDirs = mapContents.filter((d) => d.isDirectory() && /^\d+$/.test(d.name));
+    mapContents = await fileAccess.readdir(mapPath, { withFileTypes: true });
+    xDirs = mapContents.filter((d) => d.isDirectory && /^\d+$/.test(d.name));
     flatBinFiles = mapContents.filter(
-      (f) => f.isFile() && f.name.endsWith(".bin"),
+      (f) => f.isFile && f.name.endsWith(".bin"),
     );
   }
 
@@ -76,11 +78,11 @@ async function scanB42Directories(mapPath, xDirs, state, onProgress) {
 
     try {
       // Read Y files in this X directory
-      const yEntries = await fs.promises.readdir(xPath, {
+      const yEntries = await fileAccess.readdir(xPath, {
         withFileTypes: true,
       });
       // Only process files (skip subdirectories inside chunk dirs)
-      const yFiles = yEntries.filter((e) => e.isFile()).map((e) => e.name);
+      const yFiles = yEntries.filter((e) => e.isFile).map((e) => e.name);
 
       if (yFiles.length === 0) {
         emptyDirs++;
@@ -113,13 +115,14 @@ async function scanB42Directories(mapPath, xDirs, state, onProgress) {
           const filePath = path.join(xPath, yFile);
 
           try {
-            const stats = await fs.promises.stat(filePath);
+            const stats = await fileAccess.stat(filePath);
+            if (!stats) throw new Error("ENOENT");
             return {
               file: `${x}/${yFile}`,
               x,
               y,
               size: stats.size,
-              modified: stats.mtime,
+              modified: new Date(stats.mtimeMs),
             };
           } catch (e) {
             log.debug(`Stat failed for chunk ${x}/${yFile}: ${e.message}`);
@@ -151,7 +154,7 @@ async function scanB42Directories(mapPath, xDirs, state, onProgress) {
 async function scanLegacyFlatFiles(mapPath, mapContents, state) {
   // Legacy flat file structure: map_X_Y.bin or X_Y.bin
   const files = mapContents
-    .filter((f) => f.isFile() && f.name.endsWith(".bin"))
+    .filter((f) => f.isFile && f.name.endsWith(".bin"))
     .map((f) => f.name);
 
   const chunkEntries = [];
@@ -172,13 +175,14 @@ async function scanLegacyFlatFiles(mapPath, mapContents, state) {
   const legacyResults = await Promise.all(
     chunkEntries.map(async ({ file, x, y }) => {
       try {
-        const stats = await fs.promises.stat(path.join(mapPath, file));
+        const stats = await fileAccess.stat(path.join(mapPath, file));
+        if (!stats) throw new Error("ENOENT");
         return {
           file,
           x,
           y,
           size: stats.size,
-          modified: stats.mtime,
+          modified: new Date(stats.mtimeMs),
         };
       } catch (e) {
         log.debug(`Stat failed for legacy chunk ${file}: ${e.message}`);

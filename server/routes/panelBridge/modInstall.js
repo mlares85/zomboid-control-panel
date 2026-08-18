@@ -110,7 +110,7 @@ router.post("/install-mod-auto", async (req, res) => {
     const luaServerPath = path.join(serverInstallDir, "media", "lua", "server");
     const destLuaFile = path.join(luaServerPath, "PanelBridge.lua");
 
-    const { content: srcContent, source: sourceLocation } = resolveModLuaSource(
+    const { content: srcContent, source: sourceLocation } = await resolveModLuaSource(
       modCandidateDirsDirnameFirst(__dirname),
     );
 
@@ -135,7 +135,7 @@ router.post("/install-mod-auto", async (req, res) => {
 });
 
 // Copy mod to server Lua folder (manual path)
-router.post("/install-mod", (req, res) => {
+router.post("/install-mod", async (req, res) => {
   const { serverLuaPath } = req.body;
 
   // Support legacy field name
@@ -195,7 +195,7 @@ router.post("/install-mod", (req, res) => {
   }
 
   try {
-    const { content: srcContent } = resolveModLuaSource(
+    const { content: srcContent } = await resolveModLuaSource(
       modCandidateDirs(__dirname),
     );
 

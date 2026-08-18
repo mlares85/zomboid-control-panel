@@ -1,5 +1,4 @@
 import express from "express";
-import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Chunks");
@@ -11,12 +10,14 @@ import {
   resolveCustomOrDefaultDataPath,
 } from "./savePaths.js";
 import { getDirSize, countFiles, formatBytes } from "./fsHelpers.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
 // Get list of available saves
 router.get("/saves", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     // Support custom path override from query parameter
     const customPath = req.query.customPath
       ? String(req.query.customPath)
@@ -28,7 +29,7 @@ router.get("/saves", async (req, res) => {
     let autoPickedFrom = null;
     if (customPath) {
       // Validate custom path exists and is a directory
-      const normalized = resolveCustomOrDefaultDataPath(customPath);
+      const normalized = await resolveCustomOrDefaultDataPath(customPath);
       zomboidDataPath = normalized;
       log.info(`[ChunkCleaner] Using custom path: ${normalized}`);
     } else {
@@ -70,10 +71,10 @@ router.get("/saves", async (req, res) => {
     }
 
     // Try the standard path first, then check if the path IS a Saves/Multiplayer dir directly
-    let savesPath = resolveSavesPath(zomboidDataPath);
+    let savesPath = await resolveSavesPath(zomboidDataPath);
     const attempted = [savesPath];
 
-    if (!fs.existsSync(savesPath)) {
+    if (!(await fileAccess.exists(savesPath))) {
       // Maybe the user pointed directly to Saves/Multiplayer
       const basename = path.basename(zomboidDataPath);
       const parentDir = path.dirname(zomboidDataPath);
@@ -113,7 +114,7 @@ router.get("/saves", async (req, res) => {
       }
     }
 
-    if (!fs.existsSync(savesPath)) {
+    if (!(await fileAccess.exists(savesPath))) {
       log.warn(
         `[ChunkCleaner] Resolved saves path does not exist: ${savesPath}`,
       );
@@ -135,7 +136,7 @@ router.get("/saves", async (req, res) => {
 
     let entries;
     try {
-      entries = await fs.promises.readdir(savesPath, { withFileTypes: true });
+      entries = await fileAccess.readdir(savesPath, { withFileTypes: true });
     } catch (e) {
       log.warn(
         `[ChunkCleaner] Failed to read saves dir ${savesPath}: ${e.message}`,
@@ -164,7 +165,7 @@ router.get("/saves", async (req, res) => {
     // folder lands inside the saves listing and would otherwise show up as a
     // fake, un-loadable "save". It is never a real PZ multiplayer save.
     const directories = entries.filter(
-      (d) => d.isDirectory() && d.name.toLowerCase() !== "backups",
+      (d) => d.isDirectory && d.name.toLowerCase() !== "backups",
     );
 
     log.info(
@@ -174,20 +175,20 @@ router.get("/saves", async (req, res) => {
     const saves = await Promise.all(
       directories.map(async (d) => {
         const savePath = path.join(savesPath, d.name);
-        const stats = await fs.promises.stat(savePath);
+        const stats = await fileAccess.stat(savePath);
 
         // Count chunk files (uses recursive count for B42's subdirectory structure)
         // Also check save root for B41 flat chunk files
         let chunkCount = 0;
         const mapPath = path.join(savePath, "map");
-        if (fs.existsSync(mapPath)) {
+        if (await fileAccess.exists(mapPath)) {
           chunkCount = await countFiles(mapPath);
         }
         if (chunkCount === 0) {
           // B41 fallback: count map_X_Y.bin files in save root
           const B41_CHUNK_REGEX = /^map_\d+_\d+\.bin$/i;
           try {
-            const rootEntries = await fs.promises.readdir(savePath);
+            const rootEntries = await fileAccess.readdir(savePath);
             chunkCount = rootEntries.filter((f) =>
               B41_CHUNK_REGEX.test(f),
             ).length;
@@ -203,7 +204,7 @@ router.get("/saves", async (req, res) => {
 
         return {
           name: d.name,
-          modified: stats.mtime,
+          modified: stats ? new Date(stats.mtimeMs) : null,
           chunkCount,
           size,
           sizeFormatted: formatBytes(size),

@@ -8,29 +8,29 @@
  * candidate path wins for existing installs.
  */
 
-import fs from "fs";
 import path from "path";
 import os from "os";
+import { LocalFiles } from "./fileAccess/index.js";
 
-function safeReadDir(dirPath) {
+async function safeReadDir(dirPath, fa) {
   try {
-    return fs.existsSync(dirPath) ? fs.readdirSync(dirPath) : [];
+    return (await fa.exists(dirPath)) ? await fa.readdir(dirPath) : [];
   } catch (e) {
     return [];
   }
 }
 
-function describePath(p, source, priority) {
+async function describePath(p, source, priority, fa) {
   const statusFile = path.join(p, "status.json");
   const initFile = path.join(p, ".init");
-  const hasStatus = fs.existsSync(statusFile);
-  const hasInit = fs.existsSync(initFile);
+  const hasStatus = await fa.exists(statusFile);
+  const hasInit = await fa.exists(initFile);
   return {
     path: p,
     source,
     hasStatus,
     hasInit,
-    exists: hasStatus || hasInit || fs.existsSync(p),
+    exists: hasStatus || hasInit || await fa.exists(p),
     priority,
   };
 }
@@ -45,13 +45,14 @@ function byStatusThenInitThenPriority(a, b) {
 
 // Used by POST /auto-configure. Applies write-side-effect-free path
 // discovery only — configuring/starting the bridge stays in the route.
-export function findAutoConfigurePath(targetServer, serverName) {
+export async function findAutoConfigurePath(targetServer, serverName, { fileAccess } = {}) {
+  const fa = fileAccess || new LocalFiles();
   const possiblePaths = [];
   const searchedLocations = [];
 
-  const addPath = (p, source, priority = 10) => {
+  const addPath = async (p, source, priority = 10) => {
     if (possiblePaths.some((pp) => pp.path === p)) return;
-    const entry = describePath(p, source, priority);
+    const entry = await describePath(p, source, priority, fa);
     possiblePaths.push(entry);
     searchedLocations.push({
       path: p,
@@ -64,7 +65,7 @@ export function findAutoConfigurePath(targetServer, serverName) {
   // PRIORITY 1: zomboidDataPath is where -cachedir points - this is where the mod WRITES status.json
   // This should be checked first since it's explicitly configured for the server
   if (targetServer.zomboidDataPath) {
-    addPath(
+    await addPath(
       path.join(targetServer.zomboidDataPath, "Lua", "panelbridge", serverName),
       "zomboidDataPath/Lua (cachedir)",
       1,
@@ -73,7 +74,7 @@ export function findAutoConfigurePath(targetServer, serverName) {
 
   // PRIORITY 2 (fallback): default ~/Zomboid folder — works on both Windows and Linux when
   // the server runs without a custom -cachedir (e.g., most Linux dedicated server setups)
-  addPath(
+  await addPath(
     path.join(os.homedir(), "Zomboid", "Lua", "panelbridge", serverName),
     "default Zomboid folder",
     2,
@@ -83,19 +84,19 @@ export function findAutoConfigurePath(targetServer, serverName) {
   // This is where -cachedir typically points for dedicated servers with separate data folders
   if (targetServer.installPath) {
     const parentDir = path.dirname(targetServer.installPath);
-    const parentContents = safeReadDir(parentDir);
+    const parentContents = await safeReadDir(parentDir, fa);
     for (const item of parentContents) {
       // Match Server_files* patterns (e.g., Server_files_B42, Server_files_B42_Beta1)
       if (item.startsWith("Server_files") || item.match(/Server.*files/i)) {
         const luaPath = path.join(parentDir, item, "Lua", "panelbridge", serverName);
-        addPath(luaPath, `${item}/Lua`, 3);
+        await addPath(luaPath, `${item}/Lua`, 3);
       }
     }
 
     // PRIORITY 4: Also check grandparent directory (for nested setups)
     const grandParentDir = path.dirname(parentDir);
     if (grandParentDir !== parentDir) {
-      const grandParentContents = safeReadDir(grandParentDir);
+      const grandParentContents = await safeReadDir(grandParentDir, fa);
       for (const item of grandParentContents) {
         if (item.startsWith("Server_files") || item.match(/Server.*files/i)) {
           const luaPath = path.join(
@@ -105,13 +106,13 @@ export function findAutoConfigurePath(targetServer, serverName) {
             "panelbridge",
             serverName,
           );
-          addPath(luaPath, `${item}/Lua`, 4);
+          await addPath(luaPath, `${item}/Lua`, 4);
         }
       }
     }
 
     // PRIORITY 5: Lua folder directly in install path (fallback)
-    addPath(
+    await addPath(
       path.join(targetServer.installPath, "Lua", "panelbridge", serverName),
       "installPath/Lua",
       5,
@@ -138,15 +139,16 @@ export function findAutoConfigurePath(targetServer, serverName) {
 // Used by GET /scan-server/:serverId — a read-only preview with its own
 // (slightly different) priority weighting, shown to the user before they
 // commit to auto-configure.
-export function scanServerPreviewPaths(targetServer, serverName) {
+export async function scanServerPreviewPaths(targetServer, serverName, { fileAccess } = {}) {
+  const fa = fileAccess || new LocalFiles();
   const possiblePaths = [];
-  const addPath = (p, source, priority = 10) => {
+  const addPath = async (p, source, priority = 10) => {
     if (possiblePaths.some((pp) => pp.path === p)) return;
-    possiblePaths.push(describePath(p, source, priority));
+    possiblePaths.push(await describePath(p, source, priority, fa));
   };
 
   // Check default Zomboid user folder (B42 without -cachedir)
-  addPath(
+  await addPath(
     path.join(os.homedir(), "Zomboid", "Lua", "panelbridge", serverName),
     "default Zomboid folder",
     0,
@@ -156,18 +158,18 @@ export function scanServerPreviewPaths(targetServer, serverName) {
     const parentDir = path.dirname(targetServer.installPath);
 
     // Server_files folders at parent level
-    const parentContents = safeReadDir(parentDir);
+    const parentContents = await safeReadDir(parentDir, fa);
     for (const item of parentContents) {
       if (item.startsWith("Server_files") || item.match(/Server.*files/i)) {
         const luaPath = path.join(parentDir, item, "Lua", "panelbridge", serverName);
-        addPath(luaPath, `${item}`, 1);
+        await addPath(luaPath, `${item}`, 1);
       }
     }
 
     // Grandparent
     const grandParentDir = path.dirname(parentDir);
     if (grandParentDir !== parentDir) {
-      const grandParentContents = safeReadDir(grandParentDir);
+      const grandParentContents = await safeReadDir(grandParentDir, fa);
       for (const item of grandParentContents) {
         if (item.startsWith("Server_files") || item.match(/Server.*files/i)) {
           const luaPath = path.join(
@@ -177,17 +179,17 @@ export function scanServerPreviewPaths(targetServer, serverName) {
             "panelbridge",
             serverName,
           );
-          addPath(luaPath, `${item} (grandparent)`, 2);
+          await addPath(luaPath, `${item} (grandparent)`, 2);
         }
       }
     }
 
-    addPath(
+    await addPath(
       path.join(targetServer.installPath, "Lua", "panelbridge", serverName),
       "installPath/Lua",
       3,
     );
-    addPath(
+    await addPath(
       path.join(parentDir, "Lua", "panelbridge", serverName),
       "parent/Lua",
       4,
@@ -195,7 +197,7 @@ export function scanServerPreviewPaths(targetServer, serverName) {
   }
 
   if (targetServer.zomboidDataPath) {
-    addPath(
+    await addPath(
       path.join(targetServer.zomboidDataPath, "Lua", "panelbridge", serverName),
       "zomboidDataPath",
       1,

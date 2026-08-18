@@ -1,11 +1,11 @@
 import express from "express";
-import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
 import { getServerConfigPath, getServerName, createBackup } from "./context.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
@@ -93,17 +93,21 @@ function toSpawnPoints(professions, serverName) {
 // Get spawn points
 router.get("/spawnpoints", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_spawnpoints.lua`);
 
-    if (!fs.existsSync(filePath)) {
+    if (!(await fileAccess.exists(filePath))) {
       return res
         .status(404)
         .json({ error: "Spawn points file not found", path: filePath });
     }
 
-    const content = fs.readFileSync(filePath, "utf-8");
+    const { success, data: content, error } = await fileAccess.readFile(filePath);
+    if (!success) {
+      return res.status(500).json({ error: sanitizeError(error) });
+    }
     const points = parseSpawnPoints(content);
 
     res.json({ spawnpoints: points, path: filePath });
@@ -117,6 +121,7 @@ router.get("/spawnpoints", async (req, res) => {
 router.put("/spawnpoints", async (req, res) => {
   try {
     log.info("PUT /spawnpoints");
+    const fileAccess = new LocalFiles();
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_spawnpoints.lua`);
@@ -129,7 +134,7 @@ router.put("/spawnpoints", async (req, res) => {
     }
 
     await withFileLock(filePath, async () => {
-      if (fs.existsSync(filePath)) {
+      if (await fileAccess.exists(filePath)) {
         await createBackup(`${serverName}_spawnpoints.lua`);
       }
 

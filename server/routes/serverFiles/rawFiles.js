@@ -1,11 +1,11 @@
 import express from "express";
-import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
 import { getServerConfigPath, getServerName, createBackup } from "./context.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
@@ -13,6 +13,7 @@ const router = express.Router();
 router.get("/paths", async (req, res) => {
   try {
     log.info("GET /paths");
+    const fileAccess = new LocalFiles();
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
 
@@ -24,10 +25,10 @@ router.get("/paths", async (req, res) => {
     };
 
     const exists = {
-      ini: fs.existsSync(files.ini),
-      sandbox: fs.existsSync(files.sandbox),
-      spawnpoints: fs.existsSync(files.spawnpoints),
-      spawnregions: fs.existsSync(files.spawnregions),
+      ini: await fileAccess.exists(files.ini),
+      sandbox: await fileAccess.exists(files.sandbox),
+      spawnpoints: await fileAccess.exists(files.spawnpoints),
+      spawnregions: await fileAccess.exists(files.spawnregions),
     };
 
     res.json({ configPath, serverName, files, exists });
@@ -41,6 +42,7 @@ router.get("/paths", async (req, res) => {
 router.get("/raw/:type", async (req, res) => {
   log.info(`GET /raw/${req.params.type}`);
   try {
+    const fileAccess = new LocalFiles();
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const type = req.params.type;
@@ -58,11 +60,14 @@ router.get("/raw/:type", async (req, res) => {
 
     const filePath = path.join(configPath, fileMap[type]);
 
-    if (!fs.existsSync(filePath)) {
+    if (!(await fileAccess.exists(filePath))) {
       return res.status(404).json({ error: "File not found" });
     }
 
-    const content = fs.readFileSync(filePath, "utf-8");
+    const { success, data: content, error } = await fileAccess.readFile(filePath);
+    if (!success) {
+      return res.status(500).json({ error: sanitizeError(error) });
+    }
     res.json({ content, filename: fileMap[type] });
   } catch (error) {
     log.error("Failed to read raw file:", error);
@@ -73,6 +78,7 @@ router.get("/raw/:type", async (req, res) => {
 // Save raw file content
 router.put("/raw/:type", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const type = req.params.type;
@@ -101,7 +107,7 @@ router.put("/raw/:type", async (req, res) => {
     const filePath = path.join(configPath, fileMap[type]);
 
     await withFileLock(filePath, async () => {
-      if (fs.existsSync(filePath)) {
+      if (await fileAccess.exists(filePath)) {
         await createBackup(fileMap[type]);
       }
 

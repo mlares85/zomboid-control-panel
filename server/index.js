@@ -949,7 +949,7 @@ async function tryStartPanelBridge(trigger = "unknown") {
 
   try {
     panelBridge.configure(result.path, true);
-    panelBridge.start();
+    await panelBridge.start();
     log.info(`Started from ${result.source} (trigger: ${trigger})`);
     return true;
   } catch (error) {

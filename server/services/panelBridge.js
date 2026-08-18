@@ -13,6 +13,7 @@ import { EventEmitter } from 'events';
 import { logPlayerAction, recordPlayerSession } from '../database/init.js';
 import { createLogger } from '../utils/logger.js';
 import { PanelBridgeSftpTransport } from './panelBridgeSftp.js';
+import { LocalFiles } from './fileAccess/index.js';
 const log = createLogger('Bridge');
 
 // Build 42 (buildid 24449161) only lets Lua write files whose name ends in
@@ -35,8 +36,15 @@ function formatAge(ms) {
 }
 
 class PanelBridge extends EventEmitter {
-  constructor() {
+  constructor(fileAccess) {
     super();
+    this._files = fileAccess || new LocalFiles();
+    // Re-entrancy guards: fs calls used to be synchronous (blocking), which
+    // guaranteed the setInterval-driven poll/status-check callbacks never
+    // overlapped. Now that they await FileAccess, a slow call could still be
+    // in flight when the next timer tick fires — these skip that tick instead.
+    this._pollBusy = false;
+    this._statusBusy = false;
     this.bridgePath = null;
     this.isRunning = false;
     this.pollInterval = null;
@@ -148,7 +156,7 @@ class PanelBridge extends EventEmitter {
    * @param {string} serverName - Name of the PZ server
    * @param {string} zomboidUserFolder - Path to Zomboid user folder (optional)
    */
-  autoDetect(serverName, zomboidUserFolder = null) {
+  async autoDetect(serverName, zomboidUserFolder = null) {
     // Validate serverName to prevent path traversal
     if (!serverName || typeof serverName !== 'string' || !/^[a-zA-Z0-9_\- ]{1,64}$/.test(serverName)) {
       throw new Error('Invalid server name — use only letters, numbers, spaces, hyphens, and underscores (max 64 chars)');
@@ -169,7 +177,7 @@ class PanelBridge extends EventEmitter {
     for (const base of possibleBases) {
       // The Lua mod writes to: {base}/Lua/panelbridge/{serverName}/
       const bridgePath = path.join(base, 'Lua', 'panelbridge', serverName);
-      if (fs.existsSync(bridgePath)) {
+      if (await this._files.exists(bridgePath)) {
         return this.configure(bridgePath, true); // direct path — already the panelbridge folder
       }
     }
@@ -197,10 +205,10 @@ class PanelBridge extends EventEmitter {
    * Resolve a file written by the Lua mod, preferring the .txt-suffixed Build 42
    * name and falling back to the unsuffixed one written by older mod versions.
    */
-  resolveModFile(relativeName) {
+  async resolveModFile(relativeName) {
     if (!this.bridgePath) return null;
     const suffixedFile = this.getModWriteFile(relativeName);
-    if (suffixedFile && fs.existsSync(suffixedFile)) return suffixedFile;
+    if (suffixedFile && await this._files.exists(suffixedFile)) return suffixedFile;
     return path.join(this.bridgePath, relativeName);
   }
 
@@ -208,11 +216,11 @@ class PanelBridge extends EventEmitter {
     return this.bridgePath ? path.join(this.bridgePath, 'commands.json') : null;
   }
 
-  getResultsFile() {
+  async getResultsFile() {
     return this.resolveModFile('results.json');
   }
 
-  getStatusFile() {
+  async getStatusFile() {
     return this.resolveModFile('status.json');
   }
 
@@ -228,7 +236,7 @@ class PanelBridge extends EventEmitter {
     return this.bridgePath ? path.join(this.bridgePath, '.queue-state-node.json') : null;
   }
 
-  getInboxCursorFile() {
+  async getInboxCursorFile() {
     return this.resolveModFile(this.queue.inboxCursorFile);
   }
 
@@ -242,12 +250,12 @@ class PanelBridge extends EventEmitter {
     return path.join(inboxDir, `cmd-${this.formatSeq(seq)}.json`);
   }
 
-  getResultFileBySeq(seq) {
+  async getResultFileBySeq(seq) {
     if (!this.bridgePath) return null;
     return this.resolveModFile(path.join(this.queue.outboxDir, `res-${this.formatSeq(seq)}.json`));
   }
 
-  ensureQueueProtocol() {
+  async ensureQueueProtocol() {
     if (!this.bridgePath) {
       throw new Error('Bridge path not configured');
     }
@@ -257,13 +265,14 @@ class PanelBridge extends EventEmitter {
 
     const inboxDir = this.getInboxDir();
     const outboxDir = this.getOutboxDir();
-    fs.mkdirSync(inboxDir, { recursive: true });
-    fs.mkdirSync(outboxDir, { recursive: true });
+    await this._files.mkdir(inboxDir);
+    await this._files.mkdir(outboxDir);
 
     const stateFile = this.getQueueStateFile();
-    if (fs.existsSync(stateFile)) {
+    if (await this._files.exists(stateFile)) {
       try {
-        const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8') || '{}');
+        const read = await this._files.readFile(stateFile);
+        const state = JSON.parse((read.success ? read.data : '') || '{}');
         const nextSeq = Number(state.nextCommandSeq);
         const consumed = Number(state.lastConsumedResultSeq);
         this.queueState.nextCommandSeq = Number.isFinite(nextSeq) && nextSeq > 0 ? Math.floor(nextSeq) : 1;
@@ -276,10 +285,10 @@ class PanelBridge extends EventEmitter {
     }
 
     this.queueState.initialized = true;
-    this.persistQueueState();
+    await this.persistQueueState();
   }
 
-  persistQueueState() {
+  async persistQueueState() {
     const stateFile = this.getQueueStateFile();
     if (!stateFile) return;
     const payload = {
@@ -289,16 +298,15 @@ class PanelBridge extends EventEmitter {
       updatedAt: Date.now()
     };
     const tempFile = `${stateFile}.tmp`;
-    try {
-      fs.writeFileSync(tempFile, JSON.stringify(payload, null, 2), { mode: 0o600 });
-      fs.renameSync(tempFile, stateFile);
-    } catch (error) {
-      try {
-        fs.writeFileSync(stateFile, JSON.stringify(payload, null, 2), { mode: 0o600 });
-      } catch (writeError) {
-        log.warn(`Could not persist queue state: ${writeError.message}`);
+    const body = JSON.stringify(payload, null, 2);
+    const tempWrite = await this._files.writeFile(tempFile, body, { mode: 0o600 });
+    const renamed = tempWrite.success && (await this._files.rename(tempFile, stateFile)).success;
+    if (!renamed) {
+      const directWrite = await this._files.writeFile(stateFile, body, { mode: 0o600 });
+      if (!directWrite.success) {
+        log.warn(`Could not persist queue state: ${directWrite.error}`);
       }
-      try { fs.unlinkSync(tempFile); } catch (_) { /* ignore */ }
+      await this._files.unlink(tempFile);
     }
   }
 
@@ -306,11 +314,11 @@ class PanelBridge extends EventEmitter {
    * Assess file-based IPC health between panel and PanelBridge mod.
    * Uses fast file-system checks only (no writes).
    */
-  getConnectionDiagnostics() {
+  async getConnectionDiagnostics() {
     const bridgePath = this.bridgePath;
     const commandsFile = this.getCommandsFile();
-    const resultsFile = this.getResultsFile();
-    const statusFile = this.getStatusFile();
+    const resultsFile = await this.getResultsFile();
+    const statusFile = await this.getStatusFile();
 
     const issues = [];
     const checks = {
@@ -342,7 +350,7 @@ class PanelBridge extends EventEmitter {
     }
 
     try {
-      checks.bridgePathExists = fs.existsSync(bridgePath);
+      checks.bridgePathExists = await this._files.exists(bridgePath);
       if (!checks.bridgePathExists) {
         issues.push('Bridge directory does not exist yet.');
       }
@@ -351,53 +359,46 @@ class PanelBridge extends EventEmitter {
     }
 
     if (checks.bridgePathExists) {
-      try {
-        fs.accessSync(bridgePath, fs.constants.R_OK);
-        checks.bridgePathReadable = true;
-      } catch (e) {
-        issues.push(`Bridge directory is not readable: ${e.message}`);
+      checks.bridgePathReadable = await this._files.access(bridgePath, 'read');
+      if (!checks.bridgePathReadable) {
+        issues.push('Bridge directory is not readable.');
       }
 
-      try {
-        fs.accessSync(bridgePath, fs.constants.W_OK);
-        checks.bridgePathWritable = true;
-      } catch (e) {
-        issues.push(`Bridge directory is not writable: ${e.message}`);
+      checks.bridgePathWritable = await this._files.access(bridgePath, 'write');
+      if (!checks.bridgePathWritable) {
+        issues.push('Bridge directory is not writable.');
       }
     }
 
-    const inspectFile = (filePath, presentKey, readableKey) => {
+    const inspectFile = async (filePath, presentKey, readableKey) => {
       if (!filePath) return;
-      try {
-        const exists = fs.existsSync(filePath);
-        checks[presentKey] = exists;
-        if (!exists) return;
-        fs.accessSync(filePath, fs.constants.R_OK);
-        checks[readableKey] = true;
-      } catch (e) {
-        checks[readableKey] = false;
-        issues.push(`${path.basename(filePath)} is not readable: ${e.message}`);
+      const exists = await this._files.exists(filePath);
+      checks[presentKey] = exists;
+      if (!exists) return;
+      checks[readableKey] = await this._files.access(filePath, 'read');
+      if (!checks[readableKey]) {
+        issues.push(`${path.basename(filePath)} is not readable.`);
       }
     };
 
-    inspectFile(commandsFile, 'commandsFilePresent', 'commandsFileReadable');
-    inspectFile(resultsFile, 'resultsFilePresent', 'resultsFileReadable');
-    inspectFile(statusFile, 'statusFilePresent', 'statusFileReadable');
+    await inspectFile(commandsFile, 'commandsFilePresent', 'commandsFileReadable');
+    await inspectFile(resultsFile, 'resultsFilePresent', 'resultsFileReadable');
+    await inspectFile(statusFile, 'statusFilePresent', 'statusFileReadable');
 
     const inboxDir = this.getInboxDir();
     const outboxDir = this.getOutboxDir();
     if (inboxDir) {
-      checks.inboxDirPresent = fs.existsSync(inboxDir);
+      checks.inboxDirPresent = await this._files.exists(inboxDir);
     }
     if (outboxDir) {
-      checks.outboxDirPresent = fs.existsSync(outboxDir);
+      checks.outboxDirPresent = await this._files.exists(outboxDir);
     }
 
     if (!checks.statusFilePresent) {
       issues.push('Status file is missing. Start the game server with PanelBridge enabled.');
     } else {
       try {
-        const stats = fs.statSync(statusFile);
+        const stats = await this._files.stat(statusFile);
         const ageMs = Date.now() - stats.mtimeMs;
         // Use relaxed threshold when server idle (0 players)
         const diagStaleMs = (this.modStatus?.playerCount === 0)
@@ -431,7 +432,7 @@ class PanelBridge extends EventEmitter {
   /**
    * Start the bridge polling
    */
-  start() {
+  async start() {
     if (!this.bridgePath) {
       throw new Error('Bridge not configured. Call configure() first.');
     }
@@ -445,19 +446,23 @@ class PanelBridge extends EventEmitter {
     this.consecutiveFailures = 0;
     this.lastStatusFileCheck = 0;
     this.queueState.initialized = false;
-    this.ensureQueueProtocol();
+    await this.ensureQueueProtocol();
 
     // Start polling for results (fast poll)
-    this.pollInterval = setInterval(() => this.pollResults(), this.config.pollIntervalMs);
+    this.pollInterval = setInterval(() => {
+      this.pollResults().catch((err) => log.debug(`Poll error: ${err.message}`));
+    }, this.config.pollIntervalMs);
 
     // Start checking mod status
-    this.statusInterval = setInterval(() => this.checkModStatus(), this.config.statusCheckMs);
+    this.statusInterval = setInterval(() => {
+      this.checkModStatus().catch((err) => log.debug(`Status check error: ${err.message}`));
+    }, this.config.statusCheckMs);
 
     // Setup file watcher for immediate response to file changes
     this.setupFileWatcher();
 
     // Do an immediate status check
-    this.checkModStatus();
+    await this.checkModStatus();
 
     this.isRunning = true;
     log.info(`Started - watching ${this.bridgePath}`);
@@ -496,9 +501,9 @@ class PanelBridge extends EventEmitter {
           if (!this.isRunning) return;
           try {
             if (filename === 'status.json') {
-              this.checkModStatus();
+              this.checkModStatus().catch((e) => log.debug(`File change status check error: ${e.message}`));
             } else if (filename === 'results.json') {
-              this.pollResults();
+              this.pollResults().catch((e) => log.debug(`File change poll error: ${e.message}`));
             }
           } catch (e) {
             log.debug(`File change handler error: ${e.message}`);
@@ -602,7 +607,7 @@ class PanelBridge extends EventEmitter {
       throw new Error('Bridge not running');
     }
 
-    const connection = this.getConnectionDiagnostics();
+    const connection = await this.getConnectionDiagnostics();
     if (!connection.canSendCommands) {
       throw new Error(`Bridge file connection is unhealthy: ${connection.summary}`);
     }
@@ -614,7 +619,7 @@ class PanelBridge extends EventEmitter {
 
     const commandsFile = this.getCommandsFile();
     const id = uuidv4();
-    this.ensureQueueProtocol();
+    await this.ensureQueueProtocol();
 
     // Serialize file access to prevent TOCTOU race conditions
     if (!this._writeQueue) this._writeQueue = Promise.resolve();
@@ -655,19 +660,20 @@ class PanelBridge extends EventEmitter {
   /**
    * Append a command to the commands file (serialized via _writeQueue)
    */
-  _appendCommand(commandsFile, id, action, args) {
+  async _appendCommand(commandsFile, id, action, args) {
     let commands = { commands: [] };
-    try {
-      if (fs.existsSync(commandsFile)) {
-        const content = fs.readFileSync(commandsFile, 'utf-8');
+    if (await this._files.exists(commandsFile)) {
+      const read = await this._files.readFile(commandsFile);
+      const content = read.success ? read.data : '';
+      try {
         if (content.trim()) {
           commands = JSON.parse(content);
           if (!commands.commands) commands.commands = [];
         }
+      } catch (e) {
+        log.debug(`Failed to parse commands file ${commandsFile}: ${e.message}`);
+        commands = { commands: [] };
       }
-    } catch (e) {
-      log.debug(`Failed to parse commands file ${commandsFile}: ${e.message}`);
-      commands = { commands: [] };
     }
 
     commands.commands.push({
@@ -677,27 +683,25 @@ class PanelBridge extends EventEmitter {
       timestamp: Date.now()
     });
 
+    const body = JSON.stringify(commands, null, 2);
     const tempFile = commandsFile + '.tmp';
-    fs.writeFileSync(tempFile, JSON.stringify(commands, null, 2), { mode: 0o600 });
-    try {
-      fs.renameSync(tempFile, commandsFile);
-    } catch (err) {
+    const tempWrite = await this._files.writeFile(tempFile, body, { mode: 0o600 });
+    const renamed = tempWrite.success && (await this._files.rename(tempFile, commandsFile)).success;
+    if (!renamed) {
       // If rename fails (file locked), try direct write as fallback
-      log.warn(`renameSync failed, using direct write: ${err.message}`);
-      try {
-        fs.writeFileSync(commandsFile, JSON.stringify(commands, null, 2), { mode: 0o600 });
-      } catch (writeErr) {
-        log.error(`Direct write also failed: ${writeErr.message}`);
-        try { fs.unlinkSync(tempFile); } catch (_) { /* ignore */ }
-        throw writeErr; // Propagate so caller knows the command failed
+      log.warn('Queue rename failed, using direct write');
+      const directWrite = await this._files.writeFile(commandsFile, body, { mode: 0o600 });
+      await this._files.unlink(tempFile);
+      if (!directWrite.success) {
+        log.error(`Direct write also failed: ${directWrite.error}`);
+        throw new Error(directWrite.error); // Propagate so caller knows the command failed
       }
-      try { fs.unlinkSync(tempFile); } catch (_) { /* ignore */ }
     }
   }
 
-  _enqueueCommand(id, action, args) {
+  async _enqueueCommand(id, action, args) {
     if (!this.queueState.initialized) {
-      this.ensureQueueProtocol();
+      await this.ensureQueueProtocol();
     }
 
     const seq = this.queueState.nextCommandSeq;
@@ -713,21 +717,27 @@ class PanelBridge extends EventEmitter {
     };
 
     const tempFile = `${commandFile}.tmp`;
-    fs.writeFileSync(tempFile, JSON.stringify(payload, null, 2), { mode: 0o600 });
-    fs.renameSync(tempFile, commandFile);
+    await this._files.writeFile(tempFile, JSON.stringify(payload, null, 2), { mode: 0o600 });
+    await this._files.rename(tempFile, commandFile);
 
     this.queueState.nextCommandSeq = seq + 1;
-    this.persistQueueState();
+    await this.persistQueueState();
   }
 
   /**
    * Poll for results from the mod
    */
-  pollResults() {
-    this.pollQueueResults();
-    this.pollLegacyResults();
-    this.cleanupResultTracking();
-    this.cleanupQueueFilesIfNeeded();
+  async pollResults() {
+    if (this._pollBusy) return;
+    this._pollBusy = true;
+    try {
+      await this.pollQueueResults();
+      await this.pollLegacyResults();
+      this.cleanupResultTracking();
+      await this.cleanupQueueFilesIfNeeded();
+    } finally {
+      this._pollBusy = false;
+    }
   }
 
   /**
@@ -739,7 +749,7 @@ class PanelBridge extends EventEmitter {
    * effectively forever). Mirrors the equivalent fix in PanelBridge.lua
    * for the inbox/commands direction.
    */
-  tryResyncOutboxCursor(seq) {
+  async tryResyncOutboxCursor(seq) {
     const now = Date.now();
     if (this.outboxStuckState.seq !== seq) {
       this.outboxStuckState = { seq, since: now, nextCheckAt: now + this.queue.resyncStuckMs };
@@ -750,14 +760,15 @@ class PanelBridge extends EventEmitter {
     }
     this.outboxStuckState.nextCheckAt = now + this.queue.resyncCheckIntervalMs;
 
-    const luaStateFile = this.resolveModFile('queue-state-lua.json');
-    if (!luaStateFile || !fs.existsSync(luaStateFile)) {
+    const luaStateFile = await this.resolveModFile('queue-state-lua.json');
+    if (!luaStateFile || !await this._files.exists(luaStateFile)) {
       return false;
     }
 
     let luaState;
     try {
-      luaState = JSON.parse(fs.readFileSync(luaStateFile, 'utf-8') || '{}');
+      const read = await this._files.readFile(luaStateFile);
+      luaState = JSON.parse((read.success ? read.data : '') || '{}');
     } catch (error) {
       log.debug(`Could not parse mod queue state during resync check: ${error.message}`);
       return false;
@@ -776,15 +787,15 @@ class PanelBridge extends EventEmitter {
 
     log.warn(`Outbox sequence desync detected, resyncing to mod position (expected seq ${seq}, mod high-water ${luaHighWater})`);
     this.queueState.lastConsumedResultSeq = luaHighWater;
-    this.persistQueueState();
+    await this.persistQueueState();
     this.outboxStuckState.seq = null;
     return true;
   }
 
-  pollQueueResults() {
+  async pollQueueResults() {
     if (!this.queueState.initialized) {
       try {
-        this.ensureQueueProtocol();
+        await this.ensureQueueProtocol();
       } catch (error) {
         log.debug(`Queue init not ready during poll: ${error.message}`);
         return;
@@ -795,9 +806,9 @@ class PanelBridge extends EventEmitter {
     let consumed = 0;
     while (consumed < maxToRead) {
       const seq = this.queueState.lastConsumedResultSeq + 1;
-      const resultFile = this.getResultFileBySeq(seq);
-      if (!resultFile || !fs.existsSync(resultFile)) {
-        if (this.tryResyncOutboxCursor(seq)) {
+      const resultFile = await this.getResultFileBySeq(seq);
+      if (!resultFile || !await this._files.exists(resultFile)) {
+        if (await this.tryResyncOutboxCursor(seq)) {
           // Resynced to the mod's actual write position; loop back around
           // and retry immediately at the new expected sequence.
           continue;
@@ -807,7 +818,8 @@ class PanelBridge extends EventEmitter {
 
       let parsed = null;
       try {
-        const raw = fs.readFileSync(resultFile, 'utf-8');
+        const read = await this._files.readFile(resultFile);
+        const raw = read.success ? read.data : '';
         if (!raw.trim()) {
           // Lua may have just opened the file for writing (truncates immediately
           // with getFileWriter append=false) but not yet flushed content.
@@ -845,26 +857,26 @@ class PanelBridge extends EventEmitter {
       this.queueState.lastConsumedResultSeq = seq;
       consumed++;
 
-      try {
-        fs.writeFileSync(resultFile, '', { mode: 0o600 });
-      } catch (cleanupErr) {
-        log.debug(`Failed to clear result file seq ${seq}: ${cleanupErr.message}`);
+      const cleanup = await this._files.writeFile(resultFile, '', { mode: 0o600 });
+      if (!cleanup.success) {
+        log.debug(`Failed to clear result file seq ${seq}: ${cleanup.error}`);
       }
     }
 
     if (consumed > 0) {
-      this.persistQueueState();
+      await this.persistQueueState();
     }
   }
 
-  pollLegacyResults() {
-    const resultsFile = this.getResultsFile();
-    if (!resultsFile || !fs.existsSync(resultsFile)) {
+  async pollLegacyResults() {
+    const resultsFile = await this.getResultsFile();
+    if (!resultsFile || !await this._files.exists(resultsFile)) {
       return;
     }
 
     try {
-      const content = fs.readFileSync(resultsFile, 'utf-8');
+      const read = await this._files.readFile(resultsFile);
+      const content = read.success ? read.data : '';
       if (!content.trim()) return;
 
       const data = JSON.parse(content);
@@ -907,7 +919,7 @@ class PanelBridge extends EventEmitter {
     }
   }
 
-  cleanupQueueFilesIfNeeded() {
+  async cleanupQueueFilesIfNeeded() {
     const now = Date.now();
     if (now - this.lastQueueCleanupAt < this.queue.cleanupIntervalMs) {
       return;
@@ -915,36 +927,43 @@ class PanelBridge extends EventEmitter {
     this.lastQueueCleanupAt = now;
 
     try {
-      this.cleanupInboxFiles();
+      await this.cleanupInboxFiles();
     } catch (error) {
       log.debug(`Queue inbox cleanup skipped: ${error.message}`);
     }
 
     try {
-      this.cleanupOutboxFiles();
+      await this.cleanupOutboxFiles();
     } catch (error) {
       log.debug(`Queue outbox cleanup skipped: ${error.message}`);
     }
   }
 
-  cleanupInboxFiles() {
-    const inboxDir = this.getInboxDir();
-    if (!inboxDir || !fs.existsSync(inboxDir)) return;
+  /** @private sweep orphaned .tmp files from interrupted atomic writes */
+  async _sweepTmpFiles(dir, fileNames) {
+    let deleted = 0;
+    for (const fileName of fileNames) {
+      if (!fileName.endsWith('.tmp')) continue;
+      const result = await this._files.unlink(path.join(dir, fileName));
+      if (result.success) deleted++;
+    }
+    return deleted;
+  }
 
-    // Sweep orphaned .tmp files from interrupted atomic writes regardless of cursor state.
+  async cleanupInboxFiles() {
+    const inboxDir = this.getInboxDir();
+    if (!inboxDir || !await this._files.exists(inboxDir)) return;
+
     try {
-      for (const fileName of fs.readdirSync(inboxDir)) {
-        if (fileName.endsWith('.tmp')) {
-          try { fs.unlinkSync(path.join(inboxDir, fileName)); } catch (_) { /* ignore */ }
-        }
-      }
+      await this._sweepTmpFiles(inboxDir, await this._files.readdir(inboxDir));
     } catch (_) { /* ignore */ }
 
-    const cursorFile = this.getInboxCursorFile();
+    const cursorFile = await this.getInboxCursorFile();
     let lastProcessedSeq = 0;
-    if (cursorFile && fs.existsSync(cursorFile)) {
+    if (cursorFile && await this._files.exists(cursorFile)) {
       try {
-        const cursor = JSON.parse(fs.readFileSync(cursorFile, 'utf-8') || '{}');
+        const read = await this._files.readFile(cursorFile);
+        const cursor = JSON.parse((read.success ? read.data : '') || '{}');
         const parsed = Number(cursor.lastProcessedSeq);
         if (Number.isFinite(parsed) && parsed > 0) {
           lastProcessedSeq = Math.floor(parsed);
@@ -959,22 +978,17 @@ class PanelBridge extends EventEmitter {
     }
 
     const deleteUpToSeq = lastProcessedSeq - this.queue.retainRecentFiles;
-    const files = fs.readdirSync(inboxDir);
+    const files = await this._files.readdir(inboxDir);
     let deleted = 0;
     for (const fileName of files) {
       // Sweep .tmp orphans from interrupted writes (atomic temp+rename pattern).
       if (fileName.endsWith('.tmp')) {
-        try { fs.unlinkSync(path.join(inboxDir, fileName)); deleted++; } catch (_) { /* ignore */ }
+        if ((await this._files.unlink(path.join(inboxDir, fileName))).success) deleted++;
         continue;
       }
       const seq = this.extractSeq(fileName, /^cmd-(\d+)\.json$/);
       if (seq !== null && seq <= deleteUpToSeq) {
-        try {
-          fs.unlinkSync(path.join(inboxDir, fileName));
-          deleted++;
-        } catch (_) {
-          // Ignore cleanup failures.
-        }
+        if ((await this._files.unlink(path.join(inboxDir, fileName))).success) deleted++;
       }
     }
 
@@ -983,17 +997,12 @@ class PanelBridge extends EventEmitter {
     }
   }
 
-  cleanupOutboxFiles() {
+  async cleanupOutboxFiles() {
     const outboxDir = this.getOutboxDir();
-    if (!outboxDir || !fs.existsSync(outboxDir)) return;
+    if (!outboxDir || !await this._files.exists(outboxDir)) return;
 
-    // Sweep orphaned .tmp files first, regardless of cursor state.
     try {
-      for (const fileName of fs.readdirSync(outboxDir)) {
-        if (fileName.endsWith('.tmp')) {
-          try { fs.unlinkSync(path.join(outboxDir, fileName)); } catch (_) { /* ignore */ }
-        }
-      }
+      await this._sweepTmpFiles(outboxDir, await this._files.readdir(outboxDir));
     } catch (_) { /* ignore */ }
 
     if (this.queueState.lastConsumedResultSeq <= this.queue.retainRecentFiles) {
@@ -1001,17 +1010,12 @@ class PanelBridge extends EventEmitter {
     }
 
     const deleteUpToSeq = this.queueState.lastConsumedResultSeq - this.queue.retainRecentFiles;
-    const files = fs.readdirSync(outboxDir);
+    const files = await this._files.readdir(outboxDir);
     let deleted = 0;
     for (const fileName of files) {
       const seq = this.extractSeq(fileName, RESULT_FILE_PATTERN);
       if (seq !== null && seq <= deleteUpToSeq) {
-        try {
-          fs.unlinkSync(path.join(outboxDir, fileName));
-          deleted++;
-        } catch (_) {
-          // Ignore cleanup failures.
-        }
+        if ((await this._files.unlink(path.join(outboxDir, fileName))).success) deleted++;
       }
     }
 
@@ -1058,8 +1062,19 @@ class PanelBridge extends EventEmitter {
   /**
    * Check mod status
    */
-  checkModStatus() {
-    const statusFile = this.getStatusFile();
+  async checkModStatus() {
+    if (this._statusBusy) return;
+    this._statusBusy = true;
+    try {
+      await this._checkModStatusOnce();
+    } finally {
+      this._statusBusy = false;
+    }
+  }
+
+  /** @private */
+  async _checkModStatusOnce() {
+    const statusFile = await this.getStatusFile();
 
     // Check if file exists
     if (!statusFile) {
@@ -1067,14 +1082,14 @@ class PanelBridge extends EventEmitter {
       return;
     }
 
-    if (!fs.existsSync(statusFile)) {
+    if (!await this._files.exists(statusFile)) {
       this.handleStatusFailure('Status file does not exist');
       return;
     }
 
     try {
       // Check file modification time first (faster than reading)
-      const stats = fs.statSync(statusFile);
+      const stats = await this._files.stat(statusFile);
       const age = Date.now() - stats.mtimeMs;
 
       // Use relaxed threshold when server is idle (0 players) — PZ stops Lua ticks with no players
@@ -1099,7 +1114,12 @@ class PanelBridge extends EventEmitter {
       }
 
       // Read and parse the file
-      const content = fs.readFileSync(statusFile, 'utf-8');
+      const read = await this._files.readFile(statusFile);
+      if (!read.success) {
+        this.handleStatusFailure(`Could not read status file: ${read.error}`);
+        return;
+      }
+      const content = read.data;
       if (!content.trim()) {
         this.handleStatusFailure('Status file is empty');
         return;
@@ -1209,19 +1229,19 @@ class PanelBridge extends EventEmitter {
   /**
    * Get current status with detailed diagnostics
    */
-  getStatus() {
-    const statusFile = this.getStatusFile();
+  async getStatus() {
+    const statusFile = await this.getStatusFile();
     let fileInfo = null;
 
     if (statusFile) {
       try {
-        if (fs.existsSync(statusFile)) {
-          const stats = fs.statSync(statusFile);
+        if (await this._files.exists(statusFile)) {
+          const stats = await this._files.stat(statusFile);
           fileInfo = {
             exists: true,
             path: statusFile,
             size: stats.size,
-            modified: stats.mtime,
+            modified: new Date(stats.mtimeMs),
             age: Date.now() - stats.mtimeMs,
             ageSeconds: Math.round((Date.now() - stats.mtimeMs) / 1000)
           };
@@ -1239,7 +1259,7 @@ class PanelBridge extends EventEmitter {
       isRunning: this.isRunning,
       pendingCommands: this.pendingCommands.size,
       modStatus: this.modStatus,
-      connection: this.getConnectionDiagnostics(),
+      connection: await this.getConnectionDiagnostics(),
       consecutiveFailures: this.consecutiveFailures,
       config: {
         statusStaleMs: this.config.statusStaleMs,

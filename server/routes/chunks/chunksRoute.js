@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Chunks");
 import { sanitizeError } from "../../utils/sanitize.js";
@@ -8,6 +7,7 @@ import { hasB42IndicatorFiles } from "./geometry.js";
 import { getZomboidDataPath, resolveSavesPath, resolveCustomOrDefaultDataPath } from "./savePaths.js";
 import { createScanState, scanMapDirectory } from "./chunkScanner.js";
 import { scanB41RootFallback, scanChunkDataFolder } from "./chunkScanFallbacks.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
@@ -27,6 +27,7 @@ function makeProgressEmitter(req, scanId) {
 // Get chunk data for a specific save
 router.get("/chunks/:saveName", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { saveName } = req.params;
     const customPath = req.query.customPath
       ? String(req.query.customPath)
@@ -47,7 +48,7 @@ router.get("/chunks/:saveName", async (req, res) => {
 
     let zomboidDataPath;
     if (customPath) {
-      zomboidDataPath = resolveCustomOrDefaultDataPath(String(customPath));
+      zomboidDataPath = await resolveCustomOrDefaultDataPath(String(customPath));
     } else {
       zomboidDataPath = await getZomboidDataPath();
     }
@@ -57,7 +58,7 @@ router.get("/chunks/:saveName", async (req, res) => {
     }
 
     // Resolve the saves path the same way as /saves
-    let savesPath = resolveSavesPath(zomboidDataPath);
+    let savesPath = await resolveSavesPath(zomboidDataPath);
 
     const savePath = path.join(savesPath, sanitizedSaveName);
     const mapPath = path.join(savePath, "map");
@@ -66,7 +67,7 @@ router.get("/chunks/:saveName", async (req, res) => {
       `[ChunkCleaner] Loading chunks for "${sanitizedSaveName}" from: ${mapPath}`,
     );
 
-    if (!fs.existsSync(savePath)) {
+    if (!(await fileAccess.exists(savePath))) {
       log.warn(`[ChunkCleaner] Save directory not found: ${savePath}`);
       return res.json({ chunks: [], bounds: null });
     }
@@ -79,7 +80,7 @@ router.get("/chunks/:saveName", async (req, res) => {
     // Secondary B42 detection: if map/ is empty (no subdirs, no flat files),
     // check for B42-specific files in the save root. B42 saves have files like
     // WorldDictionary.bin, global_mod_data.bin, entity_data.bin that B41 doesn't.
-    if (!isB42 && state.chunks.length === 0 && hasB42IndicatorFiles(savePath)) {
+    if (!isB42 && state.chunks.length === 0 && (await hasB42IndicatorFiles(savePath))) {
       isB42 = true;
       log.info(
         `[ChunkCleaner] Detected B42 save via indicator files (map/ is empty)`,

@@ -1,11 +1,11 @@
 import express from "express";
-import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
 import { getServerConfigPath, getServerName, createBackup } from "./context.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 import { escapeLuaString } from "./luaEscape.js";
 
 const router = express.Router();
@@ -68,17 +68,21 @@ function toSpawnRegions(regions, serverName) {
 // Get spawn regions
 router.get("/spawnregions", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_spawnregions.lua`);
 
-    if (!fs.existsSync(filePath)) {
+    if (!(await fileAccess.exists(filePath))) {
       return res
         .status(404)
         .json({ error: "Spawn regions file not found", path: filePath });
     }
 
-    const content = fs.readFileSync(filePath, "utf-8");
+    const { success, data: content, error } = await fileAccess.readFile(filePath);
+    if (!success) {
+      return res.status(500).json({ error: sanitizeError(error) });
+    }
     const regions = parseSpawnRegions(content);
 
     res.json({ spawnregions: regions, path: filePath });
@@ -91,6 +95,7 @@ router.get("/spawnregions", async (req, res) => {
 // Save spawn regions
 router.put("/spawnregions", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_spawnregions.lua`);
@@ -101,7 +106,7 @@ router.put("/spawnregions", async (req, res) => {
     }
 
     await withFileLock(filePath, async () => {
-      if (fs.existsSync(filePath)) {
+      if (await fileAccess.exists(filePath)) {
         await createBackup(`${serverName}_spawnregions.lua`);
       }
 

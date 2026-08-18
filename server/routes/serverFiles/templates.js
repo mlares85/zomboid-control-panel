@@ -6,6 +6,7 @@ const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { getServerConfigPath, getServerName } from "./context.js";
 import { parseIni } from "./ini.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
@@ -16,10 +17,10 @@ export async function getTemplatesPath() {
 }
 
 // Ensure templates directory exists
-async function ensureTemplatesDir() {
+async function ensureTemplatesDir(fileAccess) {
   const templatesPath = await getTemplatesPath();
-  if (!fs.existsSync(templatesPath)) {
-    fs.mkdirSync(templatesPath, { recursive: true });
+  if (!(await fileAccess.exists(templatesPath))) {
+    await fileAccess.mkdir(templatesPath, { recursive: true });
   }
   return templatesPath;
 }
@@ -27,31 +28,40 @@ async function ensureTemplatesDir() {
 // GET /templates - List all saved templates
 router.get("/templates", async (req, res) => {
   try {
-    const templatesPath = await ensureTemplatesDir();
+    const fileAccess = new LocalFiles();
+    const templatesPath = await ensureTemplatesDir(fileAccess);
 
-    const files = fs
-      .readdirSync(templatesPath)
-      .filter((f) => f.endsWith(".json"))
-      .map((f) => {
-        try {
-          const filePath = path.join(templatesPath, f);
-          const stats = fs.statSync(filePath);
-          const content = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-          return {
-            id: f.replace(".json", ""),
-            name: content.name || f.replace(".json", ""),
-            description: content.description || "",
-            type: content.type || "both", // 'ini', 'sandbox', or 'both'
-            created: content.created || stats.birthtime.toISOString(),
-            modified: stats.mtime.toISOString(),
-            hasIni: !!content.ini,
-            hasSandbox: !!content.sandbox,
-          };
-        } catch (e) {
-          log.debug(`Template read failed for ${f}: ${e.message}`);
-          return null;
-        }
-      })
+    const entries = await fileAccess.readdir(templatesPath);
+    const files = (
+      await Promise.all(
+        entries
+          .filter((f) => f.endsWith(".json"))
+          .map(async (f) => {
+            try {
+              const filePath = path.join(templatesPath, f);
+              // stat() has no birthtime, so fall back to raw fs for the
+              // filesystem-provided created/modified timestamps.
+              const stats = fs.statSync(filePath);
+              const { success, data, error } = await fileAccess.readFile(filePath);
+              if (!success) throw new Error(error);
+              const content = JSON.parse(data);
+              return {
+                id: f.replace(".json", ""),
+                name: content.name || f.replace(".json", ""),
+                description: content.description || "",
+                type: content.type || "both", // 'ini', 'sandbox', or 'both'
+                created: content.created || stats.birthtime.toISOString(),
+                modified: stats.mtime.toISOString(),
+                hasIni: !!content.ini,
+                hasSandbox: !!content.sandbox,
+              };
+            } catch (e) {
+              log.debug(`Template read failed for ${f}: ${e.message}`);
+              return null;
+            }
+          }),
+      )
+    )
       .filter(Boolean)
       .sort((a, b) => new Date(b.modified) - new Date(a.modified));
 
@@ -65,6 +75,7 @@ router.get("/templates", async (req, res) => {
 // GET /templates/:id - Get a specific template
 router.get("/templates/:id", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     // Sanitize template ID to prevent path traversal
     const safeId = path.basename(req.params.id).replace(/[^a-z0-9_-]/gi, "");
     if (!safeId || safeId !== req.params.id) {
@@ -74,11 +85,15 @@ router.get("/templates/:id", async (req, res) => {
     const templatesPath = await getTemplatesPath();
     const templateFile = path.join(templatesPath, `${safeId}.json`);
 
-    if (!fs.existsSync(templateFile)) {
+    if (!(await fileAccess.exists(templateFile))) {
       return res.status(404).json({ error: "Template not found" });
     }
 
-    const content = JSON.parse(fs.readFileSync(templateFile, "utf-8"));
+    const { success, data, error } = await fileAccess.readFile(templateFile);
+    if (!success) {
+      return res.status(500).json({ error: sanitizeError(error) });
+    }
+    const content = JSON.parse(data);
     res.json(content);
   } catch (error) {
     log.error("Failed to get template:", error);
@@ -90,6 +105,7 @@ router.get("/templates/:id", async (req, res) => {
 router.post("/templates", async (req, res) => {
   log.info("POST /templates (create)");
   try {
+    const fileAccess = new LocalFiles();
     const {
       name,
       description,
@@ -101,7 +117,7 @@ router.post("/templates", async (req, res) => {
       return res.status(400).json({ error: "Template name is required" });
     }
 
-    const templatesPath = await ensureTemplatesDir();
+    const templatesPath = await ensureTemplatesDir(fileAccess);
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
 
@@ -112,7 +128,7 @@ router.post("/templates", async (req, res) => {
       .substring(0, 50);
     let safeId = baseId;
     let counter = 1;
-    while (fs.existsSync(path.join(templatesPath, `${safeId}.json`))) {
+    while (await fileAccess.exists(path.join(templatesPath, `${safeId}.json`))) {
       safeId = `${baseId}_${counter++}`;
       if (counter > 100) {
         return res
@@ -134,8 +150,9 @@ router.post("/templates", async (req, res) => {
     // Read current INI settings
     if (includeIni) {
       const iniPath = path.join(configPath, `${serverName}.ini`);
-      if (fs.existsSync(iniPath)) {
-        const iniContent = fs.readFileSync(iniPath, "utf-8");
+      if (await fileAccess.exists(iniPath)) {
+        const { success, data: iniContent, error } = await fileAccess.readFile(iniPath);
+        if (!success) throw new Error(error);
         template.ini = parseIni(iniContent);
         template.iniRaw = iniContent;
       }
@@ -147,12 +164,20 @@ router.post("/templates", async (req, res) => {
         configPath,
         `${serverName}_SandboxVars.lua`,
       );
-      if (fs.existsSync(sandboxPath)) {
-        template.sandboxRaw = fs.readFileSync(sandboxPath, "utf-8");
+      if (await fileAccess.exists(sandboxPath)) {
+        const { success, data, error } = await fileAccess.readFile(sandboxPath);
+        if (!success) throw new Error(error);
+        template.sandboxRaw = data;
       }
     }
 
-    fs.writeFileSync(templateFile, JSON.stringify(template, null, 2));
+    const writeResult = await fileAccess.writeFile(
+      templateFile,
+      JSON.stringify(template, null, 2),
+    );
+    if (!writeResult.success) {
+      throw new Error(writeResult.error);
+    }
     log.info(`Created template: ${name} (${safeId})`);
 
     res.json({

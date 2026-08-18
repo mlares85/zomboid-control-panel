@@ -17,7 +17,7 @@ const router = express.Router();
 
 // Get bridge status
 router.get("/status", async (req, res) => {
-  const status = bridge.getStatus();
+  const status = await bridge.getStatus();
 
   // Also include detected paths from active server
   let detectedPaths = null;
@@ -44,9 +44,9 @@ router.get("/status", async (req, res) => {
 });
 
 // Start the bridge polling
-router.post("/start", (req, res) => {
+router.post("/start", async (req, res) => {
   try {
-    bridge.start();
+    await bridge.start();
     res.json({ success: true, message: "Bridge started" });
   } catch (error) {
     res.status(500).json({ error: sanitizeError(error.message) });
@@ -68,7 +68,7 @@ router.post("/stop", async (req, res) => {
 router.get("/scan-paths", async (req, res) => {
   try {
     const activeServer = await getActiveServer();
-    const { foundBridges, scannedDirs } = scanKnownBridgeLocations({
+    const { foundBridges, scannedDirs } = await scanKnownBridgeLocations({
       activeServer,
       currentBridgePath: bridge.bridgePath,
     });
@@ -86,14 +86,14 @@ router.get("/scan-paths", async (req, res) => {
 });
 
 // Force refresh - restart bridge with fresh state
-router.post("/refresh", (req, res) => {
+router.post("/refresh", async (req, res) => {
   try {
     if (bridge.isRunning) {
       bridge.stop(); // stop() already resets all internal state
     }
 
     if (bridge.bridgePath) {
-      bridge.start();
+      await bridge.start();
       res.json({
         success: true,
         message: "Bridge refreshed",

@@ -5,6 +5,7 @@ import { createLogger } from "../../utils/logger.js";
 import { sanitizeError } from "../../utils/sanitize.js";
 import { resolveZomboidDataPath } from "./consoleShared.js";
 import { filterConsoleLogLines } from "./consoleFilters.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Server");
 
@@ -17,6 +18,7 @@ function registerConsoleStreamRoute(router) {
   // Stream server console log (long-polling for new content)
   router.get("/console-log/stream", async (req, res) => {
     try {
+      const fileAccess = new LocalFiles();
       const zomboidDataPath = await resolveZomboidDataPath();
 
       if (!zomboidDataPath) {
@@ -29,7 +31,7 @@ function registerConsoleStreamRoute(router) {
 
       const consoleLogPath = path.join(zomboidDataPath, "server-console.txt");
 
-      if (!fs.existsSync(consoleLogPath)) {
+      if (!(await fileAccess.exists(consoleLogPath))) {
         return res.json({ success: true, newLines: [], exists: false });
       }
 
@@ -38,11 +40,12 @@ function registerConsoleStreamRoute(router) {
 
       // Get the last known position from client
       const lastSize = Math.max(0, parseInt(req.query.lastSize, 10) || 0);
-      const stats = fs.statSync(consoleLogPath);
+      const stats = await fileAccess.stat(consoleLogPath);
 
       // If file is smaller than last known size, it was likely rotated/cleared
       if (stats.size < lastSize) {
-        const content = fs.readFileSync(consoleLogPath, "utf-8");
+        const readResult = await fileAccess.readFile(consoleLogPath);
+        const content = readResult.success ? readResult.data : "";
         const allLines = content.split("\n").filter((l) => l.trim());
         const lines = filterConsoleLogLines(allLines, filterLevel);
         return res.json({
@@ -51,7 +54,7 @@ function registerConsoleStreamRoute(router) {
           currentSize: stats.size,
           rotated: true,
           filterLevel,
-          lastModified: stats.mtime.toISOString(),
+          lastModified: new Date(stats.mtimeMs).toISOString(),
         });
       }
 
@@ -62,11 +65,12 @@ function registerConsoleStreamRoute(router) {
           newLines: [],
           currentSize: stats.size,
           filterLevel,
-          lastModified: stats.mtime.toISOString(),
+          lastModified: new Date(stats.mtimeMs).toISOString(),
         });
       }
 
-      // Read only new content from the last known position
+      // Read only new content from the last known position (fd-based partial
+      // read — left on direct fs, see console.js).
       const fd = fs.openSync(consoleLogPath, "r");
       const newBytes = stats.size - lastSize;
       const buffer = Buffer.alloc(newBytes);
@@ -89,7 +93,7 @@ function registerConsoleStreamRoute(router) {
         newLines,
         currentSize: stats.size,
         filterLevel,
-        lastModified: stats.mtime.toISOString(),
+        lastModified: new Date(stats.mtimeMs).toISOString(),
       });
     } catch (error) {
       log.error(`Failed to stream server console log: ${error.message}`);
@@ -102,6 +106,7 @@ function registerConsoleClearRoute(router) {
   // Clear server console log
   router.post("/console-log/clear", async (req, res) => {
     try {
+      const fileAccess = new LocalFiles();
       const zomboidDataPath = await resolveZomboidDataPath();
 
       if (!zomboidDataPath) {
@@ -114,8 +119,8 @@ function registerConsoleClearRoute(router) {
 
       const consoleLogPath = path.join(zomboidDataPath, "server-console.txt");
 
-      if (fs.existsSync(consoleLogPath)) {
-        fs.writeFileSync(consoleLogPath, "");
+      if (await fileAccess.exists(consoleLogPath)) {
+        await fileAccess.writeFile(consoleLogPath, "");
         log.info("Server console log cleared");
       }
 

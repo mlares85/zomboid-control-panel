@@ -1,11 +1,11 @@
 // Server .ini configuration writes (RCON, network) and update-checker status.
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../utils/logger.js";
 import { setSetting, getSetting, getActiveServer } from "../../database/init.js";
 import { sanitizeError, sanitizeIniValue } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
 import { validateInt } from "./shared.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Server");
 
@@ -38,6 +38,7 @@ function registerConfigureRconRoute(router) {
   // Configure RCON in server's .ini file
   router.post("/configure-rcon", async (req, res) => {
     try {
+      const fileAccess = new LocalFiles();
       const { rconPassword, rconPort: rawRconPort = 27015 } = req.body;
       const rconPort = validateInt(rawRconPort, 1024, 65535, 27015);
 
@@ -57,7 +58,7 @@ function registerConfigureRconRoute(router) {
 
       const iniPath = path.join(serverConfigPath, `${serverName}.ini`);
 
-      if (!fs.existsSync(iniPath)) {
+      if (!(await fileAccess.exists(iniPath))) {
         return res.status(400).json({
           error: `Server config not found at ${iniPath}. Start the server once first to generate the config file.`,
         });
@@ -66,7 +67,11 @@ function registerConfigureRconRoute(router) {
       // Read and update the ini file. Locked per-path so this can't interleave
       // with ensureRconConfigured() or another config-save racing the same file.
       await withFileLock(iniPath, async () => {
-        let content = fs.readFileSync(iniPath, "utf-8").replace(/\r\n/g, "\n");
+        const readResult = await fileAccess.readFile(iniPath);
+        if (!readResult.success) {
+          throw new Error(readResult.error);
+        }
+        let content = readResult.data.replace(/\r\n/g, "\n");
 
         // Update RCONPassword (sanitize to prevent INI injection via newlines)
         const safePassword = sanitizeIniValue(rconPassword);
@@ -111,6 +116,7 @@ function registerConfigureNetworkRoute(router) {
   // Configure server network settings (port, UPnP) in .ini file
   router.post("/configure-network", async (req, res) => {
     try {
+      const fileAccess = new LocalFiles();
       const { serverPort: rawServerPort = 16261, useUpnp = true } = req.body;
       const serverPort = validateInt(rawServerPort, 1024, 65535, 16261);
 
@@ -126,7 +132,7 @@ function registerConfigureNetworkRoute(router) {
 
       const iniPath = path.join(serverConfigPath, `${serverName}.ini`);
 
-      if (!fs.existsSync(iniPath)) {
+      if (!(await fileAccess.exists(iniPath))) {
         return res.status(400).json({
           error: `Server config not found at ${iniPath}. Start the server once first to generate the config file.`,
         });
@@ -135,7 +141,11 @@ function registerConfigureNetworkRoute(router) {
       // Read and update the ini file. Locked per-path for the same reason as
       // the RCON-config endpoint above.
       await withFileLock(iniPath, async () => {
-        let content = fs.readFileSync(iniPath, "utf-8").replace(/\r\n/g, "\n");
+        const readResult = await fileAccess.readFile(iniPath);
+        if (!readResult.success) {
+          throw new Error(readResult.error);
+        }
+        let content = readResult.data.replace(/\r\n/g, "\n");
 
         // Update DefaultPort
         if (content.includes("DefaultPort=")) {

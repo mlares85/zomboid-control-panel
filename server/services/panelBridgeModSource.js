@@ -6,7 +6,6 @@
  * previously duplicated this exact lookup.
  */
 
-import fs from "fs";
 import path from "path";
 import {
   getEmbeddedPanelBridgeLua,
@@ -14,17 +13,21 @@ import {
   writeLuaAtomic,
 } from "../utils/embeddedLua.js";
 import { createLogger } from "../utils/logger.js";
+import { LocalFiles } from "./fileAccess/index.js";
 
 const log = createLogger("Services:PanelBridgeModSource");
 
-export function resolveModLuaSource(candidateDirs) {
+export async function resolveModLuaSource(candidateDirs, { fileAccess } = {}) {
   const embedded = getEmbeddedPanelBridgeLua();
   if (embedded) return { content: embedded, source: "embedded" };
 
+  const fa = fileAccess || new LocalFiles();
   for (const dir of candidateDirs) {
     const candidate = path.join(dir, "media", "lua", "server", "PanelBridge.lua");
-    if (fs.existsSync(candidate)) {
-      return { content: fs.readFileSync(candidate, "utf8"), source: candidate };
+    if (await fa.exists(candidate)) {
+      const read = await fa.readFile(candidate, "utf8");
+      if (read.success) return { content: read.data, source: candidate };
+      log.debug(`Could not read ${candidate}: ${read.error}`);
     }
   }
   return { content: null, source: null };
@@ -52,7 +55,8 @@ export function modCandidateDirsDirnameFirst(dirname) {
 // Auto-install or version-upgrade PanelBridge.lua into a target server's
 // media/lua/server/ folder. Used by POST /auto-configure right after the
 // bridge path is (re)configured.
-export async function installOrUpdateMod(targetServer, candidateDirs) {
+export async function installOrUpdateMod(targetServer, candidateDirs, { fileAccess } = {}) {
+  const fa = fileAccess || new LocalFiles();
   let modInstalled = false;
   let modUpdated = false;
   try {
@@ -67,10 +71,10 @@ export async function installOrUpdateMod(targetServer, candidateDirs) {
         : serverInstallDir;
     const destLuaFile = path.join(installDir, "media", "lua", "server", "PanelBridge.lua");
 
-    const { content: srcContent } = resolveModLuaSource(candidateDirs);
+    const { content: srcContent } = await resolveModLuaSource(candidateDirs, { fileAccess: fa });
     if (!srcContent) return { modInstalled, modUpdated };
 
-    let needsCopy = !fs.existsSync(destLuaFile);
+    let needsCopy = !await fa.exists(destLuaFile);
 
     // If dest exists, compare VERSION strings and only upgrade if
     // embedded is strictly newer (avoids silent downgrade of hand-
@@ -78,7 +82,8 @@ export async function installOrUpdateMod(targetServer, candidateDirs) {
     if (!needsCopy) {
       modInstalled = true;
       try {
-        const destContent = fs.readFileSync(destLuaFile, "utf8");
+        const read = await fa.readFile(destLuaFile, "utf8");
+        const destContent = read.success ? read.data : "";
         const srcVersion = (srcContent.match(/VERSION\s*=\s*"([^"]+)"/) || [])[1];
         const destVersion = (destContent.match(/VERSION\s*=\s*"([^"]+)"/) || [])[1];
         if (srcVersion && destVersion && compareModVersions(srcVersion, destVersion) > 0) {

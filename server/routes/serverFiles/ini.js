@@ -1,11 +1,11 @@
 import express from "express";
-import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
 import { getServerConfigPath, getServerName, createBackup } from "./context.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
@@ -99,15 +99,19 @@ export function toIni(obj, originalContent = "") {
 // Get INI file (parsed)
 router.get("/ini", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}.ini`);
 
-    if (!fs.existsSync(filePath)) {
+    if (!(await fileAccess.exists(filePath))) {
       return res.status(404).json({ error: "INI file not found" });
     }
 
-    const content = fs.readFileSync(filePath, "utf-8");
+    const { success, data: content, error } = await fileAccess.readFile(filePath);
+    if (!success) {
+      return res.status(500).json({ error: sanitizeError(error) });
+    }
     const parsed = parseIni(content);
 
     res.json({ settings: parsed });
@@ -120,6 +124,7 @@ router.get("/ini", async (req, res) => {
 // Save INI file
 router.put("/ini", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     log.info(
@@ -145,8 +150,12 @@ router.put("/ini", async (req, res) => {
     // overlapping PUTs to the same INI can't interleave their read-modify-write.
     await withFileLock(filePath, async () => {
       let originalContent = "";
-      if (fs.existsSync(filePath)) {
-        originalContent = fs.readFileSync(filePath, "utf-8");
+      if (await fileAccess.exists(filePath)) {
+        const readResult = await fileAccess.readFile(filePath);
+        if (!readResult.success) {
+          throw new Error(readResult.error);
+        }
+        originalContent = readResult.data;
         await createBackup(`${serverName}.ini`);
       }
 

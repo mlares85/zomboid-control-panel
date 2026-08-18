@@ -1,7 +1,9 @@
-import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Chunks");
+import { LocalFiles } from "../../services/fileAccess/index.js";
+
+const fileAccess = new LocalFiles();
 
 // Find all chunk files whose coordinates fall inside (or, if `invert`,
 // outside) the given region. Handles the B42 map/{X}/{Y}.bin layout, the
@@ -9,14 +11,14 @@ const log = createLogger("API:Chunks");
 // of matching chunks plus whether the save uses the B42 layout (needed by
 // the caller for cell-aux cleanup and vehicle tile-size math).
 export async function findChunksInRegion(savePath, mapPath, region) {
-  const mapExists = fs.existsSync(mapPath);
+  const mapExists = await fileAccess.exists(mapPath);
   const chunksToDelete = [];
   let mapContents = [];
   let xDirs = [];
 
   if (mapExists) {
-    mapContents = await fs.promises.readdir(mapPath, { withFileTypes: true });
-    xDirs = mapContents.filter((d) => d.isDirectory() && /^\d+$/.test(d.name));
+    mapContents = await fileAccess.readdir(mapPath, { withFileTypes: true });
+    xDirs = mapContents.filter((d) => d.isDirectory && /^\d+$/.test(d.name));
   }
 
   if (xDirs.length > 0) {
@@ -43,7 +45,7 @@ async function scanB42RegionDirs(mapPath, xDirs, region, chunksToDelete) {
       const xPath = path.join(mapPath, xDir.name);
 
       try {
-        const yFiles = await fs.promises.readdir(xPath);
+        const yFiles = await fileAccess.readdir(xPath);
         const binFiles = yFiles.filter((f) => f.endsWith(".bin"));
 
         for (const yFile of binFiles) {
@@ -70,7 +72,7 @@ function scanLegacyRegionFiles(mapContents, region, chunksToDelete) {
   const { minX, maxX, minY, maxY, invert } = region;
   // Legacy flat file structure in map/ directory
   const files = mapContents
-    .filter((f) => f.isFile() && f.name.endsWith(".bin"))
+    .filter((f) => f.isFile && f.name.endsWith(".bin"))
     .map((f) => f.name);
 
   for (const file of files) {
@@ -95,11 +97,11 @@ async function scanRootRegionFallback(savePath, region, chunksToDelete) {
   const { minX, maxX, minY, maxY, invert } = region;
   // B41 save-root fallback: check for map_X_Y.bin in save root
   const B41_CHUNK_REGEX = /^map_(\d+)_(\d+)\.bin$/i;
-  const rootEntries = await fs.promises.readdir(savePath, {
+  const rootEntries = await fileAccess.readdir(savePath, {
     withFileTypes: true,
   });
   const rootBinFiles = rootEntries.filter(
-    (f) => f.isFile() && B41_CHUNK_REGEX.test(f.name),
+    (f) => f.isFile && B41_CHUNK_REGEX.test(f.name),
   );
 
   for (const entry of rootBinFiles) {

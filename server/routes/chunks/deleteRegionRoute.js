@@ -1,5 +1,4 @@
 import express from "express";
-import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Chunks");
@@ -12,6 +11,7 @@ import { cleanupEmptyCellFiles } from "./cellCleanup.js";
 import { checkServerNotRunning } from "./serverRunningGuard.js";
 import { buildRegionDeletionBoxes } from "./vehicleCleanup.js";
 import { findChunksInRegion } from "./regionChunkFinder.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
@@ -47,13 +47,14 @@ async function backupRegionChunks(
   mapPath,
   chunksToDelete,
   region,
+  fileAccess,
 ) {
   const backupPath = path.join(
     zomboidDataPath,
     "backups",
     `${sanitizedSaveName}_region_${Date.now()}`,
   );
-  await fs.promises.mkdir(backupPath, { recursive: true });
+  await fileAccess.mkdir(backupPath, { recursive: true });
 
   // Parallel backup
   await Promise.all(
@@ -62,20 +63,14 @@ async function backupRegionChunks(
         chunk.source === "saveroot"
           ? path.join(savePath, chunk.file)
           : path.join(mapPath, chunk.file);
-      try {
-        const backupName = `map_${chunk.file.replace(/[/\\]/g, "_")}`;
-        await fs.promises.copyFile(
-          srcFile,
-          path.join(backupPath, backupName),
-        );
-      } catch (e) {
-        // Ignore missing files or errors
-      }
+      const backupName = `map_${chunk.file.replace(/[/\\]/g, "_")}`;
+      // Ignore missing files or errors — best-effort backup.
+      await fileAccess.copyFile(srcFile, path.join(backupPath, backupName));
     }),
   );
 
   // Save region info
-  await fs.promises.writeFile(
+  await fileAccess.writeFile(
     path.join(backupPath, "region_info.json"),
     JSON.stringify(
       { ...region, chunksDeleted: chunksToDelete.length },
@@ -88,25 +83,24 @@ async function backupRegionChunks(
   return backupPath;
 }
 
-async function deleteRegionChunkFiles(savePath, mapPath, chunksToDelete, regionCellDiv) {
+async function deleteRegionChunkFiles(savePath, mapPath, chunksToDelete, regionCellDiv, fileAccess) {
   let deleted = 0;
   const touchedCells = new Set();
 
   await Promise.all(
     chunksToDelete.map(async (chunk) => {
-      try {
-        const chunkFile =
-          chunk.source === "saveroot"
-            ? path.join(savePath, chunk.file)
-            : path.join(mapPath, chunk.file);
-        await fs.promises.unlink(chunkFile);
+      const chunkFile =
+        chunk.source === "saveroot"
+          ? path.join(savePath, chunk.file)
+          : path.join(mapPath, chunk.file);
+      const result = await fileAccess.unlink(chunkFile);
+      if (result.success) {
         deleted++;
         touchedCells.add(
           `${Math.floor(chunk.x / regionCellDiv)},${Math.floor(chunk.y / regionCellDiv)}`,
         );
-      } catch (err) {
-        if (err.code !== "ENOENT")
-          log.warn(`Failed to delete chunk ${chunk.file}: ${err.message}`);
+      } else if (!result.error.includes("ENOENT")) {
+        log.warn(`Failed to delete chunk ${chunk.file}: ${result.error}`);
       }
     }),
   );
@@ -114,7 +108,7 @@ async function deleteRegionChunkFiles(savePath, mapPath, chunksToDelete, regionC
   return { deleted, touchedCells };
 }
 
-async function cleanupEmptyRegionMapDirs(mapPath, chunksToDelete) {
+async function cleanupEmptyRegionMapDirs(mapPath, chunksToDelete, fileAccess) {
   const deletedXDirs = new Set();
   for (const chunk of chunksToDelete) {
     const parts = chunk.file.split("/");
@@ -123,8 +117,10 @@ async function cleanupEmptyRegionMapDirs(mapPath, chunksToDelete) {
   for (const xDir of deletedXDirs) {
     try {
       const xDirPath = path.join(mapPath, xDir);
-      const remaining = await fs.promises.readdir(xDirPath);
-      if (remaining.length === 0) await fs.promises.rmdir(xDirPath);
+      const remaining = await fileAccess.readdir(xDirPath);
+      if (remaining.length === 0) {
+        await fileAccess.rm(xDirPath, { recursive: true });
+      }
     } catch (e) {
       if (e.code !== "ENOENT")
         log.debug(`Failed to clean up empty dir ${xDir}: ${e.message}`);
@@ -135,6 +131,7 @@ async function cleanupEmptyRegionMapDirs(mapPath, chunksToDelete) {
 // Delete chunks by region (x/y coordinate range)
 router.post("/delete-region", requireRole("admin"), async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const {
       saveName,
       minX,
@@ -176,17 +173,17 @@ router.post("/delete-region", requireRole("admin"), async (req, res) => {
     if (!validateRegionBounds(minX, maxX, minY, maxY, res)) return;
 
     const zomboidDataPath = customPath
-      ? resolveCustomOrDefaultDataPath(String(customPath))
+      ? await resolveCustomOrDefaultDataPath(String(customPath))
       : await getZomboidDataPath();
     if (!zomboidDataPath) {
       return res.status(400).json({ error: "Zomboid data path not set" });
     }
 
-    const savesPath = resolveSavesPath(zomboidDataPath);
+    const savesPath = await resolveSavesPath(zomboidDataPath);
     const savePath = path.join(savesPath, sanitizedSaveName);
     const mapPath = path.join(savePath, "map");
 
-    if (!fs.existsSync(savePath)) {
+    if (!(await fileAccess.exists(savePath))) {
       return res.status(404).json({ error: "Save not found" });
     }
 
@@ -221,6 +218,7 @@ router.post("/delete-region", requireRole("admin"), async (req, res) => {
         mapPath,
         chunksToDelete,
         { minX, maxX, minY, maxY, invert },
+        fileAccess,
       );
     }
 
@@ -231,6 +229,7 @@ router.post("/delete-region", requireRole("admin"), async (req, res) => {
       mapPath,
       chunksToDelete,
       regionCellDiv,
+      fileAccess,
     );
 
     // Per-cell aux cleanup — only for cells that are now fully empty on disk.
@@ -242,7 +241,7 @@ router.post("/delete-region", requireRole("admin"), async (req, res) => {
     );
 
     // Clean up empty X directories after B42 chunk deletion
-    await cleanupEmptyRegionMapDirs(mapPath, chunksToDelete);
+    await cleanupEmptyRegionMapDirs(mapPath, chunksToDelete, fileAccess);
 
     // Vehicles.db cleanup (optional, destructive).
     // Backup lives inside the chunk backup folder (if one was made) so a

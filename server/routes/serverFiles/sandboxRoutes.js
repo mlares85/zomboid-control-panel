@@ -1,11 +1,11 @@
 import express from "express";
-import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
 import { getServerConfigPath, getServerName, createBackup } from "./context.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 import { parseSandboxVars, modifySandboxValue } from "./sandboxParse.js";
 import {
   checkSandboxBraceBalance,
@@ -19,15 +19,19 @@ const router = express.Router();
 // Get SandboxVars (parsed)
 router.get("/sandbox", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_SandboxVars.lua`);
 
-    if (!fs.existsSync(filePath)) {
+    if (!(await fileAccess.exists(filePath))) {
       return res.status(404).json({ error: "SandboxVars file not found" });
     }
 
-    const content = fs.readFileSync(filePath, "utf-8");
+    const { success, data: content, error } = await fileAccess.readFile(filePath);
+    if (!success) {
+      return res.status(500).json({ error: sanitizeError(error) });
+    }
     const parsed = parseSandboxVars(content);
 
     res.json({ sandbox: parsed });
@@ -41,6 +45,7 @@ router.get("/sandbox", async (req, res) => {
 router.put("/sandbox", async (req, res) => {
   try {
     log.info("PUT /sandbox");
+    const fileAccess = new LocalFiles();
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_SandboxVars.lua`);
@@ -85,10 +90,17 @@ router.put("/sandbox", async (req, res) => {
     // values so the editor works before the game's first boot.
     let fileExists;
     await withFileLock(filePath, async () => {
-      fileExists = fs.existsSync(filePath);
-      const newContent = fileExists
-        ? applySandboxChanges(fs.readFileSync(filePath, "utf-8"), sandbox)
-        : createSandboxVars(sandbox);
+      fileExists = await fileAccess.exists(filePath);
+      let newContent;
+      if (fileExists) {
+        const readResult = await fileAccess.readFile(filePath);
+        if (!readResult.success) {
+          throw new Error(readResult.error);
+        }
+        newContent = applySandboxChanges(readResult.data, sandbox);
+      } else {
+        newContent = createSandboxVars(sandbox);
+      }
       if (fileExists) {
         await createBackup(`${serverName}_SandboxVars.lua`);
       }
@@ -113,6 +125,7 @@ router.put("/sandbox", async (req, res) => {
 // since PZ regenerates those from the mod's own defaults.
 router.put("/sandbox-option", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { name, value } = req.body || {};
 
     if (typeof name !== "string" || !name) {
@@ -134,7 +147,7 @@ router.put("/sandbox-option", async (req, res) => {
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_SandboxVars.lua`);
 
-    if (!fs.existsSync(filePath)) {
+    if (!(await fileAccess.exists(filePath))) {
       return res.status(404).json({
         error:
           "SandboxVars file not found. Start the server once to generate it.",
@@ -143,7 +156,11 @@ router.put("/sandbox-option", async (req, res) => {
 
     let persisted = false;
     await withFileLock(filePath, async () => {
-      const originalContent = fs.readFileSync(filePath, "utf-8");
+      const readResult = await fileAccess.readFile(filePath);
+      if (!readResult.success) {
+        throw new Error(readResult.error);
+      }
+      const originalContent = readResult.data;
       const newContent = modifySandboxValue(originalContent, key, value, block);
       if (newContent === originalContent) return;
       await createBackup(`${serverName}_SandboxVars.lua`);
@@ -164,15 +181,19 @@ router.put("/sandbox-option", async (req, res) => {
 // cause of "server won't boot, no obvious reason" reports.
 router.get("/sandbox/validate", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_SandboxVars.lua`);
 
-    if (!fs.existsSync(filePath)) {
+    if (!(await fileAccess.exists(filePath))) {
       return res.status(404).json({ error: "SandboxVars file not found" });
     }
 
-    const content = fs.readFileSync(filePath, "utf-8");
+    const { success, data: content, error } = await fileAccess.readFile(filePath);
+    if (!success) {
+      return res.status(500).json({ error: sanitizeError(error) });
+    }
     const { balanced, depth } = checkSandboxBraceBalance(content);
     res.json({ valid: balanced, braceDepth: depth });
   } catch (error) {
@@ -188,16 +209,21 @@ router.get("/sandbox/validate", async (req, res) => {
 router.post("/sandbox/repair", async (req, res) => {
   try {
     log.info("POST /sandbox/repair");
+    const fileAccess = new LocalFiles();
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
     const filePath = path.join(configPath, `${serverName}_SandboxVars.lua`);
 
-    if (!fs.existsSync(filePath)) {
+    if (!(await fileAccess.exists(filePath))) {
       return res.status(404).json({ error: "SandboxVars file not found" });
     }
 
     const result = await withFileLock(filePath, async () => {
-      const originalContent = fs.readFileSync(filePath, "utf-8");
+      const readResult = await fileAccess.readFile(filePath);
+      if (!readResult.success) {
+        throw new Error(readResult.error);
+      }
+      const originalContent = readResult.data;
       const before = checkSandboxBraceBalance(originalContent);
       if (before.balanced) {
         return { alreadyValid: true };

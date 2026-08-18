@@ -1,17 +1,18 @@
 import express from "express";
-import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Chunks");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { getZomboidDataPath, resolveSavesPath, resolveCustomOrDefaultDataPath } from "./savePaths.js";
 import { getDirSize, countFiles, formatBytes } from "./fsHelpers.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
 // Get save statistics
 router.get("/stats/:saveName", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const { saveName } = req.params;
     const customPath = req.query.customPath
       ? String(req.query.customPath)
@@ -27,7 +28,7 @@ router.get("/stats/:saveName", async (req, res) => {
     if (customPath) {
       // Validate custom path the same way /saves and /chunks do — prevents
       // arbitrary filesystem reads via the stats endpoint.
-      zomboidDataPath = resolveCustomOrDefaultDataPath(String(customPath));
+      zomboidDataPath = await resolveCustomOrDefaultDataPath(String(customPath));
     } else {
       zomboidDataPath = await getZomboidDataPath();
     }
@@ -37,11 +38,11 @@ router.get("/stats/:saveName", async (req, res) => {
     }
 
     // Resolve the saves path the same way as /saves
-    let savesPath = resolveSavesPath(zomboidDataPath);
+    let savesPath = await resolveSavesPath(zomboidDataPath);
 
     const savePath = path.join(savesPath, sanitizedSaveName);
 
-    if (!fs.existsSync(savePath)) {
+    if (!(await fileAccess.exists(savePath))) {
       return res.status(404).json({ error: "Save not found" });
     }
 
@@ -64,7 +65,7 @@ router.get("/stats/:saveName", async (req, res) => {
     for (const folder of folders) {
       const folderPath = path.join(savePath, folder);
       try {
-        if (fs.existsSync(folderPath)) {
+        if (await fileAccess.exists(folderPath)) {
           const fileCount = await countFiles(folderPath);
           const size = await getDirSize(folderPath);
           stats.folders[folder] = {
@@ -82,17 +83,17 @@ router.get("/stats/:saveName", async (req, res) => {
     if (!stats.folders.map || stats.folders.map.fileCount === 0) {
       const B41_CHUNK_REGEX = /^map_\d+_\d+\.bin$/i;
       try {
-        const rootEntries = await fs.promises.readdir(savePath, {
+        const rootEntries = await fileAccess.readdir(savePath, {
           withFileTypes: true,
         });
         const rootChunks = rootEntries.filter(
-          (f) => f.isFile() && B41_CHUNK_REGEX.test(f.name),
+          (f) => f.isFile && B41_CHUNK_REGEX.test(f.name),
         );
         if (rootChunks.length > 0) {
           let rootChunkSize = 0;
           for (const f of rootChunks) {
             try {
-              const s = await fs.promises.stat(path.join(savePath, f.name));
+              const s = await fileAccess.stat(path.join(savePath, f.name));
               rootChunkSize += s.size;
             } catch (e) {
               log.debug(`Stat failed for root chunk ${f.name}: ${e.message}`);
@@ -111,9 +112,9 @@ router.get("/stats/:saveName", async (req, res) => {
 
     // Players count
     const playersDb = path.join(savePath, "players.db");
-    if (fs.existsSync(playersDb)) {
+    if (await fileAccess.exists(playersDb)) {
       try {
-        const s = await fs.promises.stat(playersDb);
+        const s = await fileAccess.stat(playersDb);
         stats.playersDbSize = s.size;
       } catch (e) {
         log.debug(`Stat failed for players.db: ${e.message}`);
@@ -122,9 +123,9 @@ router.get("/stats/:saveName", async (req, res) => {
 
     // Vehicles db
     const vehiclesDb = path.join(savePath, "vehicles.db");
-    if (fs.existsSync(vehiclesDb)) {
+    if (await fileAccess.exists(vehiclesDb)) {
       try {
-        const s = await fs.promises.stat(vehiclesDb);
+        const s = await fileAccess.stat(vehiclesDb);
         stats.vehiclesDbSize = s.size;
       } catch (e) {
         log.debug(`Stat failed for vehicles.db: ${e.message}`);

@@ -5,6 +5,7 @@ import fs from "fs";
 import { createLogger } from "../../utils/logger.js";
 import { sanitizeError } from "../../utils/sanitize.js";
 import { isValidPath, isWindows } from "./shared.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Server");
 
@@ -56,6 +57,7 @@ function registerListDirectoryRoute(router) {
   // List directory contents for the in-app folder browser
   router.post("/list-directory", async (req, res) => {
     try {
+      const fileAccess = new LocalFiles();
       const { dirPath } = req.body;
 
       // If no path provided, return available drives (Windows) or root (Linux)
@@ -66,31 +68,29 @@ function registerListDirectoryRoute(router) {
           for (let i = 65; i <= 90; i++) {
             const letter = String.fromCharCode(i);
             const drivePath = `${letter}:\\`;
+            if (!(await fileAccess.access(drivePath, "read"))) continue;
+            let label = `Local Disk (${letter}:)`;
             try {
-              fs.accessSync(drivePath, fs.constants.R_OK);
-              let label = `Local Disk (${letter}:)`;
-              try {
-                const stats = fs.statfsSync(drivePath);
-                const totalGB = (
-                  (stats.bsize * stats.blocks) /
-                  1024 ** 3
-                ).toFixed(1);
-                const freeGB = ((stats.bsize * stats.bfree) / 1024 ** 3).toFixed(
-                  1,
-                );
-                label = `${letter}: — ${freeGB} GB free of ${totalGB} GB`;
-              } catch (e) {
-                log.debug(`Drive stat failed for ${letter}: ${e.message}`);
-              }
-              drives.push({
-                name: `${letter}:`,
-                path: drivePath,
-                label,
-                isDrive: true,
-              });
+              // Disk free-space query — OS-level, not game file access, so
+              // this stays on direct fs (not part of the FileAccess interface).
+              const stats = fs.statfsSync(drivePath);
+              const totalGB = (
+                (stats.bsize * stats.blocks) /
+                1024 ** 3
+              ).toFixed(1);
+              const freeGB = ((stats.bsize * stats.bfree) / 1024 ** 3).toFixed(
+                1,
+              );
+              label = `${letter}: — ${freeGB} GB free of ${totalGB} GB`;
             } catch (e) {
-              // Drive not accessible
+              log.debug(`Drive stat failed for ${letter}: ${e.message}`);
             }
+            drives.push({
+              name: `${letter}:`,
+              path: drivePath,
+              label,
+              isDrive: true,
+            });
           }
           return res.json({
             entries: drives,
@@ -114,19 +114,19 @@ function registerListDirectoryRoute(router) {
 
       const normalized = path.normalize(dirPath);
 
-      if (!fs.existsSync(normalized)) {
+      if (!(await fileAccess.exists(normalized))) {
         return res.status(404).json({ error: "Path does not exist" });
       }
 
-      const stat = fs.statSync(normalized);
-      if (!stat.isDirectory()) {
+      const stat = await fileAccess.stat(normalized);
+      if (!stat || !stat.isDirectory) {
         return res.status(400).json({ error: "Path is not a directory" });
       }
 
       // Read directory entries — only folders
       let items;
       try {
-        items = fs.readdirSync(normalized, { withFileTypes: true });
+        items = await fileAccess.readdir(normalized, { withFileTypes: true });
       } catch (e) {
         const code = e && typeof e === "object" && "code" in e ? e.code : "UNKNOWN";
         const guidance = isWindows
@@ -139,7 +139,7 @@ function registerListDirectoryRoute(router) {
 
       const folders = [];
       for (const item of items) {
-        if (!item.isDirectory()) continue;
+        if (!item.isDirectory) continue;
         // Skip hidden/system folders
         if (
           item.name.startsWith(".") ||

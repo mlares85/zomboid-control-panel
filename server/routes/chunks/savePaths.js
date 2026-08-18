@@ -1,4 +1,3 @@
-import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Chunks");
@@ -7,6 +6,9 @@ import {
   normalizeUserPath,
   inspectZomboidPath,
 } from "../../utils/zomboidPaths.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
+
+const fileAccess = new LocalFiles();
 
 // Helper: Get zomboidDataPath from active server or legacy settings
 export async function getZomboidDataPath() {
@@ -21,10 +23,10 @@ export async function getZomboidDataPath() {
   return normalizeUserPath(legacyPath) || null;
 }
 
-export function resolveSavesPath(zomboidDataPath) {
+export async function resolveSavesPath(zomboidDataPath) {
   let savesPath = path.join(zomboidDataPath, "Saves", "Multiplayer");
 
-  if (!fs.existsSync(savesPath)) {
+  if (!(await fileAccess.exists(savesPath))) {
     const basename = path.basename(zomboidDataPath);
     const parentDir = path.dirname(zomboidDataPath);
     const parentBase = path.basename(parentDir);
@@ -46,12 +48,12 @@ export function resolveSavesPath(zomboidDataPath) {
   return savesPath;
 }
 
-export function resolveCustomOrDefaultDataPath(customPath) {
+export async function resolveCustomOrDefaultDataPath(customPath) {
   if (!customPath) return null;
   const cleaned = normalizeUserPath(customPath);
   if (!cleaned) return null;
   const normalized = path.resolve(cleaned);
-  if (!fs.existsSync(normalized)) {
+  if (!(await fileAccess.exists(normalized))) {
     const error = new Error(
       `Custom path does not exist: ${normalized}. ` +
         `Check for typos and verify the panel has read access to this folder.`,
@@ -61,7 +63,8 @@ export function resolveCustomOrDefaultDataPath(customPath) {
     throw error;
   }
   try {
-    if (!fs.statSync(normalized).isDirectory()) {
+    const s = await fileAccess.stat(normalized);
+    if (!s || !s.isDirectory) {
       const error = new Error(`Custom path is not a directory: ${normalized}`);
       error.statusCode = 400;
       error.details = { reason: "not-a-directory", tried: normalized };

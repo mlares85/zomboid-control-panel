@@ -48,7 +48,7 @@ export function registerLifecycleRoutes(router) {
         activeServer.installPath
       ) {
         try {
-          const scripts = generateStartupScripts({
+          const scripts = await generateStartupScripts({
             installPath: activeServer.installPath,
             serverName: activeServer.serverName,
             minMemory: activeServer.minMemory || 4,

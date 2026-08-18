@@ -5,19 +5,21 @@ import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Files");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { getServerConfigPath, getBackupPath, createBackup } from "./context.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
 // List backups
 router.get("/backups", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const backupDir = await getBackupPath();
 
-    if (!fs.existsSync(backupDir)) {
+    if (!(await fileAccess.exists(backupDir))) {
       return res.json({ backups: [] });
     }
 
-    const fileList = await fs.promises.readdir(backupDir);
+    const fileList = await fileAccess.readdir(backupDir);
     const files = (
       await Promise.all(
         fileList
@@ -61,6 +63,7 @@ router.get("/backups", async (req, res) => {
 // Restore from backup
 router.post("/restore/:filename", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const backupDir = await getBackupPath();
     const configPath = await getServerConfigPath();
 
@@ -74,7 +77,7 @@ router.post("/restore/:filename", async (req, res) => {
 
     const backupPath = path.join(backupDir, filename);
 
-    if (!fs.existsSync(backupPath)) {
+    if (!(await fileAccess.exists(backupPath))) {
       return res.status(404).json({ error: "Backup not found" });
     }
 
@@ -92,11 +95,14 @@ router.post("/restore/:filename", async (req, res) => {
     const targetPath = path.join(configPath, originalName);
 
     // Create backup of current before restoring
-    if (fs.existsSync(targetPath)) {
+    if (await fileAccess.exists(targetPath)) {
       await createBackup(originalName);
     }
 
-    await fs.promises.copyFile(backupPath, targetPath);
+    const copyResult = await fileAccess.copyFile(backupPath, targetPath);
+    if (!copyResult.success) {
+      throw new Error(copyResult.error);
+    }
 
     log.info(`Restored from backup: ${filename} -> ${originalName}`);
     res.json({

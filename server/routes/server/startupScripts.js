@@ -3,11 +3,11 @@
 // (which regenerates the scripts before every /start so config changes take
 // effect).
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../utils/logger.js";
 import { writeFileAtomic } from "../../utils/fileWriteQueue.js";
 import { normalizeMemoryGb } from "../../utils/memory.js";
 import { sanitizeForBatch } from "./shared.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Server");
 
@@ -19,13 +19,13 @@ const log = createLogger("API:Server");
 // with a NoClassDefFoundError (see GitHub issue #14). Instead, scan the
 // java/ folder that SteamCMD actually downloaded and include every jar
 // present, so the classpath always matches the installed build.
-export function buildClasspathEntries(installPath) {
+export async function buildClasspathEntries(installPath) {
+  const fileAccess = new LocalFiles();
   const entries = ["java/."];
   try {
     const javaDir = path.join(installPath, "java");
-    if (fs.existsSync(javaDir)) {
-      const jars = fs
-        .readdirSync(javaDir)
+    if (await fileAccess.exists(javaDir)) {
+      const jars = (await fileAccess.readdir(javaDir))
         .filter((f) => f.toLowerCase().endsWith(".jar"))
         .sort();
       for (const jar of jars) {
@@ -45,7 +45,7 @@ export function buildClasspathEntries(installPath) {
 
 // Generate a custom startup script with configured options
 // Returns { bat: string, sh: string } with both Windows and Linux scripts
-export function generateStartupScripts(options) {
+export async function generateStartupScripts(options) {
   const {
     installPath,
     serverName,
@@ -132,7 +132,7 @@ export function generateStartupScripts(options) {
     gameArgs.push("-nosteam");
   }
 
-  const classpathEntries = buildClasspathEntries(installPath);
+  const classpathEntries = await buildClasspathEntries(installPath);
 
   // Windows batch file
   const batchContent = `@echo off

@@ -1,16 +1,17 @@
 // Delete server files (used when removing a server from panel with file deletion).
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../utils/logger.js";
 import { sanitizeError } from "../../utils/sanitize.js";
 import { requireRole } from "../../services/auth.js";
 import { isValidPath } from "./shared.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Server");
 
 export function registerDeleteFilesRoute(router) {
   router.post("/delete-files", requireRole("admin"), async (req, res) => {
     try {
+      const fileAccess = new LocalFiles();
       const { path: deletePath } = req.body;
 
       if (!deletePath || !isValidPath(deletePath)) {
@@ -18,7 +19,7 @@ export function registerDeleteFilesRoute(router) {
       }
 
       // Safety check: path must exist and contain PZ server files
-      if (!fs.existsSync(deletePath)) {
+      if (!(await fileAccess.exists(deletePath))) {
         return res.status(404).json({ error: "Path does not exist" });
       }
 
@@ -31,9 +32,13 @@ export function registerDeleteFilesRoute(router) {
         "StartServer32.bat",
         "start-server.sh",
       ];
-      const hasPzFiles = pzSpecificMarkers.some((marker) =>
-        fs.existsSync(path.join(deletePath, marker)),
-      );
+      let hasPzFiles = false;
+      for (const marker of pzSpecificMarkers) {
+        if (await fileAccess.exists(path.join(deletePath, marker))) {
+          hasPzFiles = true;
+          break;
+        }
+      }
 
       // Also reject paths containing '..' after normalization
       const normalizedDelete = path.normalize(deletePath);
@@ -51,7 +56,7 @@ export function registerDeleteFilesRoute(router) {
       log.warn(`Deleting server files at: ${deletePath}`);
 
       // Use recursive delete
-      fs.rmSync(deletePath, { recursive: true, force: true });
+      await fileAccess.rm(deletePath, { recursive: true, force: true });
 
       log.info(`Successfully deleted server files at: ${deletePath}`);
       res.json({ success: true, message: "Server files deleted" });

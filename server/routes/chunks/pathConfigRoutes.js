@@ -41,7 +41,7 @@ router.post("/save-path", async (req, res) => {
     }
     let validated;
     try {
-      validated = resolveCustomOrDefaultDataPath(rawPath);
+      validated = await resolveCustomOrDefaultDataPath(rawPath);
     } catch (e) {
       // Surface validation details so the UI can render the same empty-state
       // remediation it gets from /saves.

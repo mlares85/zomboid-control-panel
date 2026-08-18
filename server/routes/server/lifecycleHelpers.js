@@ -2,11 +2,11 @@
 // into the server .ini before/while the process boots, and the background
 // polling loop that waits for the process + RCON to come up after start.
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../utils/logger.js";
 import { getActiveServer } from "../../database/init.js";
 import { sanitizeIniValue } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Server");
 
@@ -16,6 +16,7 @@ const log = createLogger("API:Server");
 // so PZ will merge its defaults with our RCON settings instead of generating a blank password.
 export async function ensureRconConfigured() {
   try {
+    const fileAccess = new LocalFiles();
     const activeServer = await getActiveServer();
     if (!activeServer) {
       log.debug("ensureRconConfigured: No active server");
@@ -47,14 +48,14 @@ export async function ensureRconConfigured() {
     // settings save) must not interleave their read-modify-write of the INI.
     return await withFileLock(iniPath, async () => {
       // If the INI doesn't exist, pre-create it with RCON settings so PZ reads them on first boot
-      if (!fs.existsSync(iniPath)) {
+      if (!(await fileAccess.exists(iniPath))) {
         log.info(
           `ensureRconConfigured: INI not found — pre-creating ${iniPath} with RCON settings`,
         );
         try {
           // Ensure the Server/ directory exists
-          if (!fs.existsSync(serverConfigPath)) {
-            fs.mkdirSync(serverConfigPath, { recursive: true });
+          if (!(await fileAccess.exists(serverConfigPath))) {
+            await fileAccess.mkdir(serverConfigPath, { recursive: true });
             log.info(`Created server config directory: ${serverConfigPath}`);
           }
           const safePassword = sanitizeIniValue(rconPassword);
@@ -73,7 +74,11 @@ export async function ensureRconConfigured() {
       }
 
       // INI exists — check if RCON is already configured correctly
-      let content = fs.readFileSync(iniPath, "utf-8").replace(/\r\n/g, "\n");
+      const readResult = await fileAccess.readFile(iniPath);
+      if (!readResult.success) {
+        throw new Error(readResult.error);
+      }
+      let content = readResult.data.replace(/\r\n/g, "\n");
       const hasCorrectPassword = content.includes(
         `RCONPassword=${rconPassword}`,
       );

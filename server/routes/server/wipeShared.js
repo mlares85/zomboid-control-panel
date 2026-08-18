@@ -1,7 +1,7 @@
 // Shared target lists/regexes/helpers used by both wipe/preview and wipe.
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../utils/logger.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Server");
 
@@ -30,22 +30,24 @@ export const PLAYER_ROOT_FILES =
 export const WORLD_ROOT_FILES =
   /^(WorldDictionary.*|map_meta\.bin|map_t\.bin|map_worldgen\.bin|map_animals\.bin|map_basements\.bin|entity_data\.bin|global_mod_data\.bin|reanimated\.bin|iTrack\.bin|gos_.*\.bin|id_manager_data\.bin|important_area_data\.bin|z_outfits\.bin|recorded_media\.bin|servermap_symbols\.bin|map_sand\.bin|hidden_authors\.ini|erosion\.ini)$/i;
 
-export function countDir(dir) {
+export async function countDir(dir) {
+  const fileAccess = new LocalFiles();
   let files = 0;
   let size = 0;
-  if (!fs.existsSync(dir)) return { files: 0, size: 0 };
+  if (!(await fileAccess.exists(dir))) return { files: 0, size: 0 };
   try {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const entries = await fileAccess.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        const sub = countDir(fullPath);
+      if (entry.isDirectory) {
+        const sub = await countDir(fullPath);
         files += sub.files;
         size += sub.size;
       } else {
         files++;
         try {
-          size += fs.statSync(fullPath).size;
+          const stat = await fileAccess.stat(fullPath);
+          if (stat) size += stat.size;
         } catch (e) {
           log.debug(`Stat failed for ${fullPath}: ${e.message}`);
         }

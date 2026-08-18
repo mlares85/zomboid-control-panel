@@ -8,6 +8,7 @@ import { sanitizeError } from "../../utils/sanitize.js";
 import { resolveZomboidDataPath } from "./consoleShared.js";
 import { filterConsoleLogLines, CONSOLE_LOG_ERROR_PATTERNS } from "./consoleFilters.js";
 import { registerConsoleStreamRoutes } from "./consoleStream.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Server");
 
@@ -27,6 +28,7 @@ function registerConsoleLogRoute(router) {
   // Get server console log content
   router.get("/console-log", async (req, res) => {
     try {
+      const fileAccess = new LocalFiles();
       const zomboidDataPath = await resolveZomboidDataPath();
 
       if (!zomboidDataPath) {
@@ -39,7 +41,7 @@ function registerConsoleLogRoute(router) {
 
       const consoleLogPath = path.join(zomboidDataPath, "server-console.txt");
 
-      if (!fs.existsSync(consoleLogPath)) {
+      if (!(await fileAccess.exists(consoleLogPath))) {
         return res.json({
           success: true,
           content: "",
@@ -56,10 +58,13 @@ function registerConsoleLogRoute(router) {
       const maxLines = Math.min(parseInt(req.query.lines, 10) || 500, 2000);
 
       // Read only the tail of the file to prevent DoS with large log files
-      const stats = fs.statSync(consoleLogPath);
+      const stats = await fileAccess.stat(consoleLogPath);
       const MAX_READ_BYTES = 5 * 1024 * 1024; // 5MB cap
       let content;
       if (stats.size > MAX_READ_BYTES) {
+        // fd-based partial read: cheap tail read of a potentially huge log
+        // file. Left on direct fs — not a good fit for the FileAccess
+        // abstraction, which reads whole files.
         const fd = fs.openSync(consoleLogPath, "r");
         const readStart = stats.size - MAX_READ_BYTES;
         const buffer = Buffer.alloc(MAX_READ_BYTES);
@@ -77,7 +82,8 @@ function registerConsoleLogRoute(router) {
         const firstNewline = raw.indexOf("\n");
         content = firstNewline >= 0 ? raw.slice(firstNewline + 1) : raw;
       } else {
-        content = fs.readFileSync(consoleLogPath, "utf-8");
+        const readResult = await fileAccess.readFile(consoleLogPath);
+        content = readResult.success ? readResult.data : "";
       }
       const allLines = content.split("\n");
 
@@ -94,7 +100,7 @@ function registerConsoleLogRoute(router) {
         filterLevel,
         exists: true,
         path: consoleLogPath,
-        lastModified: stats.mtime.toISOString(),
+        lastModified: new Date(stats.mtimeMs).toISOString(),
         size: stats.size,
       });
     } catch (error) {
@@ -107,6 +113,7 @@ function registerConsoleLogRoute(router) {
 function registerErrorCountRoute(router) {
   router.get("/console-log/error-count", async (req, res) => {
     try {
+      const fileAccess = new LocalFiles();
       const now = Date.now();
       if (errorCountCache.value && now - errorCountCache.at < ERROR_COUNT_TTL_MS) {
         return res.json(errorCountCache.value);
@@ -119,18 +126,19 @@ function registerErrorCountRoute(router) {
       }
 
       const consoleLogPath = path.join(zomboidDataPath, "server-console.txt");
-      if (!fs.existsSync(consoleLogPath)) {
+      if (!(await fileAccess.exists(consoleLogPath))) {
         return res.json({ exists: false, count: 0, sinceStart: false });
       }
 
       // Only ever read the tail. This endpoint is polled, so it must stay cheap
       // no matter how large the log has grown.
       const MAX_READ_BYTES = 2 * 1024 * 1024;
-      const stats = fs.statSync(consoleLogPath);
+      const stats = await fileAccess.stat(consoleLogPath);
       let content;
       let truncated = false;
       if (stats.size > MAX_READ_BYTES) {
         truncated = true;
+        // fd-based partial read: see registerConsoleLogRoute above.
         const fd = fs.openSync(consoleLogPath, "r");
         const buffer = Buffer.alloc(MAX_READ_BYTES);
         try {
@@ -146,7 +154,8 @@ function registerErrorCountRoute(router) {
         const firstNewline = raw.indexOf("\n");
         content = firstNewline >= 0 ? raw.slice(firstNewline + 1) : raw;
       } else {
-        content = fs.readFileSync(consoleLogPath, "utf-8");
+        const readResult = await fileAccess.readFile(consoleLogPath);
+        content = readResult.success ? readResult.data : "";
       }
 
       const lines = content.split("\n");
@@ -167,7 +176,7 @@ function registerErrorCountRoute(router) {
         count,
         sinceStart: startIndex >= 0,
         truncated,
-        lastModified: stats.mtime.toISOString(),
+        lastModified: new Date(stats.mtimeMs).toISOString(),
       };
       errorCountCache = { at: now, value: payload };
       res.json(payload);

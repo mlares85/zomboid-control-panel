@@ -99,7 +99,7 @@ export async function completeSuccessfulInstall(ctx) {
 
   // Generate custom startup scripts (both .bat and .sh)
   try {
-    const scripts = generateStartupScripts({
+    const scripts = await generateStartupScripts({
       installPath,
       serverName,
       minMemory: safeMinMemory,

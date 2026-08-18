@@ -1,9 +1,9 @@
-import fs from "fs";
 import path from "path";
 import os from "os";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Files");
 import { getActiveServer, getAllSettings } from "../../database/init.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 import {
   SFTP_CONFIG_PATH_KEY,
   getMirrorPath,
@@ -79,32 +79,36 @@ export async function getBackupPath() {
 
 // Create backup before saving
 export async function createBackup(filename) {
+  const fileAccess = new LocalFiles();
   const configPath = await getServerConfigPath();
   const backupDir = await getBackupPath();
   const filePath = path.join(configPath, filename);
 
   try {
     // Check file existence asynchronously
-    try {
-      await fs.promises.access(filePath);
-    } catch (e) {
-      log.debug(`Config backup source not found: ${filePath} — ${e.message}`);
+    const sourceExists = await fileAccess.exists(filePath);
+    if (!sourceExists) {
+      log.debug(`Config backup source not found: ${filePath}`);
       return null;
     }
 
     // Ensure backup directory exists
-    await fs.promises.mkdir(backupDir, { recursive: true });
+    await fileAccess.mkdir(backupDir, { recursive: true });
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const backupName = `${filename}.${timestamp}.bak`;
     const backupPath = path.join(backupDir, backupName);
 
     // Async copy
-    await fs.promises.copyFile(filePath, backupPath);
+    const copyResult = await fileAccess.copyFile(filePath, backupPath);
+    if (!copyResult.success) {
+      log.error(`Backup creation failed: ${copyResult.error}`);
+      return null;
+    }
     log.info(`Created backup: ${backupName}`);
 
     // Cleanup old backups asynchronously
-    const files = await fs.promises.readdir(backupDir);
+    const files = await fileAccess.readdir(backupDir);
     const backups = files
       .filter((f) => f.startsWith(filename + ".") && f.endsWith(".bak"))
       .sort()
@@ -113,13 +117,12 @@ export async function createBackup(filename) {
     if (backups.length > 10) {
       const filesToDelete = backups.slice(10);
       await Promise.all(
-        filesToDelete.map((old) =>
-          fs.promises
-            .unlink(path.join(backupDir, old))
-            .catch((e) =>
-              log.warn(`Failed to delete old backup ${old}: ${e.message}`),
-            ),
-        ),
+        filesToDelete.map(async (old) => {
+          const result = await fileAccess.unlink(path.join(backupDir, old));
+          if (!result.success) {
+            log.warn(`Failed to delete old backup ${old}: ${result.error}`);
+          }
+        }),
       );
     }
 

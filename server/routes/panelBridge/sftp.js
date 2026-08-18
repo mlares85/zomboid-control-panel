@@ -90,7 +90,7 @@ router.post("/sftp/configure", requireRole("admin"), async (req, res) => {
     }
     const cachePath = getSftpCachePath(config);
     await bridge.configureSftp(config, cachePath);
-    res.json({ success: true, bridgePath: cachePath, transport: bridge.getStatus().transport });
+    res.json({ success: true, bridgePath: cachePath, transport: (await bridge.getStatus()).transport });
   } catch (error) {
     res.status(400).json({ error: sanitizeError(error.message) });
   }

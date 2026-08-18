@@ -60,7 +60,7 @@ router.post("/auto-configure", async (req, res) => {
       });
     }
 
-    const { foundPath, searchedLocations } = findAutoConfigurePath(
+    const { foundPath, searchedLocations } = await findAutoConfigurePath(
       targetServer,
       serverName,
     );
@@ -81,7 +81,7 @@ router.post("/auto-configure", async (req, res) => {
 
     // Configure and start bridge - foundPath IS the complete panelbridge folder
     bridge.configure(foundPath.path, true); // true = direct path
-    bridge.start();
+    await bridge.start();
 
     // Auto-install or update PanelBridge mod
     const { modInstalled, modUpdated } = await installOrUpdateMod(
@@ -132,7 +132,7 @@ router.get("/scan-server/:serverId", async (req, res) => {
       });
     }
 
-    const { possiblePaths, recommendedPath } = scanServerPreviewPaths(
+    const { possiblePaths, recommendedPath } = await scanServerPreviewPaths(
       targetServer,
       serverName,
     );
@@ -166,8 +166,8 @@ router.post("/auto-detect", async (req, res) => {
     if (bridge.isRunning) {
       bridge.stop();
     }
-    const bridgePath = bridge.autoDetect(serverName, zomboidUserFolder);
-    bridge.start();
+    const bridgePath = await bridge.autoDetect(serverName, zomboidUserFolder);
+    await bridge.start();
     res.json({
       success: true,
       message: "Bridge auto-configured and started",
@@ -194,7 +194,7 @@ router.post("/configure", async (req, res) => {
     }
     const bridgePath = bridge.configure(zomboidSavePath);
     // Also start the bridge automatically after configuring
-    bridge.start();
+    await bridge.start();
     res.json({
       success: true,
       message: "Bridge configured and started",
@@ -238,7 +238,7 @@ router.post("/configure-direct", async (req, res) => {
       bridge.stop();
     }
     const configuredPath = bridge.configure(resolved, true);
-    bridge.start();
+    await bridge.start();
     res.json({
       success: true,
       message: "Bridge configured with manual path and started",

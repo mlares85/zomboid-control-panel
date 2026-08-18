@@ -1,5 +1,4 @@
 import express from "express";
-import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Files");
@@ -7,6 +6,7 @@ import { sanitizeError } from "../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, createBackup } from "./context.js";
 import { getTemplatesPath } from "./templates.js";
 import { getActiveServer, updateServer } from "../../database/init.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
@@ -14,6 +14,7 @@ const router = express.Router();
 router.post("/templates/:id/apply", async (req, res) => {
   log.info(`POST /templates/${req.params.id}/apply`);
   try {
+    const fileAccess = new LocalFiles();
     // Sanitize template ID to prevent path traversal
     const safeId = path.basename(req.params.id).replace(/[^a-z0-9_-]/gi, "");
     if (!safeId || safeId !== req.params.id) {
@@ -25,11 +26,15 @@ router.post("/templates/:id/apply", async (req, res) => {
     const templatesPath = await getTemplatesPath();
     const templateFile = path.join(templatesPath, `${safeId}.json`);
 
-    if (!fs.existsSync(templateFile)) {
+    if (!(await fileAccess.exists(templateFile))) {
       return res.status(404).json({ error: "Template not found" });
     }
 
-    const template = JSON.parse(fs.readFileSync(templateFile, "utf-8"));
+    const readResult = await fileAccess.readFile(templateFile);
+    if (!readResult.success) {
+      return res.status(500).json({ error: sanitizeError(readResult.error) });
+    }
+    const template = JSON.parse(readResult.data);
     const configPath = await getServerConfigPath();
     const serverName = await getServerName();
 
@@ -43,7 +48,8 @@ router.post("/templates/:id/apply", async (req, res) => {
       await createBackup(`${serverName}.ini`);
 
       // Write the template INI
-      fs.writeFileSync(iniPath, template.iniRaw);
+      const writeResult = await fileAccess.writeFile(iniPath, template.iniRaw);
+      if (!writeResult.success) throw new Error(writeResult.error);
       applied.push("INI");
       log.info(`Applied INI from template: ${template.name}`);
     }
@@ -59,7 +65,8 @@ router.post("/templates/:id/apply", async (req, res) => {
       await createBackup(`${serverName}_SandboxVars.lua`);
 
       // Write the template sandbox
-      fs.writeFileSync(sandboxPath, template.sandboxRaw);
+      const writeResult = await fileAccess.writeFile(sandboxPath, template.sandboxRaw);
+      if (!writeResult.success) throw new Error(writeResult.error);
       applied.push("Sandbox");
       log.info(`Applied Sandbox from template: ${template.name}`);
     }
@@ -95,6 +102,7 @@ router.post("/templates/:id/apply", async (req, res) => {
 // PUT /templates/:id - Update template metadata
 router.put("/templates/:id", async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     // Sanitize template ID to prevent path traversal
     const safeId = path.basename(req.params.id).replace(/[^a-z0-9_-]/gi, "");
     if (!safeId || safeId !== req.params.id) {
@@ -106,17 +114,27 @@ router.put("/templates/:id", async (req, res) => {
     const templatesPath = await getTemplatesPath();
     const templateFile = path.join(templatesPath, `${safeId}.json`);
 
-    if (!fs.existsSync(templateFile)) {
+    if (!(await fileAccess.exists(templateFile))) {
       return res.status(404).json({ error: "Template not found" });
     }
 
-    const template = JSON.parse(fs.readFileSync(templateFile, "utf-8"));
+    const readResult = await fileAccess.readFile(templateFile);
+    if (!readResult.success) {
+      return res.status(500).json({ error: sanitizeError(readResult.error) });
+    }
+    const template = JSON.parse(readResult.data);
 
     if (name) template.name = name;
     if (description !== undefined) template.description = description;
     template.modified = new Date().toISOString();
 
-    fs.writeFileSync(templateFile, JSON.stringify(template, null, 2));
+    const writeResult = await fileAccess.writeFile(
+      templateFile,
+      JSON.stringify(template, null, 2),
+    );
+    if (!writeResult.success) {
+      return res.status(500).json({ error: sanitizeError(writeResult.error) });
+    }
 
     res.json({ success: true, message: "Template updated" });
   } catch (error) {
@@ -129,6 +147,7 @@ router.put("/templates/:id", async (req, res) => {
 router.delete("/templates/:id", async (req, res) => {
   log.info(`DELETE /templates/${req.params.id}`);
   try {
+    const fileAccess = new LocalFiles();
     // Sanitize template ID to prevent path traversal
     const safeId = path.basename(req.params.id).replace(/[^a-z0-9_-]/gi, "");
     if (!safeId || safeId !== req.params.id) {
@@ -138,11 +157,14 @@ router.delete("/templates/:id", async (req, res) => {
     const templatesPath = await getTemplatesPath();
     const templateFile = path.join(templatesPath, `${safeId}.json`);
 
-    if (!fs.existsSync(templateFile)) {
+    if (!(await fileAccess.exists(templateFile))) {
       return res.status(404).json({ error: "Template not found" });
     }
 
-    fs.unlinkSync(templateFile);
+    const unlinkResult = await fileAccess.unlink(templateFile);
+    if (!unlinkResult.success) {
+      return res.status(500).json({ error: sanitizeError(unlinkResult.error) });
+    }
     log.info(`Deleted template: ${req.params.id}`);
 
     res.json({ success: true, message: "Template deleted" });

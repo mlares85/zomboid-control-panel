@@ -1,17 +1,17 @@
 import express from "express";
-import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 const log = createLogger("API:Chunks");
 import { sanitizeError } from "../../utils/sanitize.js";
 import { requireRole } from "../../services/auth.js";
 import { deleteVehiclesInBoxes } from "../../utils/vehiclesDb.js";
-import { cellDivisorFor, tilesPerChunkFor, detectSaveIsB42Sync } from "./geometry.js";
+import { cellDivisorFor, tilesPerChunkFor, detectSaveIsB42 } from "./geometry.js";
 import { getZomboidDataPath, resolveSavesPath, resolveCustomOrDefaultDataPath } from "./savePaths.js";
 import { cleanupEmptyCellFiles } from "./cellCleanup.js";
 import { checkServerNotRunning } from "./serverRunningGuard.js";
 import { backupSelectedChunks } from "./chunkFileBackup.js";
 import { buildChunkDeletionBoxes } from "./vehicleCleanup.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const router = express.Router();
 
@@ -68,7 +68,7 @@ function backfillCellCoords(chunks, cellDivisor) {
   }
 }
 
-async function deleteChunkFiles(savePath, chunks) {
+async function deleteChunkFiles(savePath, chunks, fileAccess) {
   let deleted = 0;
   const errors = [];
   const touchedCells = new Set();
@@ -83,32 +83,30 @@ async function deleteChunkFiles(savePath, chunks) {
           // Use the ACTUAL filename captured by the scanner (it may be
           // `chunkdata_X_Y.bin` OR a bare `X_Y.bin` depending on save layout).
           const chunkDataFile = path.join(savePath, "chunkdata", chunk.file);
-          try {
-            await fs.promises.unlink(chunkDataFile);
+          const result = await fileAccess.unlink(chunkDataFile);
+          if (result.success) {
             wasDeleted = true;
-          } catch (e) {
-            if (e.code !== "ENOENT")
-              return {
-                success: false,
-                error: `chunkdata: ${e.message}`,
-                file: chunk.file,
-              };
+          } else if (!result.error.includes("ENOENT")) {
+            return {
+              success: false,
+              error: `chunkdata: ${result.error}`,
+              file: chunk.file,
+            };
           }
         } else {
           const mapFile =
             chunk.source === "saveroot"
               ? path.join(savePath, chunk.file)
               : path.join(savePath, "map", chunk.file);
-          try {
-            await fs.promises.unlink(mapFile);
+          const result = await fileAccess.unlink(mapFile);
+          if (result.success) {
             wasDeleted = true;
-          } catch (e) {
-            if (e.code !== "ENOENT")
-              return {
-                success: false,
-                error: sanitizeError(e.message),
-                file: chunk.file,
-              };
+          } else if (!result.error.includes("ENOENT")) {
+            return {
+              success: false,
+              error: sanitizeError(result.error),
+              file: chunk.file,
+            };
           }
         }
 
@@ -135,7 +133,7 @@ async function deleteChunkFiles(savePath, chunks) {
   return { deleted, errors, touchedCells };
 }
 
-async function cleanupEmptyMapDirs(savePath, chunks) {
+async function cleanupEmptyMapDirs(savePath, chunks, fileAccess) {
   const deletedXDirs = new Set();
   for (const chunk of chunks) {
     const parts = chunk.file.split("/");
@@ -144,8 +142,10 @@ async function cleanupEmptyMapDirs(savePath, chunks) {
   for (const xDir of deletedXDirs) {
     try {
       const xPath = path.join(savePath, "map", xDir);
-      const remaining = await fs.promises.readdir(xPath);
-      if (remaining.length === 0) await fs.promises.rmdir(xPath);
+      const remaining = await fileAccess.readdir(xPath);
+      if (remaining.length === 0) {
+        await fileAccess.rm(xPath, { recursive: true });
+      }
     } catch (e) {
       /* ignore */
     }
@@ -155,6 +155,7 @@ async function cleanupEmptyMapDirs(savePath, chunks) {
 // Delete selected chunks
 router.post("/delete-chunks", requireRole("admin"), async (req, res) => {
   try {
+    const fileAccess = new LocalFiles();
     const {
       saveName,
       chunks,
@@ -198,16 +199,16 @@ router.post("/delete-chunks", requireRole("admin"), async (req, res) => {
     if (!validateChunkList(chunks, res)) return;
 
     const zomboidDataPath = customPath
-      ? resolveCustomOrDefaultDataPath(String(customPath))
+      ? await resolveCustomOrDefaultDataPath(String(customPath))
       : await getZomboidDataPath();
     if (!zomboidDataPath) {
       return res.status(400).json({ error: "Zomboid data path not set" });
     }
 
-    const savesPath = resolveSavesPath(zomboidDataPath);
+    const savesPath = await resolveSavesPath(zomboidDataPath);
     const savePath = path.join(savesPath, sanitizedSaveName);
 
-    if (!fs.existsSync(savePath)) {
+    if (!(await fileAccess.exists(savePath))) {
       return res.status(404).json({ error: "Save not found" });
     }
 
@@ -216,7 +217,7 @@ router.post("/delete-chunks", requireRole("admin"), async (req, res) => {
     // mis-detects selections made of only `chunkdata_X_Y.bin` entries on B42
     // saves. That would compute the wrong cell size and the wrong vehicle
     // bbox (30×10 B41 tiles vs 32×8 B42 tiles).
-    const isB42 = detectSaveIsB42Sync(savePath);
+    const isB42 = await detectSaveIsB42(savePath);
     const cellDivisor = cellDivisorFor(isB42);
     const tilesPerChunk = tilesPerChunkFor(isB42);
 
@@ -238,6 +239,7 @@ router.post("/delete-chunks", requireRole("admin"), async (req, res) => {
     const { deleted, errors, touchedCells } = await deleteChunkFiles(
       savePath,
       chunks,
+      fileAccess,
     );
 
     // ─── Pass 2: remove per-cell aux files only for cells that are now empty ───
@@ -251,7 +253,7 @@ router.post("/delete-chunks", requireRole("admin"), async (req, res) => {
     );
 
     // Clean up empty X directories (B42)
-    await cleanupEmptyMapDirs(savePath, chunks);
+    await cleanupEmptyMapDirs(savePath, chunks, fileAccess);
 
     // ─── Pass 3: delete matching rows from vehicles.db ─────────────────
     // This is the critical fix for "cars come back when I return to the cell".

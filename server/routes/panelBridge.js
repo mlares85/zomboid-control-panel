@@ -205,7 +205,7 @@ const BRIDGE_USERNAME_REGEX = /^(?=.*\S)[^\x00-\x1F\x7F"\\]{1,64}$/;
 
 // Get bridge status
 router.get("/status", async (req, res) => {
-  const status = bridge.getStatus();
+  const status = await bridge.getStatus();
 
   // Also include detected paths from active server
   let detectedPaths = null;
@@ -413,7 +413,7 @@ router.post("/auto-configure", async (req, res) => {
 
     // Configure and start bridge - foundPath IS the complete panelbridge folder
     bridge.configure(foundPath.path, true); // true = direct path
-    bridge.start();
+    await bridge.start();
 
     // Auto-install or update PanelBridge mod
     let modInstalled = false;
@@ -692,8 +692,8 @@ router.post("/auto-detect", async (req, res) => {
     if (bridge.isRunning) {
       bridge.stop();
     }
-    const bridgePath = bridge.autoDetect(serverName, zomboidUserFolder);
-    bridge.start();
+    const bridgePath = await bridge.autoDetect(serverName, zomboidUserFolder);
+    await bridge.start();
     res.json({
       success: true,
       message: "Bridge auto-configured and started",
@@ -720,7 +720,7 @@ router.post("/configure", async (req, res) => {
     }
     const bridgePath = bridge.configure(zomboidSavePath);
     // Also start the bridge automatically after configuring
-    bridge.start();
+    await bridge.start();
     res.json({
       success: true,
       message: "Bridge configured and started",
@@ -764,7 +764,7 @@ router.post("/configure-direct", async (req, res) => {
       bridge.stop();
     }
     const configuredPath = bridge.configure(resolved, true);
-    bridge.start();
+    await bridge.start();
     res.json({
       success: true,
       message: "Bridge configured with manual path and started",
@@ -794,7 +794,7 @@ router.post("/sftp/configure", requireRole("admin"), async (req, res) => {
     }
     const cachePath = getSftpCachePath(config);
     await bridge.configureSftp(config, cachePath);
-    res.json({ success: true, bridgePath: cachePath, transport: bridge.getStatus().transport });
+    res.json({ success: true, bridgePath: cachePath, transport: (await bridge.getStatus()).transport });
   } catch (error) {
     res.status(400).json({ error: sanitizeError(error.message) });
   }
@@ -848,9 +848,9 @@ router.post("/sftp/config/list", requireRole("admin"), async (req, res) => {
 });
 
 // Start the bridge polling
-router.post("/start", (req, res) => {
+router.post("/start", async (req, res) => {
   try {
-    bridge.start();
+    await bridge.start();
     res.json({ success: true, message: "Bridge started" });
   } catch (error) {
     res.status(500).json({ error: sanitizeError(error.message) });
@@ -1006,14 +1006,14 @@ router.get("/scan-paths", async (req, res) => {
 });
 
 // Force refresh - restart bridge with fresh state
-router.post("/refresh", (req, res) => {
+router.post("/refresh", async (req, res) => {
   try {
     if (bridge.isRunning) {
       bridge.stop(); // stop() already resets all internal state
     }
 
     if (bridge.bridgePath) {
-      bridge.start();
+      await bridge.start();
       res.json({
         success: true,
         message: "Bridge refreshed",

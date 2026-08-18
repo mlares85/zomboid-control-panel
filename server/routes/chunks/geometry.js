@@ -1,5 +1,7 @@
-import fs from "fs";
 import path from "path";
+import { LocalFiles } from "../../services/fileAccess/index.js";
+
+const fileAccess = new LocalFiles();
 
 // B42: 1 cell = 32×32 chunks (256×256 tiles, 8 tiles/chunk).
 // B41: 1 cell = 30×30 chunks (300×300 tiles, 10 tiles/chunk).
@@ -18,14 +20,15 @@ const B42_INDICATOR_FILES = [
 
 // B42 saves have files like WorldDictionary.bin, global_mod_data.bin,
 // entity_data.bin in the save root that B41 doesn't.
-export function hasB42IndicatorFiles(savePath) {
-  return B42_INDICATOR_FILES.some((f) => {
+export async function hasB42IndicatorFiles(savePath) {
+  for (const f of B42_INDICATOR_FILES) {
     try {
-      return fs.existsSync(path.join(savePath, f));
+      if (await fileAccess.exists(path.join(savePath, f))) return true;
     } catch {
-      return false;
+      /* ignore */
     }
-  });
+  }
+  return false;
 }
 
 // Filesystem-based B42 detection. Much more reliable than inferring from a
@@ -34,12 +37,12 @@ export function hasB42IndicatorFiles(savePath) {
 //   1. map/ contains numeric X subdirectories → B42 layout
 //   2. B42 indicator files in save root (WorldDictionary.bin etc)
 //   3. fall back to flat B41 layout
-export function detectSaveIsB42Sync(savePath) {
+export async function detectSaveIsB42(savePath) {
   try {
     const mapPath = path.join(savePath, "map");
-    if (fs.existsSync(mapPath)) {
-      const entries = fs.readdirSync(mapPath, { withFileTypes: true });
-      if (entries.some((e) => e.isDirectory() && /^\d+$/.test(e.name)))
+    if (await fileAccess.exists(mapPath)) {
+      const entries = await fileAccess.readdir(mapPath, { withFileTypes: true });
+      if (entries.some((e) => e.isDirectory && /^\d+$/.test(e.name)))
         return true;
     }
   } catch {

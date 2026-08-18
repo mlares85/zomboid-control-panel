@@ -1,6 +1,5 @@
 // World/save wipe: destructive execution (see wipePreview.js for the dry-run).
 import path from "path";
-import fs from "fs";
 import { createLogger } from "../../utils/logger.js";
 import { logServerEvent } from "../../database/init.js";
 import { sanitizeError } from "../../utils/sanitize.js";
@@ -14,6 +13,7 @@ import {
   WORLD_ROOT_FILES,
 } from "./wipeShared.js";
 import { registerWipePreviewRoute } from "./wipePreview.js";
+import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Server");
 
@@ -39,6 +39,7 @@ function registerWipeRoute(router) {
     wipeInProgress = true;
 
     try {
+      const fileAccess = new LocalFiles();
       const serverManager = req.app.get("serverManager");
       await serverManager.loadConfig();
 
@@ -78,7 +79,7 @@ function registerWipeRoute(router) {
       }
 
       const saveDir = path.join(savePath, "Saves", "Multiplayer", serverName);
-      if (!fs.existsSync(saveDir)) {
+      if (!(await fileAccess.exists(saveDir))) {
         return res
           .status(404)
           .json({ error: `Save directory not found: ${serverName}` });
@@ -97,9 +98,9 @@ function registerWipeRoute(router) {
           let deletedCount = 0;
           for (const dirName of MAP_DIRS) {
             const dir = path.join(saveDir, dirName);
-            if (fs.existsSync(dir)) {
+            if (await fileAccess.exists(dir)) {
               log.warn(`WIPE: Deleting ${dirName}/ at ${dir}`);
-              fs.rmSync(dir, { recursive: true, force: true });
+              await fileAccess.rm(dir, { recursive: true, force: true });
               deletedCount++;
             }
           }
@@ -112,11 +113,11 @@ function registerWipeRoute(router) {
         if (targets.includes("players")) {
           let deletedCount = 0;
           try {
-            const rootEntries = fs.readdirSync(saveDir, { withFileTypes: true });
+            const rootEntries = await fileAccess.readdir(saveDir, { withFileTypes: true });
             for (const entry of rootEntries) {
-              if (!entry.isDirectory() && PLAYER_ROOT_FILES.test(entry.name)) {
+              if (!entry.isDirectory && PLAYER_ROOT_FILES.test(entry.name)) {
                 log.warn(`WIPE: Deleting player file ${entry.name}`);
-                fs.unlinkSync(path.join(saveDir, entry.name));
+                await fileAccess.unlink(path.join(saveDir, entry.name));
                 deletedCount++;
               }
             }
@@ -132,19 +133,19 @@ function registerWipeRoute(router) {
           // Delete world directories
           for (const dirName of WORLD_DIRS) {
             const dir = path.join(saveDir, dirName);
-            if (fs.existsSync(dir)) {
+            if (await fileAccess.exists(dir)) {
               log.warn(`WIPE: Deleting ${dirName}/ at ${dir}`);
-              fs.rmSync(dir, { recursive: true, force: true });
+              await fileAccess.rm(dir, { recursive: true, force: true });
               deletedCount++;
             }
           }
           // Delete world root files
           try {
-            const rootEntries = fs.readdirSync(saveDir, { withFileTypes: true });
+            const rootEntries = await fileAccess.readdir(saveDir, { withFileTypes: true });
             for (const entry of rootEntries) {
-              if (!entry.isDirectory() && WORLD_ROOT_FILES.test(entry.name)) {
+              if (!entry.isDirectory && WORLD_ROOT_FILES.test(entry.name)) {
                 log.warn(`WIPE: Deleting world file ${entry.name}`);
-                fs.unlinkSync(path.join(saveDir, entry.name));
+                await fileAccess.unlink(path.join(saveDir, entry.name));
                 deletedCount++;
               }
             }
@@ -159,9 +160,9 @@ function registerWipeRoute(router) {
         // per-target lists don't recognise so nothing from the old world survives.
         if (SAVE_TARGETS.every((t) => targets.includes(t))) {
           let leftovers = 0;
-          for (const entry of fs.readdirSync(saveDir, { withFileTypes: true })) {
+          for (const entry of await fileAccess.readdir(saveDir, { withFileTypes: true })) {
             log.warn(`WIPE: Deleting leftover ${entry.name}`);
-            fs.rmSync(path.join(saveDir, entry.name), {
+            await fileAccess.rm(path.join(saveDir, entry.name), {
               recursive: true,
               force: true,
             });
@@ -175,9 +176,9 @@ function registerWipeRoute(router) {
           let deletedCount = 0;
           for (const suffix of ["", "-journal", "-wal", "-shm"]) {
             const dbFile = path.join(savePath, "db", `${serverName}.db${suffix}`);
-            if (fs.existsSync(dbFile)) {
+            if (await fileAccess.exists(dbFile)) {
               log.warn(`WIPE: Deleting account database ${dbFile}`);
-              fs.rmSync(dbFile, { force: true });
+              await fileAccess.rm(dbFile, { force: true });
               deletedCount++;
             }
           }
