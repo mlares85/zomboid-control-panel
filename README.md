@@ -1,20 +1,17 @@
 <div align="center">
 
-# 🧟 Zomboid Control Panel
+# 🧟 Zomboid Control Panel — Enhanced Fork
 
 ### The complete admin cockpit for Project Zomboid dedicated servers
 
-[![Latest Release](https://img.shields.io/github/v/release/fpsacha/zomboid-control-panel?style=for-the-badge&logo=github&color=8a9a5b)](https://github.com/fpsacha/zomboid-control-panel/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/fpsacha/zomboid-control-panel/total?style=for-the-badge&logo=github&color=8a9a5b)](https://github.com/fpsacha/zomboid-control-panel/releases)
-[![Discord](https://img.shields.io/badge/discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/jHsWJDNmSg)
+[![Upstream](https://img.shields.io/badge/upstream-fpsacha%2Fzomboid--control--panel-8a9a5b?style=for-the-badge&logo=github)](https://github.com/fpsacha/zomboid-control-panel)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
 
-Manage your Project Zomboid dedicated server from one place: server controls, RCON, a live world map, Workshop mods, scheduled restarts, backups, and Discord integration.
+Manage your Project Zomboid dedicated server from one place: server controls, RCON, a live world map, Workshop mods, scheduled restarts, backups, Discord integration, **built-in help wiki**, and a **modular server provider architecture** supporting native, Docker, and remote setups.
 
-[**🚀 Download**](https://github.com/fpsacha/zomboid-control-panel/releases/latest) ·
-[**👁️ Live demo**](https://fpsacha.github.io/zomboid-control-panel/) ·
-[**💬 Discord**](https://discord.gg/jHsWJDNmSg) ·
-[**📖 Setup**](#quick-start)
+[**📖 Setup**](#quick-start) ·
+[**🆕 Fork Features**](#fork-enhancements) ·
+[**🔧 Development**](#development)
 
 </div>
 
@@ -121,9 +118,45 @@ Java crash dumps, error logs, support bundles. One-click `.zip` export for when 
 
 ---
 
+## Fork Enhancements
+
+This fork extends the upstream panel with architectural improvements and new features:
+
+### 📚 Built-in Help & Wiki
+Every page has contextual help. Every field and option has a tooltip explaining what it does, why it matters, and whether beginners need to change it — with links to deeper wiki articles. 26 searchable articles covering setup, Docker, mods, templates, backups, scheduling, Discord, and advanced topics. No external docs site needed.
+
+### 🔌 Server Provider Abstraction
+Modular `FileAccess` interface replaces 200+ scattered `fs` calls with a clean abstraction. Two implementations ship today:
+- **`LocalFiles`** — direct filesystem access for native, docker-local, and docker-managed servers
+- **`SftpMirrorFiles`** — session-aware SFTP mirror with pull/edit/push semantics and a concurrency lock for remote servers
+
+This is the foundation for platform-specific server providers (native SteamCMD on Windows/Linux, Docker via OrbStack on macOS).
+
+### 🐳 Docker Managed Servers
+Create and fully manage PZ server containers from the panel UI. Shared base volume (~3 GB of game files downloaded once), per-server data volumes, auto port assignment, internal Docker network for RCON, container lifecycle events via Socket.IO, and resource monitoring (CPU, memory, disk, network).
+
+### 🧪 Comprehensive E2E Testing
+Two-tier Playwright test suite:
+- **UI smoke tests** (`npm run test:e2e`) — 89 tests across all 16 pages, no Docker needed
+- **Integration tests** (`npm run test:e2e:integration`) — full workflow tests with a live PZ server in Docker (server lifecycle, RCON console, backup create/restore, template save/export, settings persistence)
+
+Plus 830+ unit tests (723 server + 107 client).
+
+### 🏗️ Structural Improvements
+- Dashboard decomposed from 1,556 → 131-line shell + 12 components
+- Backups decomposed from 1,077 → 160-line shell + 7 components
+- Per-server RCON status probing across all configured servers
+- Container resource stats polling (CPU/memory/disk/network)
+- Backup server snapshots with curated config data
+- Mount auto-discovery with guided server creation
+- Platform-specific onboarding (macOS Docker guidance, Windows firewall hints)
+
+---
+
 ## Contents
 
 - [What It Does](#what-it-does)
+- [Fork Enhancements](#fork-enhancements)
 - [Requirements](#requirements)
 - [Quick Start](#quick-start)
 - [Setup](#setup)
@@ -398,9 +431,21 @@ npm run dev
 ```
 Frontend at `http://localhost:5173`, backend at `http://localhost:3001`.
 
+### Testing
+
+```bash
+npm run test:server        # 723 server unit tests (Vitest)
+npm run test:client        # 107 client unit tests (Vitest)
+npm run test:e2e           # 89 E2E smoke tests — all 16 pages (Playwright, no Docker needed)
+npm run test:e2e:integration  # Full workflow tests with a live PZ server in Docker
+npm run lint:server        # ESLint with require-result-handling rule
+npm run build              # Verify frontend builds
+```
+
+### Building
+
 ```bash
 node build.js --all        # Build Windows + Linux binaries
-npm test                   # Run tests
 ```
 
 ---
