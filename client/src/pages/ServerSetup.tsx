@@ -836,7 +836,7 @@ export default function ServerSetup() {
                     id="full-setup-description"
                     className="text-xs"
                   >
-                    Download and configure a new dedicated server from scratch
+                    Download PZ server files and run the server as a process on this machine
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 pb-5">
@@ -901,7 +901,7 @@ export default function ServerSetup() {
                     id="quick-setup-description"
                     className="text-xs"
                   >
-                    Register a server using files you already downloaded
+                    Point at PZ server files you already have and run the server as a local process
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 pb-5">
@@ -958,7 +958,7 @@ export default function ServerSetup() {
                     id="docker-setup-description"
                     className="text-xs"
                   >
-                    Panel creates and manages a container with shared base files
+                    Create an isolated Docker container running PZ — the panel controls its full lifecycle
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 pb-5">
