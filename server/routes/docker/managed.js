@@ -6,7 +6,7 @@ import { getServer, getServers, createServer, deleteServer } from "../../databas
 import { createDockerVolumeManager } from "../../services/dockerVolumeManager.js";
 import { createDockerContainerFactory } from "../../services/dockerContainerFactory.js";
 import { PROVIDERS } from "../../utils/serverProvider.js";
-import { startBaseVolumePopulation } from "../../services/baseVolumePopulator.js";
+import { ContainerSteamCmdInstaller } from "../../services/installer/ContainerSteamCmdInstaller.js";
 import { installPanelBridgeMod } from "../server/installHelpers.js";
 import { requireRole } from "../../services/auth.js";
 
@@ -153,12 +153,24 @@ router.post("/populate-base", requireRole("admin"), async (req, res) => {
     }
     const io = req.app.get("io");
     populatingBase = true;
-    const result = await startBaseVolumePopulation(dockerClient, io, () => { populatingBase = false; });
-    if (!result.success) {
-      populatingBase = false;
-      return res.status(502).json(result);
-    }
-    res.json(result);
+
+    const installer = new ContainerSteamCmdInstaller({ dockerClient });
+    const onProgress = (event, data) => {
+      if (event === "log") io.emit("docker:populate-log", data);
+      else if (event === "complete") {
+        io.emit("docker:populate-complete", data);
+        populatingBase = false;
+      }
+    };
+
+    // Fire-and-forget — progress via Socket.IO
+    installer.install({ volumeName: "zomboid-panel-base", onProgress })
+      .catch((err) => {
+        populatingBase = false;
+        log.error(`Base volume population failed: ${err.message}`);
+      });
+
+    res.json({ success: true, message: "Base volume population started" });
   } catch (error) {
     populatingBase = false;
     log.error(`Failed to populate base volume: ${error.message}`);
