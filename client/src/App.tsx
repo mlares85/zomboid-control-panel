@@ -606,7 +606,7 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <TooltipProvider>
+        <TooltipProvider delayDuration={400}>
           <AuthProvider>
             <ConfirmProvider>
               <AppContent />

@@ -49,12 +49,15 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
   }
 
   // Validate the base volume/path has a PZ start script before creating.
+  // containerBasePath is the path visible inside the panel container (e.g.
+  // /pz-server); basePath may already be resolved to a host path for the
+  // Docker bind mount. We check whichever is reachable from this process.
   async function preflightBaseCheck(config) {
     if (config.basePath) {
-      // Bind-mount: check if start-server.sh exists on the host
       const { existsSync } = await import("fs");
       const { join } = await import("path");
-      if (!existsSync(join(config.basePath, "start-server.sh"))) {
+      const checkPath = config.containerBasePath || config.basePath;
+      if (!existsSync(join(checkPath, "start-server.sh"))) {
         return "start-server.sh not found in base path — PZ server files may not be installed";
       }
     }

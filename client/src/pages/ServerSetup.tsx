@@ -889,10 +889,10 @@ export default function ServerSetup() {
                     <Plus className="w-5 h-5" />
                   </div>
                   <CardTitle className="text-lg flex items-center gap-1.5">
-                    Use Existing Files
+                    Use Existing Files (Local)
                     <FieldHelp
-                      description="Registers a server folder you already downloaded/installed outside the panel."
-                      context="Use this if you migrated files from another tool or already ran SteamCMD manually — no new download happens."
+                      description="Registers a server folder you already downloaded/installed outside the panel and runs PZ as a local process."
+                      context="Use this if you migrated files from another tool or already ran SteamCMD manually — no new download happens. Not for Docker setups."
                       recommendation="safe-default"
                       articleId="adding-servers"
                     />

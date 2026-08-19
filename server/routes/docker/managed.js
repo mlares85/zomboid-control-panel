@@ -197,7 +197,8 @@ router.post("/servers", requireRole("admin"), async (req, res) => {
       log.info(`Resolved container path ${basePath} → host path ${hostBasePath}`);
     }
     const result = await deps.containerFactory.createManagedServer({
-      serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb, basePath: hostBasePath, image, adminPassword,
+      serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb,
+      basePath: hostBasePath, containerBasePath: basePath, image, adminPassword,
     });
     if (!result.success) return res.status(502).json({ success: false, error: result.error });
 
