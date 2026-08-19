@@ -121,7 +121,10 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
     return {
       Image: image,
       Entrypoint: PZ_ENTRYPOINT,
-      Cmd: ["-servername", config.serverName],
+      Cmd: [
+        "-servername", config.serverName,
+        ...(config.adminPassword ? ["-adminpassword", config.adminPassword] : []),
+      ],
       Env: [
         // HOME must point at the install dir so PZ's SQLite JDBC loader
         // can extract native libs to a writable location relative to CWD.
