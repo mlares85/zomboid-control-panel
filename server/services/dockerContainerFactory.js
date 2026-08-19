@@ -93,10 +93,12 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       "  rm -rf /var/lib/apt/lists/*;",
       "  echo '[panel] 32-bit libraries installed.';",
       "fi;",
-      // Java 25+ blocks native access by default. PZ's SQLite JDBC and
-      // native libs need it. JDK_JAVA_OPTIONS is picked up automatically
-      // by any JVM invocation (unlike JAVA_TOOL_OPTIONS, no warning).
-      "export JDK_JAVA_OPTIONS='--enable-native-access=ALL-UNNAMED';",
+      // PZ's start-server.sh sets LD_LIBRARY_PATH to jre64/lib/amd64 which
+      // doesn't exist in JRE 25 (moved to jre64/lib + jre64/lib/server).
+      // Pre-set the correct paths so the JVM finds libjsig.so, libjvm.so,
+      // and SQLite's native lib extraction works.
+      "export JAVA_HOME=/opt/pz-server/jre64;",
+      "export LD_LIBRARY_PATH=/opt/pz-server/linux64:/opt/pz-server/natives:/opt/pz-server:${JAVA_HOME}/lib/server:${JAVA_HOME}/lib:${LD_LIBRARY_PATH:-};",
       // Run the PZ start script
       'exec /opt/pz-server/start-server.sh "$@"',
     ].join(" "),
