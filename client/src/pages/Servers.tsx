@@ -695,9 +695,9 @@ export default function Servers() {
                   <div className="mission-step-icon mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
                     <Download className="h-5 w-5" />
                   </div>
-                  <p className="text-sm font-semibold text-foreground">Install a new local server</p>
+                  <p className="text-sm font-semibold text-foreground">Install a new server</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    Use the installer when you need files, ports, passwords, and memory setup in one flow.
+                    Download via SteamCMD or create a Docker container — handles files, ports, passwords, and memory.
                   </p>
                   <Button className="onboarding-cta mt-4 w-full" onClick={() => navigate('/server-setup')}>
                     <Download className="mr-2 h-4 w-4" />
