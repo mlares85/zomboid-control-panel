@@ -3,15 +3,19 @@
 ## Current Focus
 Upstream dev (fpsacha) is open to merge requests. Need to analyze upstream's
 latest version and plan a migration path that preserves existing users' data
-while adding all fork features. NativeSteamCmdInstaller service built; next
-is wiring routes to delegate to it (strangler cutover).
+while adding all fork features. Installer abstraction complete — both native
+and container installers built, routes refactored.
 
 ## Recent Decisions
+- Strangler cutover done: POST /install and POST /steam-update now delegate
+  SteamCMD spawning to NativeSteamCmdInstaller. Routes keep input validation,
+  HTTP response shape, and post-install orchestration. onProgress callback
+  bridges installer events to existing Socket.IO event names.
+- ContainerSteamCmdInstaller wraps Docker-based PZ install behind the same
+  interface. Pulls steamcmd image, runs against a named volume, polls logs.
 - E2E "8 assertion mismatches" were actually 2 real mismatches (Settings
   World Map tab, Help & Wiki nav entry) plus flaky auth cascades from stale
-  refresh tokens. The auth fixture re-logs in when tokens expire, but the
-  default `e2e_admin` credentials can fail against the dev server if it has
-  different accounts.
+  refresh tokens.
 - NativeSteamCmdInstaller uses an `onProgress` callback instead of taking
   Socket.IO directly — keeps the service testable without a live server.
 - Installer abstract base class follows the FileAccess pattern: abstract
@@ -20,25 +24,17 @@ is wiring routes to delegate to it (strangler cutover).
 - Setup auto-detection scans platform-specific paths (Windows/Linux/Docker)
   for SteamCMD and existing PZ installs — exposed via
   `GET /api/server/setup/detect`.
-- Map version checker uses a separate service class (not inline in resolution)
-  to keep the periodic polling testable and stoppable on shutdown.
-- Backup destination selection is in the page header (not a dialog) because
-  it's a per-backup choice, not a global setting. Scheduler uses all enabled
-  destinations automatically.
-- Docker managed containers install 32-bit libs via inline entrypoint rather
-  than a custom Dockerfile — avoids requiring users to build/push images.
-- E2E isolation uses DATA_DIR env var rather than a test-specific config file
-  so it composes with the existing paths.js resolution without new plumbing.
-- Fork merged into main and pushed. Upstream dev open to merge requests.
 
 ## Blockers / Open Questions
 - Upstream migration strategy: 130+ commits need to be organized into
   reviewable PRs. Need to diff upstream's latest vs our fork.
-- Routes still inline SteamCMD spawn logic alongside the new installer
-  service — strangler cutover pending.
-- ContainerSteamCmdInstaller not yet built (wrapping baseVolumePopulator).
+- Docker managed route (`POST /docker/managed/populate-base`) still uses
+  baseVolumePopulator directly — could optionally switch to
+  ContainerSteamCmdInstaller for consistency, but not required since the
+  route has its own Socket.IO event names.
 
 ## Next Steps
 1. Analyze upstream repo's latest version and plan migration/PR strategy.
-2. Wire install/update routes to delegate to NativeSteamCmdInstaller.
-3. Build ContainerSteamCmdInstaller (wrapping baseVolumePopulator.js).
+2. Wire Docker managed populate-base route to ContainerSteamCmdInstaller
+   (optional — low priority since it already works).
+3. Continue provider abstraction: extract lifecycle capability next.

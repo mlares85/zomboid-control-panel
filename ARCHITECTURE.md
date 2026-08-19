@@ -108,7 +108,12 @@ Migration sequence (strangler fig): (1) characterization tests, (2) extract file
 
 ### Installer implementation (step 5 started)
 
-`server/services/installer/Installer.js` defines the abstract base class (`install()`, `update()`, `isAvailable()`). `NativeSteamCmdInstaller` wraps the SteamCMD child-process logic previously inlined in `routes/server/install.js` and `steamUpdate.js` — concurrent-op guard, LD_LIBRARY_PATH setup, Linux auto-download fallback, Steam depot access denied detection. Progress is reported via an `onProgress` callback (not Socket.IO directly) so the service is testable without a live server. `detectInstall.js` scans platform-specific paths (Windows/Linux/Docker) for SteamCMD binaries and existing PZ server installs, exposed via `GET /api/server/setup/detect`. Routes still inline the spawn logic — next step is to have them delegate to the installer service (strangler cutover).
+`server/services/installer/Installer.js` defines the abstract base class (`install()`, `update()`, `isAvailable()`). Two concrete adapters:
+
+- **`NativeSteamCmdInstaller`** — wraps the SteamCMD child-process logic with concurrent-op guard, LD_LIBRARY_PATH setup, Linux auto-download fallback, and Steam depot access denied detection. `POST /install` and `POST /steam-update` delegate to it (strangler cutover complete); routes still own input validation, HTTP response shape, and post-install orchestration (`completeSuccessfulInstall`, event logging).
+- **`ContainerSteamCmdInstaller`** — pulls `steamcmd/steamcmd:latest`, runs it against a named Docker volume, polls container logs for progress, cleans up on completion. Supports branch selection via beta args.
+
+Both report progress via an `onProgress(event, data)` callback (not Socket.IO directly) so they're testable without a live server. Routes bridge the callback to Socket.IO event names (`install:log`, `steam:log`, etc.). `detectInstall.js` scans platform-specific paths for SteamCMD binaries and existing PZ server installs, exposed via `GET /api/server/setup/detect`. `installer/index.js` provides `getNativeInstaller()` factory wired to the real SteamCMD helpers.
 
 Top risks: SFTP mirror lock semantics, losing RCON-save-before-kill during extraction, stale provider instances on server-switch, Windows process tree termination (`.bat` → Java child).
 
