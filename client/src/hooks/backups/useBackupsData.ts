@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useToast } from '@/components/ui/use-toast'
 import { useSocket } from '@/contexts/SocketContext'
-import { backupApi, serversApi, type BackupStatus, type BackupFile, type BackupFormatId } from '@/lib/api'
+import { backupApi, serversApi, type BackupStatus, type BackupFile, type BackupFormatId, type BackupDestination } from '@/lib/api'
 
 export interface BackupProgress {
   phase: 'preparing' | 'archiving' | 'finalizing' | 'complete' | 'error'
@@ -37,6 +37,9 @@ export function useBackupsData() {
   const [backupSchedule, setBackupSchedule] = useState('0 */6 * * *')
   const [backupMaxCount, setBackupMaxCount] = useState(10)
   const [savingSettings, setSavingSettings] = useState(false)
+  // Destination selection for manual backups
+  const [destinations, setDestinations] = useState<BackupDestination[]>([])
+  const [selectedDestinations, setSelectedDestinations] = useState<Set<string>>(new Set(['local']))
 
   /* ── fetchers ─────────────────────────────────────────────────────── */
   const fetchBackupStatus = useCallback(async () => {
@@ -67,12 +70,22 @@ export function useBackupsData() {
     }
   }, [])
 
+  const fetchDestinations = useCallback(async () => {
+    try {
+      const data = await backupApi.listDestinations()
+      setDestinations(data.destinations || [])
+    } catch {
+      // best-effort — destination list is optional
+    }
+  }, [])
+
   const refreshAll = useCallback(async () => {
     setLoading(true)
     try {
       await Promise.all([
         fetchBackupStatus(),
         fetchBackups(),
+        fetchDestinations(),
         serversApi.getResolvedActive()
           .then(({ server }) => setActiveServerRemote(!!server?.isRemote))
           .catch(() => setActiveServerRemote(false)),
@@ -80,7 +93,7 @@ export function useBackupsData() {
     } finally {
       setLoading(false)
     }
-  }, [fetchBackupStatus, fetchBackups])
+  }, [fetchBackupStatus, fetchBackups, fetchDestinations])
 
   /* ── effects ──────────────────────────────────────────────────────── */
   useEffect(() => { refreshAll() }, [refreshAll])
@@ -115,7 +128,11 @@ export function useBackupsData() {
     setCreatingBackup(true)
     setBackupProgress({ phase: 'preparing', percent: 0, message: 'Starting backup...' })
     try {
-      const result = await backupApi.createBackup({ format: backupFormat })
+      const destIds = Array.from(selectedDestinations)
+      const result = await backupApi.createBackup({
+        format: backupFormat,
+        destinations: destIds.length > 0 ? destIds : undefined,
+      })
       if (result.success && result.backup) {
         const backupLabel = 'name' in result.backup ? result.backup.name : (result.backup.fileName || result.backup.id)
         toast({
@@ -285,6 +302,14 @@ export function useBackupsData() {
     else setSelectedBackups(new Set(backups.map(b => b.name)))
   }
 
+  const toggleDestination = (id: string) => {
+    setSelectedDestinations(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
   /* ── derived ─────────────────────────────────────────────────────── */
   const totalSize = useMemo(() => backups.reduce((sum, b) => sum + b.size, 0), [backups])
   const isAnySelected = selectedBackups.size > 0
@@ -295,7 +320,7 @@ export function useBackupsData() {
     backupStatus, backups, loading, loadError, creatingBackup, restoringBackup,
     deletingBackups, backupProgress, uploadingBackup, uploadPercent, backupFormat,
     activeServerRemote, selectedBackups, showSettings, backupSchedule, backupMaxCount,
-    savingSettings, fileInputRef,
+    savingSettings, fileInputRef, destinations, selectedDestinations,
     // derived
     totalSize, isAnySelected, allSelected,
     // setters (for controlled inputs in the shell)
@@ -304,6 +329,6 @@ export function useBackupsData() {
     refreshAll, handleCreateBackup, handleUploadFile, handleRestoreBackup,
     handleDeleteBackups, handleDeleteOlderThan, handleSaveSettings, toggleBackupEnabled,
     // selection
-    toggleBackupSelection, toggleSelectAll,
+    toggleBackupSelection, toggleSelectAll, toggleDestination,
   }
 }

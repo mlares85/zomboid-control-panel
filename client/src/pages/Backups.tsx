@@ -46,6 +46,9 @@ export default function Backups() {
         savesExists={d.backupStatus?.savesExists ?? false}
         activeServerRemote={d.activeServerRemote}
         loading={d.loading}
+        destinations={d.destinations}
+        selectedDestinations={d.selectedDestinations}
+        onToggleDestination={d.toggleDestination}
         onCreateBackup={d.handleCreateBackup}
         onUploadClick={() => d.fileInputRef.current?.click()}
         onToggleSettings={() => d.setShowSettings(s => !s)}

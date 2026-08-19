@@ -470,11 +470,20 @@ export class Scheduler {
           // Routed through the enhanced/destination-aware pipeline (same one
           // manual backups use) rather than the legacy backupService.createBackup,
           // so scheduled backups participate in the destinations system too.
-          // destinations defaults to ["local"] to keep behavior unchanged for
-          // panels that haven't configured any extra destinations.
+          // Use all enabled destinations so scheduled backups go everywhere the
+          // user has configured, not just local.
+          let scheduledDestinations = ["local"];
+          try {
+            const { listDestinations } = await import("./backupDestinations/index.js");
+            const allDests = await listDestinations();
+            const enabledIds = allDests.filter((d) => d.enabled).map((d) => d.id);
+            if (enabledIds.length > 0) scheduledDestinations = enabledIds;
+          } catch {
+            // Fall back to local-only if destination listing fails
+          }
           const result = await createEnhancedBackup(this.backupService, {
             includeDb: settings.includeDb,
-            destinations: ["local"],
+            destinations: scheduledDestinations,
           });
           const duration = Date.now() - startTime;
           if (result.success) {
