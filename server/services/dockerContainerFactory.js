@@ -87,6 +87,10 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       "  rm -rf /var/lib/apt/lists/*;",
       "  echo '[panel] 32-bit libraries installed.';",
       "fi;",
+      // Java 25+ blocks native access by default. PZ's SQLite JDBC and
+      // native libs need it. JDK_JAVA_OPTIONS is picked up automatically
+      // by any JVM invocation (unlike JAVA_TOOL_OPTIONS, no warning).
+      "export JDK_JAVA_OPTIONS='--enable-native-access=ALL-UNNAMED';",
       // Run the PZ start script
       'exec /opt/pz-server/start-server.sh "$@"',
     ].join(" "),
