@@ -152,6 +152,22 @@ Managed routes live in `server/routes/docker/managed.js`, mounted at `/api/docke
 
 `baseVolumePopulator.js` downloads PZ server files into the `zomboid-panel-base` Docker volume by running a temporary `steamcmd/steamcmd:latest` container with `+app_update 380870 validate +quit`. Progress is polled every 3 seconds from the container's logs and emitted via Socket.IO (`docker:populate-log` / `docker:populate-complete`). The temp container is auto-removed on completion. Alternative to downloading: bind-mount an existing host path containing PZ server files (e.g., `/mnt/user/appdata/steamcmd/pzserver`), validated by `POST /validate-base-path`.
 
+## Map version checking
+
+`MapVersionChecker` (server/services/mapVersionChecker.js) periodically polls `map.projectzomboid.com` for new PZ map builds. Interval is user-configurable (1h–7d, default 24h) via `GET/PUT /api/map/settings/check-interval`. Emits `map:version-changed` over Socket.IO when a new build is detected. `b42Resolution.js` supports dynamic TTL via `setResolutionTtl()` and exposes `getResolutionState()` / `invalidateResolutionCache()` for the settings route. WorldMap.tsx has a version selector dropdown in the control rail; `mapApi.versions()` fetches available builds and `mapApi.resolve(?version=X)` resolves geometry for a specific one. The `Settings > World Map` tab shows checker status, interval control, and tile cache stats.
+
+## Backup destination selection
+
+Manual backups now support destination selection. `BackupPageHeader` renders a multi-select dropdown when multiple destinations are enabled (local + SFTP/Google Drive). The `useBackupsData` hook tracks `selectedDestinations` and passes them to `createBackup({ destinations })`. The scheduler (`scheduler.js`) queries all enabled destinations via `listDestinations()` instead of hardcoding `["local"]`, so scheduled backups go to SFTP/Google Drive automatically.
+
+## Docker managed container runtime
+
+Managed container specs (`dockerContainerFactory.js`) use an inline bash entrypoint that installs `lib32gcc-s1` + `libstdc++6:i386` on first boot (dpkg check skips on subsequent starts). PZ's native `.so` files require these 32-bit compat libs on glibc-based images like `eclipse-temurin:21-jre`. A `/tmp` tmpfs mount is included in HostConfig. `GET /api/docker/managed/servers/:id/health` inspects container state, restart count, and recent logs for common failures (missing libs, OOM, disk full), returning structured issues with severity and remediation hints.
+
+## E2E test isolation
+
+Playwright's `webServer` command runs `e2e/ensure-ports-free.sh` before `npm run dev` to kill stale processes on 3001/5173. Vite uses `strictPort: true` to fail fast instead of silently shifting ports. `DATA_DIR` env var (read by `server/utils/paths.js`) isolates the test database from production; set `E2E_DATA_DIR` to enable. `reuseExistingServer` is disabled when `E2E_DATA_DIR` is set so the test server uses the isolated DB. The `dashboard` fixture detects login failures via form-scoped alert locators to avoid strict mode violations from unrelated destructive elements on the dashboard.
+
 ## Dashboard server cards
 
 `components/dashboard/ServerCards.tsx` renders one compact `ServerCard` per configured server above the main dashboard. Non-active servers now show both a host process signal and an RCON connectivity signal (from `GET /servers/rcon-status`). The active server gets full 3-signal status (host/RCON/bridge) from `GET /servers/active/status`. Cards are clickable without nesting `<button>`s inside `<button>`s: a full-size `<button>` sits absolutely positioned behind a `pointer-events-none` content wrapper, and only the real action buttons opt back in with `pointer-events-auto` — clicks on empty card space fall through to the cover button (switches server), clicks on an action button are captured by that button first.

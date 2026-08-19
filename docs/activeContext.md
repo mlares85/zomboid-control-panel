@@ -1,33 +1,31 @@
 # Active Context
 
 ## Current Focus
-All three next-step items completed this session: map version checking with
-configurable interval + version selector UI, backup destination selection in
-create-backup UI, Docker managed container fixes (32-bit libs, tmpfs, health
-check). Upstream dev open to merge requests.
+Upstream dev (fpsacha) is open to merge requests. Need to analyze upstream's
+latest version and plan a migration path that preserves existing users' data
+while adding all fork features. E2E port conflict is fixed; 8 remaining
+test failures are UI assertion mismatches from new features.
 
 ## Recent Decisions
-- Map version checker service polls map.projectzomboid.com at a configurable
-  interval (1h–7d, default 24h). Socket.IO events notify when a new build
-  is detected. WorldMap control rail has a version selector dropdown.
-- Backup destination picker appears in the header when multiple destinations
-  are configured. Scheduler now sends to all enabled destinations, not just
-  local.
-- Docker managed containers now install lib32gcc-s1 + libstdc++6:i386 via
-  inline entrypoint on first boot. Tmpfs mounted at /tmp. Health check
-  endpoint diagnoses common failures (missing libs, OOM, disk full).
-- Fork merged into main and pushed to origin. Upstream dev (fpsacha) is open
-  to receiving changes as merge/pull requests.
+- Map version checker uses a separate service class (not inline in resolution)
+  to keep the periodic polling testable and stoppable on shutdown.
+- Backup destination selection is in the page header (not a dialog) because
+  it's a per-backup choice, not a global setting. Scheduler uses all enabled
+  destinations automatically.
+- Docker managed containers install 32-bit libs via inline entrypoint rather
+  than a custom Dockerfile — avoids requiring users to build/push images.
+- E2E isolation uses DATA_DIR env var rather than a test-specific config file
+  so it composes with the existing paths.js resolution without new plumbing.
+- Fork merged into main and pushed. Upstream dev open to merge requests.
 
 ## Blockers / Open Questions
-- E2E tests need a clean run (last failure was port conflict, not code)
-- Upstream PR strategy: 130+ commits need to be organized into reviewable
-  chunks if contributing back to fpsacha/zomboid-control-panel
-- Map settings page added but not yet behind auth middleware (follows
-  existing pattern — map proxy routes are unauthenticated)
+- Upstream migration strategy: 130+ commits need to be organized into
+  reviewable PRs. Need to diff upstream's latest vs our fork.
+- 8 E2E test assertion failures from UI changes (new Settings tab, renamed
+  nav items) — need test updates, not code fixes.
+- NativeSteamCmdInstaller not yet built (provider abstraction milestone).
 
 ## Next Steps
-1. Build NativeSteamCmdInstaller + PZ install auto-detection during setup.
-2. Prepare PR(s) for upstream repo if contributing back.
-3. E2E test clean run — fix port conflict issue.
-4. Wire WorldMap version selector to show "new version available" indicator.
+1. Analyze upstream repo's latest version and plan migration/PR strategy.
+2. Fix remaining 8 E2E test assertion mismatches.
+3. Build NativeSteamCmdInstaller + PZ install auto-detection during setup.
