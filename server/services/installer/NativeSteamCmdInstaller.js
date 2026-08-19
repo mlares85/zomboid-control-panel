@@ -202,7 +202,9 @@ export class NativeSteamCmdInstaller extends Installer {
     });
 
     return new Promise((resolve) => {
-      const streaming = steamCmd.attachStreaming(child, emit, "log", {
+      // attachStreaming expects an io-like object with .emit(eventName, data)
+      const ioShim = { emit: (_, data) => emit("log", data) };
+      const streaming = steamCmd.attachStreaming(child, ioShim, "log", {
         logFlush: operation === "install",
       });
 

@@ -1,27 +1,13 @@
 // Update/verify an existing PZ server install via SteamCMD.
-import path from "path";
-import fs from "fs";
-import { spawn } from "child_process";
 import { createLogger } from "../../utils/logger.js";
 import { logServerEvent, getSetting } from "../../database/init.js";
 import { sanitizeError } from "../../utils/sanitize.js";
 import { isValidPath } from "./shared.js";
-import {
-  getSteamCmdExe,
-  ensureSteamCmdLinux,
-  hasActiveSteamOperation,
-  activeSteamOperations,
-  recoverMismatchedSteamBranchManifest,
-  getBetaArgs,
-  getSteamLoginArgs,
-  attachSteamCmdLineStreaming,
-  isWindows,
-} from "./steamcmd.js";
+import { getNativeInstaller } from "../../services/installer/index.js";
 
 const log = createLogger("API:Server");
 
 export function registerSteamUpdateRoutes(router) {
-  // Update server using SteamCMD
   router.post("/steam-update", async (req, res) => {
     try {
       let {
@@ -32,7 +18,6 @@ export function registerSteamUpdateRoutes(router) {
         validateFiles = false,
       } = req.body;
 
-      // Determine branch - support both new 'branch' param and legacy 'useUnstable'
       const selectedBranch = branch || (useUnstable ? "unstable" : "stable");
 
       // Auto-load steamcmdPath from settings if not provided
@@ -60,161 +45,67 @@ export function registerSteamUpdateRoutes(router) {
         const isRunning = await serverManager.checkServerRunning();
         if (isRunning) {
           return res.status(400).json({
-            error:
-              "Server is currently running. Please stop the server before updating.",
+            error: "Server is currently running. Please stop the server before updating.",
           });
         }
       } catch (e) {
         log.warn(`Could not verify server status before update: ${e.message}`);
-        // Continue anyway - user may be updating a different server
-      }
-
-      // Prevent concurrent operations on the same install path
-      const normalizedPath = path.normalize(installPath).toLowerCase();
-      if (hasActiveSteamOperation(normalizedPath)) {
-        return res.status(409).json({
-          error:
-            "A Steam operation is already in progress for this server. Please wait for it to complete.",
-        });
-      }
-
-      // Auto-download SteamCMD on Linux instead of hard-failing — see
-      // ensureSteamCmdLinux.
-      let steamcmdExe = getSteamCmdExe(steamcmdPath);
-      if (!fs.existsSync(steamcmdExe)) {
-        if (isWindows) {
-          return res
-            .status(400)
-            .json({ error: `SteamCMD not found at: ${steamcmdExe}` });
-        }
-        try {
-          steamcmdExe = await ensureSteamCmdLinux(
-            steamcmdPath,
-            req.app.get("io"),
-          );
-        } catch (dlErr) {
-          return res.status(500).json({
-            error: `SteamCMD not found and auto-download failed: ${sanitizeError(dlErr.message)}`,
-          });
-        }
-      }
-
-      try {
-        const recovery = recoverMismatchedSteamBranchManifest(
-          installPath,
-          selectedBranch,
-        );
-        if (recovery) {
-          log.warn(
-            `Reset stale SteamCMD branch manifest (${recovery.mountedBranch} -> ${recovery.targetBranch}); backup: ${recovery.backupPath}`,
-          );
-        }
-      } catch (error) {
-        log.warn(`Could not inspect SteamCMD branch manifest: ${error.message}`);
       }
 
       const operation = validateFiles ? "verification" : "update";
       log.info(`Starting PZ server ${operation} (branch: ${selectedBranch})...`);
 
-      // Mark operation as active
-      activeSteamOperations.set(normalizedPath, {
-        type: operation,
-        startTime: Date.now(),
-        branch: selectedBranch,
-      });
-
-      // Build SteamCMD command
-      const betaArgs = getBetaArgs(selectedBranch);
-      const loginArgs = await getSteamLoginArgs();
-      const steamcmdArgs = [
-        "+force_install_dir",
-        installPath,
-        ...loginArgs,
-        "+app_update",
-        "380870",
-        ...betaArgs,
-        "validate",
-        "+quit",
-      ];
-
+      // ── Delegate to installer service ──────────────────────────────
       const io = req.app.get("io");
+      const installer = getNativeInstaller();
 
-      // Emit start event
-      io.emit("steam:start", {
-        type: validateFiles ? "verify" : "update",
-        message: validateFiles ? "Verifying game files..." : "Updating server...",
-      });
+      // Bridge installer progress events to Socket.IO
+      const onProgress = (event, data) => {
+        if (event === "log") io.emit("steam:log", data);
+        else if (event === "start") io.emit("steam:start", data);
+      };
 
-      // On Linux, set LD_LIBRARY_PATH so SteamCMD can find its 32-bit libraries
-      const updateSpawnOpts = { cwd: steamcmdPath };
-      if (!isWindows) {
-        const ldPaths = [
-          path.join(steamcmdPath, "linux32"),
-          path.join(steamcmdPath, "linux64"),
-          steamcmdPath,
-          process.env.LD_LIBRARY_PATH || "",
-        ]
-          .filter(Boolean)
-          .join(":");
-        updateSpawnOpts.env = { ...process.env, LD_LIBRARY_PATH: ldPaths };
-      }
-      const steamcmd = spawn(steamcmdExe, steamcmdArgs, updateSpawnOpts);
-      activeSteamOperations.get(normalizedPath).pid = steamcmd.pid;
+      // Fire-and-forget — result comes via Socket.IO
+      installer.update({
+        steamcmdPath,
+        installPath,
+        branch: selectedBranch,
+        validate: validateFiles,
+        onProgress,
+      })
+        .then((result) => {
+          io.emit("steam:complete", {
+            success: result.success,
+            message: result.success
+              ? `Server ${operation} completed successfully`
+              : result.error,
+          });
 
-      const streaming = attachSteamCmdLineStreaming(steamcmd, io, "steam:log");
-
-      steamcmd.on("close", (code) => {
-        streaming.flush();
-
-        // Clear active operation
-        activeSteamOperations.delete(normalizedPath);
-
-        const success = code === 0;
-        const output = streaming.getOutput();
-        const steamDepotAccessDenied =
-          /app ['"]?380870['"]? state is 0x6/i.test(output) ||
-          /manifest.*access denied/i.test(output);
-        const failureMessage = steamDepotAccessDenied
-          ? "SteamCMD could not access a Project Zomboid depot manifest. Your installed server files were not changed. Retry later; if it persists, update using a Steam account that owns Project Zomboid."
-          : `Server ${operation} failed with code ${code}`;
-
-        io.emit("steam:complete", {
-          success,
-          message: success
-            ? `Server ${operation} completed successfully`
-            : failureMessage,
-        });
-
-        // After successful update, re-check update status so banner clears
-        if (success) {
-          try {
-            const updateChecker = req.app.get("updateChecker");
-            if (updateChecker) {
-              setTimeout(() => updateChecker.checkForUpdates(true), 3000);
+          if (result.success) {
+            try {
+              const updateChecker = req.app.get("updateChecker");
+              if (updateChecker) {
+                setTimeout(() => updateChecker.checkForUpdates(true), 3000);
+              }
+            } catch {
+              // Non-critical
             }
-          } catch (e) {
-            // Non-critical
           }
-        }
 
-        logServerEvent(
-          success ? "server_update" : "server_update_failed",
-          `Server ${operation} ${success ? "completed" : "failed"}`,
-        ).catch((e) => log.error("Failed to log server event:", e));
+          logServerEvent(
+            result.success ? "server_update" : "server_update_failed",
+            `Server ${operation} ${result.success ? "completed" : "failed"}`,
+          ).catch((e) => log.error("Failed to log server event:", e));
 
-        log.info(`SteamCMD ${operation} finished with code ${code}`);
-      });
-
-      steamcmd.on("error", (error) => {
-        // Clear active operation on error
-        activeSteamOperations.delete(normalizedPath);
-
-        io.emit("steam:complete", {
-          success: false,
-          message: `Failed to run SteamCMD: ${sanitizeError(error.message)}`,
+          log.info(`SteamCMD ${operation} finished (success=${result.success})`);
+        })
+        .catch((err) => {
+          io.emit("steam:complete", {
+            success: false,
+            message: `Failed to run SteamCMD: ${sanitizeError(err.message)}`,
+          });
+          log.error(`SteamCMD error: ${err.message}`);
         });
-        log.error(`SteamCMD error: ${error.message}`);
-      });
 
       res.json({
         success: true,
