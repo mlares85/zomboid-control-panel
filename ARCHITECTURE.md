@@ -106,6 +106,10 @@ Platform support matrix:
 
 Migration sequence (strangler fig): (1) characterization tests, (2) extract file access, (3) extract detection, (4) extract lifecycle, (5) SteamCMD/installer last — build new Windows/Linux local-install only on the new interface. Deletion gate: when `_isDockerBacked()` has zero callers, phase 4 is done.
 
+### Installer implementation (step 5 started)
+
+`server/services/installer/Installer.js` defines the abstract base class (`install()`, `update()`, `isAvailable()`). `NativeSteamCmdInstaller` wraps the SteamCMD child-process logic previously inlined in `routes/server/install.js` and `steamUpdate.js` — concurrent-op guard, LD_LIBRARY_PATH setup, Linux auto-download fallback, Steam depot access denied detection. Progress is reported via an `onProgress` callback (not Socket.IO directly) so the service is testable without a live server. `detectInstall.js` scans platform-specific paths (Windows/Linux/Docker) for SteamCMD binaries and existing PZ server installs, exposed via `GET /api/server/setup/detect`. Routes still inline the spawn logic — next step is to have them delegate to the installer service (strangler cutover).
+
 Top risks: SFTP mirror lock semantics, losing RCON-save-before-kill during extraction, stale provider instances on server-switch, Windows process tree termination (`.bat` → Java child).
 
 ## Deferred decisions
