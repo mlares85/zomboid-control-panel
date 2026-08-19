@@ -108,9 +108,12 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
     return {
       Image: image,
       Entrypoint: PZ_ENTRYPOINT,
-      Cmd: ["-servername", config.serverName],
+      Cmd: ["-servername", config.serverName, "-cachedir=/opt/pz-data"],
       Env: [
-        `HOME=/opt/pz-data`,
+        // HOME must point at the install dir so PZ's SQLite JDBC loader
+        // can extract native libs to a writable location relative to CWD.
+        // PZ's -cachedir arg directs saves/configs to the data volume.
+        `HOME=/opt/pz-server`,
         `RCON_PORT=${rconPort}`,
         `RCON_PASSWORD=${config.rconPassword}`,
         `GAME_PORT=${gamePort}`,
