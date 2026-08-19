@@ -106,6 +106,24 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       "    echo '[panel] SQLite native lib extracted.';",
       "  else echo '[panel] SQLite extraction failed — server may not start.'; fi;",
       "fi;",
+      // Pre-configure RCON in the server INI before PZ starts.
+      // PZ reads the INI at startup; RCON won't listen without RCONEnabled=true.
+      // Extract -servername from args without consuming them.
+      "SRV_NAME='servertest';",
+      "for arg in \"$@\"; do",
+      "  if [ \"$prev\" = '-servername' ]; then SRV_NAME=\"$arg\"; fi;",
+      "  prev=\"$arg\";",
+      "done;",
+      "INI_DIR=\"${HOME}/Zomboid/Server\";",
+      "INI_FILE=\"${INI_DIR}/${SRV_NAME}.ini\";",
+      "mkdir -p \"$INI_DIR\";",
+      "if [ ! -f \"$INI_FILE\" ] && [ -n \"$RCON_PASSWORD\" ]; then",
+      "  echo '[panel] Pre-creating server INI with RCON enabled...';",
+      "  printf 'RCONEnabled=true\\nRCONPort=%s\\nRCONPassword=%s\\n' \"${RCON_PORT:-27015}\" \"$RCON_PASSWORD\" > \"$INI_FILE\";",
+      "elif [ -f \"$INI_FILE\" ] && ! grep -q 'RCONEnabled=true' \"$INI_FILE\"; then",
+      "  echo '[panel] Enabling RCON in existing INI...';",
+      "  sed -i 's/^RCONEnabled=.*/RCONEnabled=true/' \"$INI_FILE\" 2>/dev/null || printf '\\nRCONEnabled=true\\n' >> \"$INI_FILE\";",
+      "fi;",
       // Fix LD_LIBRARY_PATH for JRE 25 (lib/amd64 moved to lib/server)
       "export JAVA_HOME=/opt/pz-server/jre64;",
       "export LD_LIBRARY_PATH=/opt/pz-server/linux64:/opt/pz-server:${JAVA_HOME}/lib/server:${JAVA_HOME}/lib:${LD_LIBRARY_PATH:-};",
