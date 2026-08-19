@@ -2171,14 +2171,17 @@ export default function ServerSetup() {
           </p>
         </div>
 
-        {/* RCON - Critical */}
+        {/* Passwords - Critical */}
         <Card className="border-primary/35 bg-card shadow-sm">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-2">
               <Shield className="w-5 h-5 text-primary" />
-              <CardTitle className="text-lg">Remote Control (RCON)</CardTitle>
+              <CardTitle className="text-lg">Passwords</CardTitle>
               <Badge className="ml-auto">Required</Badge>
             </div>
+            <CardDescription>
+              RCON lets the panel manage the server. The admin password is for in-game admin access.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -2264,26 +2267,70 @@ export default function ServerSetup() {
 
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
-                  RCON Port
+                  Admin Password <span className="text-destructive">*</span>
                   <FieldHelp
-                    description="Port the RCON listener runs on."
-                    context="Must stay unique per server if you run more than one on the same machine — the panel fails to connect if two servers share a port."
-                    recommendation="safe-default"
-                    articleId="rcon-setup"
+                    description="In-game admin password, passed as the server's -adminpassword launch argument."
+                    context="Required before the server can start for the first time. This is different from the RCON password and is used to log in as admin in-game."
+                    recommendation="must-configure"
+                    articleId="first-run-checklist"
                   />
                 </Label>
-                <Input
-                  type="number"
-                  value={rconPort}
-                  onChange={(e) =>
-                    setRconPort(parseInt(e.target.value) || 27015)
-                  }
-                  className="font-mono"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Default port: 27015
-                </p>
+                <div className="relative">
+                  <Input
+                    type={showAdminPassword ? "text" : "password"}
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="For in-game admin access"
+                    className="pr-10"
+                    maxLength={128}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1 h-9 w-9 p-0"
+                    onClick={() => setShowAdminPassword(!showAdminPassword)}
+                    aria-label={
+                      showAdminPassword
+                        ? "Hide admin password"
+                        : "Show admin password"
+                    }
+                  >
+                    {showAdminPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                {adminPassword.trim().length === 0 && (
+                  <p className="text-xs text-destructive">
+                    Required before server can start
+                  </p>
+                )}
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                RCON Port
+                <FieldHelp
+                  description="Port the RCON listener runs on."
+                  context="Must stay unique per server if you run more than one on the same machine — the panel fails to connect if two servers share a port."
+                  recommendation="safe-default"
+                  articleId="rcon-setup"
+                />
+              </Label>
+              <Input
+                type="number"
+                value={rconPort}
+                onChange={(e) =>
+                  setRconPort(parseInt(e.target.value) || 27015)
+                }
+                className="font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                Default port: 27015
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -2417,71 +2464,27 @@ export default function ServerSetup() {
                 </div>
               )}
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1.5">
-                    Game Port
-                    <FieldHelp
-                      description="UDP port players connect to."
-                      context="Change this only if 16261 is already used by another server on this machine — remember to forward the new port on your router."
-                      recommendation="advanced"
-                      articleId="adding-servers"
-                    />
-                  </Label>
-                  <Input
-                    type="number"
-                    value={serverPort}
-                    onChange={(e) =>
-                      setServerPort(parseInt(e.target.value) || 16261)
-                    }
-                    className="font-mono"
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5">
+                  Game Port
+                  <FieldHelp
+                    description="UDP port players connect to."
+                    context="Change this only if 16261 is already used by another server on this machine — remember to forward the new port on your router."
+                    recommendation="advanced"
+                    articleId="adding-servers"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Default port: 16261
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1.5">
-                    Admin Password <span className="text-destructive">*</span>
-                    <FieldHelp
-                      description="In-game admin password, passed as the server's -adminpassword launch argument."
-                      context="Required before the server can start for the first time. This is different from the RCON password above and is used to log in as admin in-game."
-                      recommendation="must-configure"
-                      articleId="first-run-checklist"
-                    />
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type={showAdminPassword ? "text" : "password"}
-                      value={adminPassword}
-                      onChange={(e) => setAdminPassword(e.target.value)}
-                      placeholder="Required before first server start"
-                      className="pr-10"
-                      maxLength={128}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-1 top-1 h-9 w-9 p-0"
-                      onClick={() => setShowAdminPassword(!showAdminPassword)}
-                      aria-label={
-                        showAdminPassword
-                          ? "Hide admin password"
-                          : "Show admin password"
-                      }
-                    >
-                      {showAdminPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Required before first server start.
-                  </p>
-                </div>
+                </Label>
+                <Input
+                  type="number"
+                  value={serverPort}
+                  onChange={(e) =>
+                    setServerPort(parseInt(e.target.value) || 16261)
+                  }
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Default port: 16261
+                </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
