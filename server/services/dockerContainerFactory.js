@@ -93,12 +93,22 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       "  rm -rf /var/lib/apt/lists/*;",
       "  echo '[panel] 32-bit libraries installed.';",
       "fi;",
-      // PZ's start-server.sh sets LD_LIBRARY_PATH to jre64/lib/amd64 which
-      // doesn't exist in JRE 25 (moved to jre64/lib + jre64/lib/server).
-      // Pre-set the correct paths so the JVM finds libjsig.so, libjvm.so,
-      // and SQLite's native lib extraction works.
+      // PZ's SQLite JDBC looks for libsqlitejdbc.so in java.library.path
+      // (set to linux64/ by ProjectZomboid64.json). The .so is bundled
+      // inside projectzomboid.jar but the JNI-launched JVM can't extract
+      // it at runtime. Pre-extract it so PZ finds it on the filesystem.
+      "if [ ! -f /opt/pz-server/linux64/libsqlitejdbc.so ]; then",
+      "  echo '[panel] Extracting SQLite native lib from JAR...';",
+      "  cd /tmp && /opt/pz-server/jre64/bin/jar xf /opt/pz-server/java/projectzomboid.jar org/sqlite/native/Linux/x86_64/libsqlitejdbc.so 2>/dev/null;",
+      "  if [ -f org/sqlite/native/Linux/x86_64/libsqlitejdbc.so ]; then",
+      "    cp org/sqlite/native/Linux/x86_64/libsqlitejdbc.so /opt/pz-server/linux64/libsqlitejdbc.so;",
+      "    rm -rf org/;",
+      "    echo '[panel] SQLite native lib extracted.';",
+      "  else echo '[panel] SQLite extraction failed — server may not start.'; fi;",
+      "fi;",
+      // Fix LD_LIBRARY_PATH for JRE 25 (lib/amd64 moved to lib/server)
       "export JAVA_HOME=/opt/pz-server/jre64;",
-      "export LD_LIBRARY_PATH=/opt/pz-server/linux64:/opt/pz-server/natives:/opt/pz-server:${JAVA_HOME}/lib/server:${JAVA_HOME}/lib:${LD_LIBRARY_PATH:-};",
+      "export LD_LIBRARY_PATH=/opt/pz-server/linux64:/opt/pz-server:${JAVA_HOME}/lib/server:${JAVA_HOME}/lib:${LD_LIBRARY_PATH:-};",
       // Run the PZ start script
       'exec /opt/pz-server/start-server.sh "$@"',
     ].join(" "),
