@@ -126,6 +126,14 @@ All deps are injected (spawn, execFile, exec, fs) so both adapters are testable 
 
 Both report progress via an `onProgress(event, data)` callback (not Socket.IO directly) so they're testable without a live server. Routes bridge the callback to Socket.IO event names (`install:log`, `steam:log`, etc.). `detectInstall.js` scans platform-specific paths for SteamCMD binaries and existing PZ server installs, exposed via `GET /api/server/setup/detect`. `installer/index.js` provides `getNativeInstaller()` factory wired to the real SteamCMD helpers.
 
+### Provider registry
+
+`server/services/providers/ProviderRegistry.js` maps provider type strings to declarative capability factory entries (`{label, capabilities, create(deps, cfg)}`). `createDefaultRegistry()` in `defaultRegistry.js` wires all four types: `native` → NativeLifecycle + LocalFiles + installer; `docker-local` → LocalFiles only; `docker-managed` → DockerLifecycle + LocalFiles + ContainerSteamCmdInstaller; `remote-sftp` → all null (SftpMirrorFiles wired separately). Not yet consumed by ServerManager — the registry is defined, not integrated.
+
+### ServerManager decomposition
+
+The monolith (originally 1,624 lines) has been decomposed via strangler fig. Extracted services: `processDetection.js` (pgrep/WMI scanning, ownership scoring), `launchConfigBuilder.js` (command validation, platform spawn config, LD_LIBRARY_PATH), `serverConfigIo.js` (INI parse/read/write, mod list), `serverNetwork.js` (IP detection, public IP fetch). ServerManager methods become thin delegations; orchestration (start/stop/restart, config loading, status) stays in the class. Current size: ~1,018 lines.
+
 Top risks: SFTP mirror lock semantics, losing RCON-save-before-kill during extraction, stale provider instances on server-switch, Windows process tree termination (`.bat` → Java child).
 
 ## Deferred decisions

@@ -1,36 +1,30 @@
 # Active Context
 
 ## Current Focus
-Upstream dev (fpsacha) is open to merge requests. Need to analyze upstream's
-latest version and plan a migration path. ServerManager decomposition
-milestone: 1,624 → 1,018 lines (-37%).
+ServerManager decomposition milestone reached (1,624 → 1,018). Upstream
+analysis complete — 10-PR strategy planned, upstream-only features adopted.
+Next: real-world smoke testing of refactored code paths, then start
+submitting PRs to upstream.
 
-## ServerManager decomposition progress
-| Extracted to | Lines | What |
-|---|---|---|
-| lifecycle/DockerLifecycle.js | 80 | Docker start/stop |
-| lifecycle/NativeLifecycle.js | 193 | Process kill, generic force stop |
-| processDetection.js | 282 | PZ process scanning, ownership scoring |
-| serverConfigIo.js | 135 | INI parse/read/write, mod list, game port |
-| serverNetwork.js | 75 | IP detection, network interfaces, public IP |
-| launchConfigBuilder.js | 171 | Start command validation, platform spawn config |
-| **Total extracted** | **936** | **ServerManager: 1,624 → 1,018 (-606)** |
-
-## Remaining in ServerManager (1,018 lines)
-- `loadConfig()` — 117 lines (complex `this.*` coupling, needs seed pattern)
-- `startServer()` — ~100 lines (config assembly extracted, spawn/crash-detect remains)
-- `restartServer()` — 114 lines (orchestration — belongs here per ARCHITECTURE.md)
-- `stopServer()` — 73 lines (orchestration — belongs here)
-- `getServerStatus()` — 73 lines (could extract but depends on many `this` fields)
-- `_waitForImmediateCrash` — 40 lines
-- Constructor/reloadConfig/loadConfig — ~150 lines
-- Docker lifecycle delegation methods — ~50 lines
-- Process detection delegation — ~45 lines
-- Config/network delegations — ~30 lines
+## Recent Decisions
+- Upstream PRs, not merge: 74 merge conflicts make a straight merge too
+  risky. Submit fork improvements as focused PRs rebased onto upstream/main.
+- 8 upstream test files dropped: they assume upstream's route shapes which
+  differ from our decomposed routes. Our own tests cover the same behavior.
+- loadConfig() left in ServerManager: extracting it requires a seed-pattern
+  fix (Object.assign clobbers Docker fields when DB has no value). Too risky
+  to refactor without integration testing first.
+- startServer() spawn delegation uses buildLaunchConfig() to produce the
+  config, but keeps _openLaunchLog/_waitForImmediateCrash in ServerManager
+  since they need `this.serverProcess` state.
 
 ## Blockers / Open Questions
-- Upstream migration: 140 fork commits vs 35 upstream commits since fork point.
-  Upstream at v1.1.49, fork at v1.1.41.
+- No integration test environment available (macOS, no Docker) — refactored
+  start/stop/install code paths need real-world smoke testing on Linux.
+- 10 upstream files exist in both forks with different content (PanelBridge
+  mod, SFTP transport, schemas) — need deliberate merge review.
 
 ## Next Steps
-1. Analyze upstream diff and plan PR strategy.
+1. Smoke test on Linux/Docker: start, stop, install, update, config save.
+2. Submit first upstream PRs (E2E tests, Wiki, Onboarding wizard).
+3. Wire ProviderRegistry into ServerManager for capability lookup.
