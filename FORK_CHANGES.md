@@ -158,8 +158,34 @@ All 7 remaining monolith route files converted to 2-line re-export shims:
 - `tokenGen` counter invalidates all tokens on password change
 - Docker bridge NAT bypass prevention on password reset tokens
 - Pattern-based secret masking (`SENSITIVE_FIELD_RE`) replaces brittle allowlists
-- `requireRole("admin")` on all sensitive endpoints (mod install, auto-scan, app settings)
+- `requireRole("admin")` on all sensitive endpoints (mod install, auto-scan, app settings, RCON execute/connect/disconnect, Docker managed create/delete/populate/base-volume)
 - Path-traversal guard on `getServerName()` and chunk browser
+- `sanitizeServerResponse` on Docker managed server creation (prevented password leak)
+
+---
+
+## Gap Analysis Fixes
+Full audit uncovered 19 findings (2 critical, 5 high, 7 medium, 5 low):
+
+### Critical — Dead features wired up
+- `environment.js` route mounted — onboarding auto-detection was 404ing since decomposition
+- `discovery.js` route mounted — server discovery banner and create-from-discovery flow were completely dead
+
+### High — Security + correctness
+- RCON execute/connect/disconnect locked to admin role
+- Docker managed routes (create, delete, populate, base-volume) locked to admin role
+- Docker delete error: fallback cleanup prevents orphaned DB records
+- `startCommand` added to server update whitelist (edits were silently dropped)
+- Backup destination errors surfaced as `destinationErrors` array + warning toast
+
+### Medium — Workflow fixes
+- Backup history records cleaned up when file is deleted
+- Scheduled backups wired through `createEnhancedBackup` (destinations pipeline)
+- `GET /api/templates/capture` route ordering fixed (was shadowed by `/:id`)
+- Docker delete: base-files checkbox auto-checks container, includes self in warning
+- Discord wizard: fixed step number references
+- BackupHistoryTable auto-refreshes via `backup:changed` socket event
+- Removed unnecessary `as any` casts
 
 ---
 
