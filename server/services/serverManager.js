@@ -1,4 +1,4 @@
-import { spawn, exec, execFile } from "child_process";
+import { spawn, execFile } from "child_process";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -20,6 +20,17 @@ import { LocalFiles } from "./fileAccess/index.js";
 import { isRemoteProvider } from "../utils/serverProvider.js";
 import { DockerLifecycle } from "./lifecycle/DockerLifecycle.js";
 import { NativeLifecycle } from "./lifecycle/NativeLifecycle.js";
+import {
+  scanDedicatedServerProcesses,
+  scoreServerProcessOwnership,
+} from "./processDetection.js";
+
+// Re-exported for backward compatibility — callers and tests still
+// import these process-detection helpers from serverManager.js.
+export {
+  scoreServerProcessOwnership,
+  isWindowsDedicatedServerCommandLine,
+} from "./processDetection.js";
 
 const isWindows = process.platform === "win32";
 // How long a live-looked-up public IP is trusted before re-checking.
@@ -89,112 +100,12 @@ function getDefaultStartupScript() {
   return isWindows ? "StartServer64.bat" : "start-server.sh";
 }
 
-export function isWindowsDedicatedServerCommandLine(commandLine) {
-  const normalized =
-    typeof commandLine === "string" ? commandLine.toLowerCase() : "";
-  if (!normalized) return false;
-
-  // 1. Direct Java execution
-  if (normalized.includes("zombie.network.gameserver")) {
-    return true;
-  }
-
-  // 2. Native Launcher (Wrappers like WinGSM often call these with specific flags)
-  if (
-    normalized.includes("projectzomboid64.exe") ||
-    normalized.includes("projectzomboid32.exe")
-  ) {
-    if (
-      normalized.includes("-server") ||
-      normalized.includes("startserver") ||
-      normalized.includes("-servername")
-    ) {
-      return true;
-    }
-  }
-
-  // 3. Fallback for custom generic setups (must explicitly name Zomboid)
-  if (
-    normalized.includes("zomboid") &&
-    (normalized.includes("-server") || normalized.includes("startserver"))
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
 // A server's `provider` isn't stored explicitly yet — only `isRemote` is.
 // Derive it so the startServer() guard (and future Docker-aware providers)
 // have one place to ask "is this a process we're allowed to spawn?".
 export function resolveServerProvider(server) {
   if (server?.provider) return server.provider;
   return server?.isRemote ? "remote-sftp" : "native";
-}
-
-// Pull the value of a PZ launch argument (`-servername X`, `-cachedir="Y"`)
-// out of a raw command line.
-function extractLaunchArgValue(commandLine, flag) {
-  const pattern = new RegExp(
-    `(?:^|\\s)-${flag}(?:\\s*=\\s*|\\s+)("[^"]*"|'[^']*'|\\S+)`,
-    "i",
-  );
-  const match = String(commandLine || "").match(pattern);
-  if (!match) return null;
-  const value = match[1].replace(/^["']|["']$/g, "").trim();
-  return value || null;
-}
-
-function normalizePathForCompare(value) {
-  const normalized = String(value || "")
-    .trim()
-    .replace(/^["']|["']$/g, "")
-    .replace(/[\\/]+/g, "/")
-    .replace(/\/+$/, "");
-  return isWindows ? normalized.toLowerCase() : normalized;
-}
-
-/**
- * How strongly a running process looks like it belongs to a given server.
- * Returns -1 when a launch argument proves it belongs to a DIFFERENT server,
- * 0 when the command line carries no identifying argument at all (so it
- * can't be attributed either way), and a positive score when it matches.
- *
- * This is what lets one host run several dedicated servers: the panel writes
- * `-servername` (and usually `-cachedir`) into every startup script it
- * generates, so each process names the server it belongs to.
- */
-export function scoreServerProcessOwnership(commandLine, descriptor = {}) {
-  const cmd = String(commandLine || "");
-  if (!cmd) return 0;
-
-  let score = 0;
-
-  const nameArg = extractLaunchArgValue(cmd, "servername");
-  if (nameArg && descriptor.serverName) {
-    if (nameArg.toLowerCase() !== String(descriptor.serverName).toLowerCase()) {
-      return -1;
-    }
-    score += 3;
-  }
-
-  const cacheArg = extractLaunchArgValue(cmd, "cachedir");
-  if (cacheArg && descriptor.savePath) {
-    if (
-      normalizePathForCompare(cacheArg) !==
-      normalizePathForCompare(descriptor.savePath)
-    ) {
-      return -1;
-    }
-    score += 2;
-  }
-
-  const installPath = normalizePathForCompare(descriptor.serverPath);
-  if (installPath && normalizePathForCompare(cmd).includes(installPath)) {
-    score += 1;
-  }
-
-  return score;
 }
 
 export class ServerManager {
@@ -513,166 +424,7 @@ export class ServerManager {
   // Raw OS scan: every Project Zomboid dedicated server process on this host,
   // regardless of which configured server it belongs to.
   async _scanDedicatedServerProcesses() {
-    return new Promise((resolve) => {
-      log.debug(
-        `getServerProcessDetails: starting detection (platform=${process.platform})`,
-      );
-      const matched = [];
-      const pushMatch = (cmd, pid) => {
-        // Keep the command line intact: ownership matching needs the
-        // -servername / -cachedir arguments, which sit well past 240 chars.
-        const full = String(cmd || "");
-        matched.push(pid ? { pid: String(pid), cmd: full } : { cmd: full });
-      };
-
-      const timeout = setTimeout(() => {
-        log.warn(
-          "getServerProcessDetails: process detection timed out, assuming server is not running",
-        );
-        resolve({ running: false, matched: [], scanFailed: true });
-      }, 10000);
-
-      if (isWindows) {
-        const psCmd =
-          "powershell -Command \"Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(java\\.exe|ProjectZomboid64\\.exe|ProjectZomboid32\\.exe)$' } | Select-Object ProcessId,CommandLine | ConvertTo-Csv -NoTypeInformation\"";
-        exec(psCmd, { timeout: 8000 }, (psError, psStdout) => {
-          clearTimeout(timeout);
-          if (psError || !psStdout) {
-            this.isRunning = false;
-            resolve({ running: false, matched: [], scanFailed: true });
-            return;
-          }
-
-          const lines = psStdout.split(/\r?\n/);
-          for (let raw of lines) {
-            raw = raw.trim();
-            if (!raw || raw.startsWith('"ProcessId"')) continue;
-            // CSV: "<pid>","<cmd>" — strip outer quotes / un-double internal "" pairs.
-            const csvMatch = raw.match(/^"([^"]*)","((?:[^"]|"")*)"$/);
-            if (!csvMatch) continue;
-            const pid = csvMatch[1];
-            const cmd = csvMatch[2].replace(/""/g, '"');
-            if (!cmd) continue;
-            if (isWindowsDedicatedServerCommandLine(cmd)) {
-              log.debug(
-                `getServerProcessDetails: matched PZ server process pid=${pid}: ${cmd.substring(0, 200)}`,
-              );
-              pushMatch(cmd, pid);
-            }
-          }
-
-          this.isRunning = matched.length > 0;
-          resolve({ running: matched.length > 0, matched });
-        });
-      } else {
-        // Linux/macOS: pgrep first (faster, more reliable), fall back to ps aux -ww.
-        // Use the same dedicated-server heuristics as Windows so a player
-        // running the *game* (ProjectZomboid64) on the same box doesn't
-        // false-positive as a running dedicated server. Direct
-        // `zombie.network.GameServer` java invocations always qualify.
-        const isLinuxDedicatedServerCommandLine = (cmd) => {
-          const lower = String(cmd || "").toLowerCase();
-          if (!lower) return false;
-          if (lower.includes("zombie.network.gameserver")) return true;
-          if (
-            lower.includes("projectzomboid64") ||
-            lower.includes("projectzomboid32")
-          ) {
-            if (
-              lower.includes("-server") ||
-              lower.includes("startserver") ||
-              lower.includes("-servername")
-            ) {
-              return true;
-            }
-            return false;
-          }
-          if (
-            lower.includes("zomboid") &&
-            (lower.includes("-server") || lower.includes("startserver"))
-          ) {
-            return true;
-          }
-          return false;
-        };
-
-        log.debug("getServerProcessDetails: trying pgrep -af first...");
-        exec(
-          'pgrep -af "zombie.network.[Gg]ame[Ss]erver|[Pp]roject[Zz]omboid64|[Pp]roject[Zz]omboid32"',
-          { timeout: 8000 },
-          (pgrepErr, pgrepOut) => {
-            if (!pgrepErr && pgrepOut && pgrepOut.trim()) {
-              for (const line of pgrepOut.split(/\r?\n/)) {
-                const trimmed = line.trim();
-                if (!trimmed) continue;
-                // pgrep -af format: "<pid> <cmdline>"
-                const m = trimmed.match(/^(\d+)\s+(.*)$/);
-                const pid = m ? m[1] : undefined;
-                const cmd = m ? m[2] : trimmed;
-                if (!isLinuxDedicatedServerCommandLine(cmd)) {
-                  log.debug(
-                    `getServerProcessDetails: pgrep candidate ignored (not a dedicated server): ${cmd.substring(0, 200)}`,
-                  );
-                  continue;
-                }
-                pushMatch(cmd, pid);
-              }
-              log.debug(
-                `getServerProcessDetails: pgrep matched ${matched.length} process(es)`,
-              );
-              clearTimeout(timeout);
-              this.isRunning = matched.length > 0;
-              resolve({ running: matched.length > 0, matched });
-              return;
-            }
-            // Fallback: ps aux
-            log.debug(
-              "getServerProcessDetails: pgrep failed or empty, falling back to ps aux -ww",
-            );
-            exec("ps aux -ww", { timeout: 8000 }, (err, stdout) => {
-              clearTimeout(timeout);
-              if (err || !stdout) {
-                this.isRunning = false;
-                resolve({ running: false, matched: [], scanFailed: true });
-                return;
-              }
-              for (const line of stdout.split(/\r?\n/)) {
-                const lower = line.toLowerCase();
-                if (
-                  !lower.includes("zombie.network.gameserver") &&
-                  !lower.includes("projectzomboid64") &&
-                  !lower.includes("projectzomboid32")
-                ) {
-                  continue;
-                }
-                // Skip our own grep / pgrep / ps invocations
-                if (
-                  /\b(ps|pgrep|grep)\b.*\b(zombie|projectzomboid)/.test(
-                    lower,
-                  ) &&
-                  !lower.includes("java") &&
-                  !lower.includes("-server")
-                ) {
-                  continue;
-                }
-                // ps aux columns: USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND
-                const m = line
-                  .trim()
-                  .match(
-                    /^\S+\s+(\d+)\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(.*)$/,
-                  );
-                const pid = m ? m[1] : undefined;
-                const cmd = m ? m[2] : line.trim();
-                if (!isLinuxDedicatedServerCommandLine(cmd)) continue;
-                pushMatch(cmd, pid);
-              }
-              this.isRunning = matched.length > 0;
-              resolve({ running: matched.length > 0, matched });
-            });
-          },
-        );
-      }
-    });
+    return scanDedicatedServerProcesses(this._getOwnershipDescriptor());
   }
 
   async getProcessUptimeSeconds(pid) {
