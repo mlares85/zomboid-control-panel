@@ -212,7 +212,7 @@ router.post("/servers", requireRole("admin"), async (req, res) => {
       dockerContainerId: result.containerId,
       dockerContainerName: result.containerName,
       installPath: basePath || "/opt/pz-server",
-      zomboidDataPath: "/opt/pz-data",
+      zomboidDataPath: "/root/Zomboid",
       rconHost: result.containerName,
       rconPort,
       rconPassword,

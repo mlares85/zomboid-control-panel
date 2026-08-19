@@ -19,7 +19,7 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
   // Bind-mounts an existing host directory or the shared named volume.
   // Not read-only: PZ writes temp files, logs, and extracts native libs
   // (SQLite JNI) into its install directory at runtime. Multi-server
-  // isolation comes from separate data volumes (/opt/pz-data), not from
+  // isolation comes from separate data volumes (/root/Zomboid), not from
   // protecting the base — PZ's runtime writes are ephemeral.
   function baseMount(config) {
     if (config.basePath) return `${config.basePath}:/opt/pz-server`;
@@ -108,21 +108,8 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       "    echo '[panel] SQLite native lib extracted.';",
       "  else echo '[panel] SQLite extraction failed — server may not start.'; fi;",
       "fi;",
-      // PZ running as root writes to /root/Zomboid/ regardless of HOME.
-      // Symlink it to the persistent data volume so saves survive container
-      // destruction. The volume is mounted at /opt/pz-data.
-      "if [ ! -L /root/Zomboid ] && [ ! -d /root/Zomboid ]; then",
-      "  mkdir -p /opt/pz-data/Zomboid;",
-      "  ln -s /opt/pz-data/Zomboid /root/Zomboid;",
-      "  echo '[panel] Linked /root/Zomboid → /opt/pz-data/Zomboid';",
-      "elif [ -d /root/Zomboid ] && [ ! -L /root/Zomboid ]; then",
-      // Existing dir from a previous boot — move contents to volume
-      "  mkdir -p /opt/pz-data/Zomboid;",
-      "  cp -a /root/Zomboid/. /opt/pz-data/Zomboid/ 2>/dev/null;",
-      "  rm -rf /root/Zomboid;",
-      "  ln -s /opt/pz-data/Zomboid /root/Zomboid;",
-      "  echo '[panel] Migrated /root/Zomboid → /opt/pz-data/Zomboid';",
-      "fi;",
+      // No symlink needed — the data volume mounts directly at /root/Zomboid
+      // (where PZ writes saves/configs when running as root).
       // Pre-configure RCON in the server INI before PZ starts.
       // PZ reads the INI at startup; RCON won't listen without RCONEnabled=true.
       // Extract -servername from args without consuming them.
@@ -162,10 +149,8 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
         ...(config.adminPassword ? ["-adminpassword", config.adminPassword] : []),
       ],
       Env: [
-        // HOME must point at the install dir so PZ's SQLite JDBC loader
-        // can extract native libs to a writable location relative to CWD.
-        // PZ's -cachedir arg directs saves/configs to the data volume.
-        `HOME=/opt/pz-server`,
+        // No HOME override needed — PZ running as root uses /root/Zomboid
+        // for data (mounted as the persistent data volume).
         `RCON_PORT=${rconPort}`,
         `RCON_PASSWORD=${config.rconPassword}`,
         `GAME_PORT=${gamePort}`,
@@ -184,7 +169,9 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       HostConfig: {
         Binds: [
           baseMount(config),
-          `zomboid-srv-${config.serverName}:/opt/pz-data`,
+          // PZ running as root writes saves/configs to /root/Zomboid.
+          // Mount the data volume there directly for persistence.
+          `zomboid-srv-${config.serverName}:/root/Zomboid`,
         ],
         PortBindings: {
           [`${gamePort}/udp`]: [{ HostPort: String(gamePort) }],
