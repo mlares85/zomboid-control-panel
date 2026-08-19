@@ -106,7 +106,18 @@ Platform support matrix:
 
 Migration sequence (strangler fig): (1) characterization tests, (2) extract file access, (3) extract detection, (4) extract lifecycle, (5) SteamCMD/installer last — build new Windows/Linux local-install only on the new interface. Deletion gate: when `_isDockerBacked()` has zero callers, phase 4 is done.
 
-### Installer implementation (step 5 started)
+### Lifecycle implementation (step 4 complete)
+
+`server/services/lifecycle/Lifecycle.js` defines the abstract base class (`launch()`, `terminate()`, `isRunning()`). Two concrete adapters:
+
+- **`DockerLifecycle`** — wraps Docker container start/stop with a `_guard()` helper for availability/ref checks. ServerManager delegates `_startDockerContainer` and `_stopDockerContainer` to it, keeping state tracking (`isRunning`, `startTime`) and event logging in the orchestrator.
+- **`NativeLifecycle`** — spawns processes via `launch({command, args, cwd, env, logPath})`, kills specific PIDs via `terminate(pids)`, and has a `terminateAll()` fallback (pkill/taskkill). `isRunning()` returns false (known gap — process detection is complex and stays in ServerManager until the provider registry is fully wired). ServerManager delegates `_killPids` and `_genericForceStop` to it.
+
+All deps are injected (spawn, execFile, exec, fs) so both adapters are testable without real processes or Docker sockets.
+
+### Installer implementation (step 5 complete)
+
+**Note:** "step 5 started" from the original migration sequence — renumbered to "complete" since both adapters are built and routes are wired.
 
 `server/services/installer/Installer.js` defines the abstract base class (`install()`, `update()`, `isAvailable()`). Two concrete adapters:
 
