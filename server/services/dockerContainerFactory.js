@@ -108,6 +108,21 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       "    echo '[panel] SQLite native lib extracted.';",
       "  else echo '[panel] SQLite extraction failed — server may not start.'; fi;",
       "fi;",
+      // PZ running as root writes to /root/Zomboid/ regardless of HOME.
+      // Symlink it to the persistent data volume so saves survive container
+      // destruction. The volume is mounted at /opt/pz-data.
+      "if [ ! -L /root/Zomboid ] && [ ! -d /root/Zomboid ]; then",
+      "  mkdir -p /opt/pz-data/Zomboid;",
+      "  ln -s /opt/pz-data/Zomboid /root/Zomboid;",
+      "  echo '[panel] Linked /root/Zomboid → /opt/pz-data/Zomboid';",
+      "elif [ -d /root/Zomboid ] && [ ! -L /root/Zomboid ]; then",
+      // Existing dir from a previous boot — move contents to volume
+      "  mkdir -p /opt/pz-data/Zomboid;",
+      "  cp -a /root/Zomboid/. /opt/pz-data/Zomboid/ 2>/dev/null;",
+      "  rm -rf /root/Zomboid;",
+      "  ln -s /opt/pz-data/Zomboid /root/Zomboid;",
+      "  echo '[panel] Migrated /root/Zomboid → /opt/pz-data/Zomboid';",
+      "fi;",
       // Pre-configure RCON in the server INI before PZ starts.
       // PZ reads the INI at startup; RCON won't listen without RCONEnabled=true.
       // Extract -servername from args without consuming them.
@@ -116,15 +131,15 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       "  if [ \"$prev\" = '-servername' ]; then SRV_NAME=\"$arg\"; fi;",
       "  prev=\"$arg\";",
       "done;",
-      "INI_DIR=\"${HOME}/Zomboid/Server\";",
+      "INI_DIR=\"/root/Zomboid/Server\";",
       "INI_FILE=\"${INI_DIR}/${SRV_NAME}.ini\";",
       "mkdir -p \"$INI_DIR\";",
       "if [ ! -f \"$INI_FILE\" ] && [ -n \"$RCON_PASSWORD\" ]; then",
-      "  echo '[panel] Pre-creating server INI with RCON enabled...';",
+      "  echo \"[panel] Pre-creating RCON config at $INI_FILE\";",
       "  printf 'RCONEnabled=true\\nRCONPort=%s\\nRCONPassword=%s\\n' \"${RCON_PORT:-27015}\" \"$RCON_PASSWORD\" > \"$INI_FILE\";",
-      "elif [ -f \"$INI_FILE\" ] && ! grep -q 'RCONEnabled=true' \"$INI_FILE\"; then",
-      "  echo '[panel] Enabling RCON in existing INI...';",
-      "  sed -i 's/^RCONEnabled=.*/RCONEnabled=true/' \"$INI_FILE\" 2>/dev/null || printf '\\nRCONEnabled=true\\n' >> \"$INI_FILE\";",
+      "elif [ -f \"$INI_FILE\" ] && [ -n \"$RCON_PASSWORD\" ]; then",
+      "  grep -q 'RCONEnabled=true' \"$INI_FILE\" || { sed -i 's/^RCONEnabled=.*/RCONEnabled=true/' \"$INI_FILE\" 2>/dev/null || printf '\\nRCONEnabled=true\\n' >> \"$INI_FILE\"; };",
+      "  grep -q \"RCONPassword=$RCON_PASSWORD\" \"$INI_FILE\" || sed -i \"s/^RCONPassword=.*/RCONPassword=$RCON_PASSWORD/\" \"$INI_FILE\";",
       "fi;",
       // Fix LD_LIBRARY_PATH for JRE 25 (lib/amd64 moved to lib/server)
       "export JAVA_HOME=/opt/pz-server/jre64;",
