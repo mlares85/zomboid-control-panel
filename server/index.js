@@ -238,6 +238,8 @@ import backupRecordsRoutes from "./routes/backupRecordsRoute.js";
 import mapProxyRoutes from "./routes/mapProxy.js";
 import dockerRoutes from "./routes/docker.js";
 import templatesRoutes from "./routes/templates.js";
+import environmentRoutes from "./routes/environment.js";
+import discoveryRoutes from "./routes/discovery.js";
 import panelBridge from "./services/panelBridge.js";
 
 dotenv.config();
@@ -1110,8 +1112,13 @@ app.use("/api/auth", authRoutes);
 
 // API Routes
 app.use("/api/server", serverRoutes);
+// discoveryRoutes MUST be mounted before serversRoutes — it defines literal
+// paths (e.g. /discover-mounts) that would otherwise be shadowed by
+// serversRoutes' /:id wildcard.
+app.use("/api/servers", discoveryRoutes);
 app.use("/api/servers", serversRoutes);
 app.use("/api/servers", serverStatusRoutes);
+app.use("/api/system", environmentRoutes);
 app.use("/api/server-files", serverFilesRoutes);
 app.use("/api/players", playerRoutes);
 app.use("/api/rcon", rconRoutes);

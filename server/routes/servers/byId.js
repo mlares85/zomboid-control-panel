@@ -57,6 +57,7 @@ const ALLOWED_SERVER_UPDATE_FIELDS = [
   "isRemote",
   "startBat",
   "batFile",
+  "startCommand",
   "description",
   "adminPassword",
 ];

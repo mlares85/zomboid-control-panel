@@ -2591,6 +2591,7 @@ export const backupApi = {
     backup?: BackupFile | BackupRecord;
     duration?: number;
     message?: string;
+    destinationErrors?: { destinationId: string; message: string }[];
   }> => apiPost("/backup/create", options || {}),
 
   // Delete a backup

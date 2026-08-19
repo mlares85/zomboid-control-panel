@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select'
 import { EmptyState } from '@/components/EmptyState'
 import { useToast } from '@/components/ui/use-toast'
+import { useSocket } from '@/contexts/SocketContext'
 import { backupApi, BackupRecord, BackupServerSummary } from '@/lib/api'
 import { formatBytes, formatDate, truncateChecksum } from './formatUtils'
 import { BackupDetailPanel } from './BackupDetailPanel'
@@ -49,6 +50,7 @@ function ServerFilter({ servers, value, onChange }: {
 
 export function BackupHistoryTable() {
   const { toast } = useToast()
+  const socket = useSocket()
   const [records, setRecords] = useState<BackupRecord[]>([])
   const [servers, setServers] = useState<BackupServerSummary[]>([])
   const [serverFilter, setServerFilter] = useState(ALL_SERVERS)
@@ -92,6 +94,20 @@ export function BackupHistoryTable() {
     fetchRecords()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverFilter])
+
+  // Backups can be created/restored/deleted from other parts of the panel
+  // (Backups.tsx, dashboard ServerCard, Discord commands, scheduler) — refresh
+  // this table whenever the server confirms any of those actions completed.
+  useEffect(() => {
+    if (!socket) return
+    const handleChanged = () => {
+      fetchRecords()
+      fetchServers()
+    }
+    socket.on('backup:changed', handleChanged)
+    return () => { socket.off('backup:changed', handleChanged) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, serverFilter])
 
   const handleVerify = async (id: string) => {
     setVerifyingId(id)

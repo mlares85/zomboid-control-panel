@@ -25,6 +25,22 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Registered before `/:id` so Express matches this literal path first —
+// otherwise `/capture` would be swallowed by `/:id` (with id="capture").
+router.get("/capture", async (req, res) => {
+  try {
+    const { serverId } = req.query;
+    if (!serverId) return res.status(400).json({ error: "serverId is required" });
+
+    const result = await captureServerConfig(serverId);
+    if (!result.success) return res.status(400).json({ error: result.error });
+    res.json(result);
+  } catch (error) {
+    log.error(`Failed to capture server config: ${error.message}`);
+    res.status(500).json({ error: sanitizeError(error.message) });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   try {
     const template = await getTemplate(req.params.id);
@@ -43,20 +59,6 @@ router.post("/", async (req, res) => {
     res.json(result);
   } catch (error) {
     log.error(`Failed to create template: ${error.message}`);
-    res.status(500).json({ error: sanitizeError(error.message) });
-  }
-});
-
-router.get("/capture", async (req, res) => {
-  try {
-    const { serverId } = req.query;
-    if (!serverId) return res.status(400).json({ error: "serverId is required" });
-
-    const result = await captureServerConfig(serverId);
-    if (!result.success) return res.status(400).json({ error: result.error });
-    res.json(result);
-  } catch (error) {
-    log.error(`Failed to capture server config: ${error.message}`);
     res.status(500).json({ error: sanitizeError(error.message) });
   }
 });

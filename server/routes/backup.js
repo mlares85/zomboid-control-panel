@@ -92,6 +92,7 @@ router.delete("/:name", requireRole("admin"), async (req, res) => {
     const result = await backupService.deleteBackup(req.params.name);
 
     if (result.success) {
+      req.app.get("io")?.emit("backup:changed", { action: "delete" });
       res.json(result);
     } else {
       res.status(400).json(result);
@@ -167,6 +168,7 @@ router.post("/restore/:name", requireRole("admin"), async (req, res) => {
     const result = await backupService.restoreBackup(safeName, req.body);
 
     if (result.success) {
+      req.app.get("io")?.emit("backup:changed", { action: "restore" });
       res.json(result);
     } else {
       res.status(400).json(result);
@@ -191,6 +193,7 @@ router.post("/delete-older-than", requireRole("admin"), async (req, res) => {
     const backupService = req.app.get("backupService");
     const result = await backupService.deleteBackupsOlderThan(days);
 
+    if (result.success) req.app.get("io")?.emit("backup:changed", { action: "delete" });
     res.json(result);
   } catch (error) {
     log.error(`Failed to delete old backups: ${error.message}`);

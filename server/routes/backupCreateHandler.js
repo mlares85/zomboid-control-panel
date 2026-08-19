@@ -32,6 +32,7 @@ export async function handleCreateBackup(req, res) {
       : await backupService.createBackup({ ...req.body, io });
 
     if (result.success) {
+      io?.emit("backup:changed", { action: "create" });
       res.json(result);
     } else {
       res.status(400).json(result);

@@ -1065,7 +1065,7 @@ export default function Discord() {
                   <p className="text-muted-foreground">
                     {inviteUrl
                       ? 'Click the button below to invite your bot. Select your Discord server from the dropdown, then click "Authorize".'
-                      : "We need your bot token to generate an invite link. Go back to Step 2 and paste + verify your token first, or use the manual method below."}
+                      : "We need your bot token to generate an invite link. Go back to Step 1 and paste + verify your token first, or use the manual method below."}
                   </p>
                 </div>
 
@@ -1141,7 +1141,7 @@ export default function Discord() {
                       </AlertDescription>
                     </Alert>
                     <p className="text-sm text-muted-foreground">
-                      Tip: go back to Step 2 and verify your token — we'll
+                      Tip: go back to Step 1 and verify your token — we'll
                       generate the invite link automatically.
                     </p>
                   </div>

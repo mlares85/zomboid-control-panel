@@ -425,13 +425,18 @@ export default function Servers() {
       }
 
       // Docker-managed: delete container if requested (sends removeData
-      // so the per-server data volume is also removed)
+      // so the per-server data volume is also removed). The managed DELETE
+      // route removes both the container and the panel DB record together —
+      // if it fails, neither happened, so we must fall back to deleting the
+      // panel record directly below or it's left orphaned.
+      let containerDeleteFailed = false
       if (isManaged && deleteContainer) {
         try {
           await dockerApi.deleteManagedServer(deleteServer.id, true)
         } catch (e) {
+          containerDeleteFailed = true
           const msg = e instanceof Error ? e.message : 'Could not remove container'
-          toast({ title: 'Warning', description: `${msg} — removing from panel anyway.`, variant: 'destructive' })
+          toast({ title: 'Warning', description: `${msg} — removing panel record anyway.`, variant: 'destructive' })
         }
       }
 
@@ -445,9 +450,11 @@ export default function Servers() {
         }
       }
 
-      // Remove the panel record — for managed servers with deleteContainer,
-      // the managed DELETE route already does this; otherwise call directly.
-      if (!(isManaged && deleteContainer)) {
+      // Remove the panel record — for managed servers where the container
+      // deletion succeeded, the managed DELETE route already did this.
+      // Otherwise (non-managed, or managed delete that failed) call directly
+      // so the record is never left orphaned.
+      if (!(isManaged && deleteContainer) || containerDeleteFailed) {
         await serversApi.delete(deleteServer.id)
       }
 
@@ -457,7 +464,8 @@ export default function Servers() {
       await new Promise(r => setTimeout(r, 350))
 
       const parts: string[] = ['Removed from panel']
-      if (isManaged && deleteContainer) parts.push('container deleted')
+      if (isManaged && deleteContainer && !containerDeleteFailed) parts.push('container deleted')
+      if (isManaged && deleteContainer && containerDeleteFailed) parts.push('container deletion failed')
       if (isManaged && deleteBaseFiles) parts.push('base game files deleted')
       if (!isManaged && deleteFiles) parts.push('server files deleted')
       toast({ title: 'Deleted', description: `"${deleteServer.name}" — ${parts.join(', ')}.` })
@@ -1303,8 +1311,13 @@ export default function Servers() {
                       <Checkbox
                         id="deleteContainer"
                         checked={deleteContainer}
-                        onCheckedChange={(checked) => setDeleteContainer(checked === true)}
-                        disabled={deleting}
+                        onCheckedChange={(checked) => {
+                          const isChecked = checked === true
+                          setDeleteContainer(isChecked)
+                          // Base files can't be deleted without also deleting the container.
+                          if (!isChecked) setDeleteBaseFiles(false)
+                        }}
+                        disabled={deleting || deleteBaseFiles}
                         className="mt-1"
                       />
                       <label htmlFor="deleteContainer" className="text-sm cursor-pointer">
@@ -1318,7 +1331,13 @@ export default function Servers() {
                       <Checkbox
                         id="deleteBaseFiles"
                         checked={deleteBaseFiles}
-                        onCheckedChange={(checked) => setDeleteBaseFiles(checked === true)}
+                        onCheckedChange={(checked) => {
+                          const isChecked = checked === true
+                          setDeleteBaseFiles(isChecked)
+                          // Deleting the shared base files without also deleting this
+                          // server's own container/data makes no sense — force it on.
+                          if (isChecked) setDeleteContainer(true)
+                        }}
                         disabled={deleting}
                         className="mt-1"
                       />
@@ -1327,12 +1346,16 @@ export default function Servers() {
                         <p className="text-muted-foreground mt-1">
                           Removes the shared PZ server installation (~3 GB).
                           {(() => {
-                            const otherManaged = servers.filter(
+                            const affectedManaged = servers.filter(
                               s => s.provider === 'docker-managed' && s.id !== deleteServer?.id
                             )
-                            return otherManaged.length > 0 ? (
+                            const names = [
+                              ...(deleteServer ? [deleteServer.name] : []),
+                              ...affectedManaged.map(s => s.name),
+                            ]
+                            return names.length > 0 ? (
                               <span className="block mt-1 text-destructive font-medium">
-                                ⚠ {otherManaged.length} other managed server{otherManaged.length > 1 ? 's' : ''} ({otherManaged.map(s => s.name).join(', ')}) will break!
+                                ⚠ {names.length} managed server{names.length > 1 ? 's' : ''} ({names.join(', ')}) will break!
                               </span>
                             ) : null
                           })()}

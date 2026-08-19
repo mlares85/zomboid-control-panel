@@ -123,6 +123,15 @@ export function useBackupsData() {
           description: `Stored ${backupLabel} in ${result.duration?.toFixed(1)}s`,
           variant: 'success' as const,
         })
+        if (result.destinationErrors && result.destinationErrors.length > 0) {
+          toast({
+            title: 'Some Backup Destinations Failed',
+            description: result.destinationErrors
+              .map((e) => `${e.destinationId}: ${e.message}`)
+              .join('; '),
+            variant: 'destructive',
+          })
+        }
         await fetchBackups()
         await fetchBackupStatus()
       } else {

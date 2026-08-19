@@ -2,6 +2,7 @@ import cron from "node-cron";
 import { createLogger } from "../utils/logger.js";
 const log = createLogger("Scheduler");
 import panelBridge from "./panelBridge.js";
+import { createEnhancedBackup } from "./backupOrchestrator.js";
 import { RconService } from "./rcon.js";
 import { ServerManager } from "./serverManager.js";
 import {
@@ -466,8 +467,14 @@ export class Scheduler {
         log.info("Executing scheduled backup");
         const startTime = Date.now();
         try {
-          const result = await this.backupService.createBackup({
+          // Routed through the enhanced/destination-aware pipeline (same one
+          // manual backups use) rather than the legacy backupService.createBackup,
+          // so scheduled backups participate in the destinations system too.
+          // destinations defaults to ["local"] to keep behavior unchanged for
+          // panels that haven't configured any extra destinations.
+          const result = await createEnhancedBackup(this.backupService, {
             includeDb: settings.includeDb,
+            destinations: ["local"],
           });
           const duration = Date.now() - startTime;
           if (result.success) {
@@ -476,10 +483,16 @@ export class Scheduler {
               "Scheduled Backup",
               "backup",
               true,
-              `Created: ${result.backup.name}`,
+              `Created: ${result.backup.fileName}`,
               duration,
             );
-            log.info(`Scheduled backup completed: ${result.backup.name}`);
+            log.info(`Scheduled backup completed: ${result.backup.fileName}`);
+            if (result.destinationErrors?.length > 0) {
+              log.warn(
+                `Scheduled backup ${result.backup.fileName} had destination upload failures: ` +
+                  result.destinationErrors.map((e) => `${e.destinationId} (${e.message})`).join(", "),
+              );
+            }
           } else {
             await logScheduleExecution(
               null,

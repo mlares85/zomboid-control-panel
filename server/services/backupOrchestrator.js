@@ -61,6 +61,7 @@ async function resolveWorldAge() {
 
 async function uploadToDestinations(destPath, fileName, destinationIds, defaultLocalPath) {
   const names = [];
+  const errors = [];
   let remotePath = null;
   for (const id of destinationIds) {
     try {
@@ -75,10 +76,10 @@ async function uploadToDestinations(destPath, fileName, destinationIds, defaultL
       names.push(record.name);
     } catch (error) {
       log.error(`Upload to destination "${id}" failed: ${error.message}`);
-      names.push(`${id} (failed: ${error.message})`);
+      errors.push({ destinationId: id, message: error.message });
     }
   }
-  return { names, remotePath };
+  return { names, remotePath, errors };
 }
 
 /**
@@ -176,7 +177,9 @@ export async function createEnhancedBackup(backupService, options = {}) {
     type,
     verified: verifyResult.readable,
     serverName,
-    destination: uploadResults.names.join(", ") || "local",
+    destination:
+      uploadResults.names.join(", ") ||
+      (uploadResults.errors.length > 0 ? "none (all destinations failed)" : "local"),
     remotePath: uploadResults.remotePath,
     incrementalBase: runFull ? null : manifest.lastFullBackupId,
     changedFiles: runFull ? null : fileList.length,
@@ -191,6 +194,17 @@ export async function createEnhancedBackup(backupService, options = {}) {
     `Backup complete (${metadata.compressionRatio} smaller, ${duration}s)`,
   );
   log.info(`Enhanced backup ${fileName} complete: ${type}, ${format}, ${metadata.compressionRatio} smaller`);
+  if (uploadResults.errors.length > 0) {
+    log.warn(
+      `Backup ${fileName} completed but ${uploadResults.errors.length} destination upload(s) failed: ` +
+        uploadResults.errors.map((e) => `${e.destinationId} (${e.message})`).join(", "),
+    );
+  }
 
-  return { success: true, backup: record, duration: parseFloat(duration) };
+  return {
+    success: true,
+    backup: record,
+    duration: parseFloat(duration),
+    destinationErrors: uploadResults.errors,
+  };
 }

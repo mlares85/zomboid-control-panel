@@ -1,13 +1,14 @@
 import express from "express";
 import { existsSync, readdirSync } from "fs";
 import { createLogger } from "../../utils/logger.js";
-import { sanitizeError } from "../../utils/sanitize.js";
+import { sanitizeError, sanitizeServerResponse } from "../../utils/sanitize.js";
 import { getServer, getServers, createServer, deleteServer } from "../../database/init.js";
 import { createDockerVolumeManager } from "../../services/dockerVolumeManager.js";
 import { createDockerContainerFactory } from "../../services/dockerContainerFactory.js";
 import { PROVIDERS } from "../../utils/serverProvider.js";
 import { startBaseVolumePopulation } from "../../services/baseVolumePopulator.js";
 import { installPanelBridgeMod } from "../server/installHelpers.js";
+import { requireRole } from "../../services/auth.js";
 
 const log = createLogger("API:DockerManaged");
 const router = express.Router();
@@ -131,7 +132,7 @@ router.get("/available-ports", async (req, res) => {
 
 let populatingBase = false;
 
-router.post("/populate-base", async (req, res) => {
+router.post("/populate-base", requireRole("admin"), async (req, res) => {
   if (populatingBase) {
     return res.status(409).json({ success: false, error: "Base volume population already in progress" });
   }
@@ -167,7 +168,7 @@ router.post("/populate-base", async (req, res) => {
 
 // ── Server CRUD ──
 
-router.post("/servers", async (req, res) => {
+router.post("/servers", requireRole("admin"), async (req, res) => {
   try {
     const validationError = validateManagedServerInput(req.body);
     if (validationError) return res.status(400).json({ success: false, error: validationError });
@@ -219,14 +220,14 @@ router.post("/servers", async (req, res) => {
       await deleteServer(server.id).catch(() => {});
       return res.status(502).json({ success: false, error: `Container created but failed to start: ${startResult.error}` });
     }
-    res.status(201).json({ success: true, server, containerId: result.containerId });
+    res.status(201).json({ success: true, server: sanitizeServerResponse(server), containerId: result.containerId });
   } catch (error) {
     log.error(`Failed to create managed server: ${error.message}`);
     res.status(500).json({ success: false, error: sanitizeError(error.message) });
   }
 });
 
-router.delete("/servers/:id", async (req, res) => {
+router.delete("/servers/:id", requireRole("admin"), async (req, res) => {
   try {
     const server = await getServer(req.params.id);
     if (!server) return res.status(404).json({ success: false, error: "Server not found" });
@@ -251,7 +252,7 @@ router.delete("/servers/:id", async (req, res) => {
 
 // ── Delete the shared base volume (PZ server installation) ──
 
-router.delete("/base-volume", async (req, res) => {
+router.delete("/base-volume", requireRole("admin"), async (req, res) => {
   try {
     const deps = getManagedDeps(req);
     if (!deps) return res.status(503).json({ success: false, error: "Docker unavailable" });

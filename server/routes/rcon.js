@@ -5,6 +5,7 @@ import { getCommandHistory } from '../database/init.js';
 import { PZ_COMMANDS } from '../utils/commands.js';
 import { sanitizeError } from '../utils/sanitize.js';
 import { testRconConnection } from '../services/rcon.js';
+import { requireRole } from '../services/auth.js';
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ function validateTestInput(host, port, password) {
 }
 
 // Execute raw RCON command
-router.post('/execute', async (req, res) => {
+router.post('/execute', requireRole('admin'), async (req, res) => {
   try {
     const rconService = req.app.get('rconService');
     const { command } = req.body;
@@ -68,7 +69,7 @@ router.get('/status', async (req, res) => {
 });
 
 // Connect to RCON
-router.post('/connect', async (req, res) => {
+router.post('/connect', requireRole('admin'), async (req, res) => {
   try {
     const rconService = req.app.get('rconService');
     const { host, port, password } = req.body;
@@ -150,7 +151,7 @@ router.get('/health', async (req, res) => {
 });
 
 // Disconnect from RCON
-router.post('/disconnect', async (req, res) => {
+router.post('/disconnect', requireRole('admin'), async (req, res) => {
   try {
     log.info('POST /disconnect');
     const rconService = req.app.get('rconService');

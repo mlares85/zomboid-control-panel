@@ -12,6 +12,7 @@ import {
   logServerEvent,
 } from "../database/init.js";
 import { sanitizeError } from "../utils/sanitize.js";
+import { listRecords, deleteRecord } from "./backupRecords.js";
 
 // Dynamic import for unzipper (CommonJS module)
 let unzipper;
@@ -494,10 +495,33 @@ export class BackupService {
       log.info(`Deleted backup: ${safeName}`);
       await logServerEvent("backup_deleted", safeName);
 
+      await this._deleteHistoryRecordForFile(safeName);
+
       return { success: true };
     } catch (error) {
       log.error(`Failed to delete backup: ${error.message}`);
       return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Delete the enhanced-backup history record (if any) matching a legacy
+   * backup file name, so removing the .zip doesn't leave orphaned metadata
+   * behind in the Backup History view. Best-effort: legacy backups created
+   * via createBackup() have no record to begin with, so a miss is expected.
+   */
+  async _deleteHistoryRecordForFile(fileName) {
+    try {
+      const records = await listRecords();
+      const match = records.find((r) => r.fileName === fileName);
+      if (match) {
+        await deleteRecord(match.id);
+        log.info(`Deleted backup history record for: ${fileName}`);
+      }
+    } catch (error) {
+      log.warn(
+        `Could not clean up backup history record for ${fileName}: ${error.message}`,
+      );
     }
   }
 

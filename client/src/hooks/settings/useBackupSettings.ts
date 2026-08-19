@@ -51,7 +51,7 @@ export function useBackupSettings() {
       if (result.success && result.backup) {
         toast({
           title: "Backup Created",
-          description: `Created ${(result.backup as any).filename || (result.backup as any).fileName || 'backup'} in ${result.duration?.toFixed(1)}s`,
+          description: `Created ${('filename' in result.backup ? result.backup.filename : result.backup.fileName) || 'backup'} in ${result.duration?.toFixed(1)}s`,
           variant: "success" as const,
         });
         await fetchBackups();

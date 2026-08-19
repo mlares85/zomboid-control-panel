@@ -50,6 +50,8 @@ The codebase uses `{success: boolean, error?: string, detail?: string}` result o
 
 bcryptjs (cost 12) + JWT access (24h) / refresh (30d, httpOnly cookie). Timing-safe dummy-hash comparison on "user not found" to prevent username enumeration. Account lockout after 10 failures (15 min). SHA-256 hashed recovery codes. `tokenGen` counter invalidates all tokens on password change. RBAC scaffolded (`requireRole()`) but currently single-role (admin).
 
+`requireRole()` is only applied to a subset of routes (backup, RCON, destructive file/chunk/mod operations, docker-managed server management). Player moderation routes (`server/routes/players.js`, `server/routes/panelBridge/players.js`) and server lifecycle routes (start/stop/restart on the active server) have no `requireRole` guard — any authenticated session can call them. This is intentional for the current single-admin model, but it's the first boundary to close when multi-user/moderator roles ship: a moderator role should plausibly get player actions but not lifecycle control (or vice versa), so those two route groups need distinct guards rather than a blanket admin check.
+
 ## Data storage
 
 Single `db.json` via lowdb — debounced 500ms writes, atomic (temp + rename), circuit breaker (60s cooldown after 5 failures). Schema versioning at v1. Append-heavy data (events, metrics) should eventually move to separate storage before adding monitoring features. `getCircuitBreakerStatus()` exposes degraded state to the frontend via `/api/system/storage-health`.
