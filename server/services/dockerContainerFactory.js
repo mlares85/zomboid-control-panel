@@ -81,6 +81,8 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
   // The default eclipse-temurin:21-jre image doesn't include them, so we wrap
   // the start script in an inline entrypoint that installs them on first boot.
   // Subsequent starts skip the install (dpkg -s check) so there's no penalty.
+  // The "--" after the -c script ensures Docker's Cmd args land in $@
+  // instead of $0/$1 (bash -c 'script' uses the next arg as $0).
   const PZ_ENTRYPOINT = [
     "/bin/bash", "-c",
     [
@@ -130,6 +132,7 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       // Run the PZ start script
       'exec /opt/pz-server/start-server.sh "$@"',
     ].join(" "),
+    "--",
   ];
 
   function buildContainerSpec(config) {

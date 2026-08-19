@@ -31,10 +31,11 @@ describe("buildContainerSpec", () => {
 
     // Should have an entrypoint that installs lib32gcc-s1
     expect(spec.Entrypoint).toBeDefined();
-    expect(spec.Entrypoint).toHaveLength(3);
+    expect(spec.Entrypoint).toHaveLength(4);
     expect(spec.Entrypoint[2]).toContain("lib32gcc-s1");
     expect(spec.Entrypoint[2]).toContain("libstdc++6:i386");
     expect(spec.Entrypoint[2]).toContain("start-server.sh");
+    expect(spec.Entrypoint[3]).toBe("--");
   });
 
   it("includes tmpfs mount for /tmp", () => {
