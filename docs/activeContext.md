@@ -1,30 +1,32 @@
 # Active Context
 
 ## Current Focus
-ServerManager decomposition milestone reached (1,624 → 1,018). Upstream
-analysis complete — 10-PR strategy planned, upstream-only features adopted.
-Next: real-world smoke testing of refactored code paths, then start
-submitting PRs to upstream.
+Docker-managed server creation flow is working end-to-end: container
+creation, PZ boot, RCON connection, dashboard green status. Several
+UX improvements and feature requests queued from smoke testing.
 
 ## Recent Decisions
-- Upstream PRs, not merge: 74 merge conflicts make a straight merge too
-  risky. Submit fork improvements as focused PRs rebased onto upstream/main.
-- 8 upstream test files dropped: they assume upstream's route shapes which
-  differ from our decomposed routes. Our own tests cover the same behavior.
-- loadConfig() left in ServerManager: extracting it requires a seed-pattern
-  fix (Object.assign clobbers Docker fields when DB has no value). Too risky
-  to refactor without integration testing first.
-- startServer() spawn delegation uses buildLaunchConfig() to produce the
-  config, but keeps _openLaunchLog/_waitForImmediateCrash in ServerManager
-  since they need `this.serverProcess` state.
+- `debian:bookworm-slim` as managed container base — PZ bundles JRE 25,
+  no image-provided Java needed. eclipse-temurin conflicted with PATH.
+- SQLite native lib pre-extracted from JAR in entrypoint — PZ's
+  JNI-launched JVM can't extract it at runtime from the JAR.
+- Data volume mounts at `/root/Zomboid` — PZ running as root ignores
+  HOME for data paths. Direct mount is simpler than symlinks.
+- `zomboidDataPath: null` for managed servers — panel can't access
+  the managed container's filesystem, so bridge/backups paths are skipped.
+- Bridge warning skipped for `docker-managed` provider — filesystem IPC
+  doesn't work across containers; RCON is the control channel.
+- Panel compose needs `networks: zomboid-panel-net: external: true` to
+  survive container restarts and still reach managed containers via DNS.
 
 ## Blockers / Open Questions
-- No integration test environment available (macOS, no Docker) — refactored
-  start/stop/install code paths need real-world smoke testing on Linux.
-- 10 upstream files exist in both forks with different content (PanelBridge
-  mod, SFTP transport, schemas) — need deliberate merge review.
+- PanelBridge mod auto-install for managed containers — the mod needs
+  to be in the base server files or injected into the container.
+- Backups for managed servers need Docker-aware implementation (exec or
+  volume access) since the panel can't read the container's filesystem.
+- Container log streaming not yet implemented (user requested).
 
 ## Next Steps
-1. Smoke test on Linux/Docker: start, stop, install, update, config save.
-2. Submit first upstream PRs (E2E tests, Wiki, Onboarding wizard).
-3. Wire ProviderRegistry into ServerManager for capability lookup.
+1. Add container log streaming to dashboard (Docker API → Socket.IO).
+2. Add server boot stage progress UI (parse PZ console milestones).
+3. Auto-install PanelBridge mod into managed containers on creation.
