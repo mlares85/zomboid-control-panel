@@ -19,6 +19,7 @@ import { getDataPaths } from "../utils/paths.js";
 import { LocalFiles } from "./fileAccess/index.js";
 import { isRemoteProvider } from "../utils/serverProvider.js";
 import { DockerLifecycle } from "./lifecycle/DockerLifecycle.js";
+import { NativeLifecycle } from "./lifecycle/NativeLifecycle.js";
 
 const isWindows = process.platform === "win32";
 // How long a live-looked-up public IP is trusted before re-checking.
@@ -278,6 +279,12 @@ export class ServerManager {
       dockerClient: this.dockerClient,
       containerRef: this._dockerRef(),
     });
+  }
+
+  // Builds the launch()/terminate()/terminateAll() lifecycle capability for
+  // native (non-Docker) processes. Not cached, matching _dockerLifecycle().
+  _nativeLifecycle() {
+    return new NativeLifecycle();
   }
 
   // Load settings from a specific server (serverId), the active server, or
@@ -1154,28 +1161,11 @@ export class ServerManager {
     }
   }
 
-  _killPids(pids) {
-    return new Promise((resolve) => {
-      if (isWindows) {
-        let remaining = pids.length;
-        for (const pid of pids) {
-          execFile("taskkill", ["/PID", pid, "/F"], (killErr) => {
-            if (killErr) log.debug(`taskkill ${pid}: ${killErr.message}`);
-            if (--remaining === 0) resolve();
-          });
-        }
-        return;
-      }
-
-      execFile("kill", ["-9", ...pids], (killErr) => {
-        if (killErr) {
-          log.warn(
-            `Kill returned error (may be normal if process already exited): ${killErr.message}`,
-          );
-        }
-        resolve();
-      });
-    });
+  async _killPids(pids) {
+    const result = await this._nativeLifecycle().terminate(pids);
+    if (!result.success) {
+      log.warn(`_killPids failed: ${result.error}`);
+    }
   }
 
   // Force-stops the configured Docker container directly. There is no PID
@@ -1195,23 +1185,11 @@ export class ServerManager {
     return { success: true, message: "Docker container stopped" };
   }
 
-  _genericForceStop() {
-    return new Promise((resolve) => {
-      if (isWindows) {
-        exec("taskkill /IM ProjectZomboid64.exe /F", () => {
-          exec(
-            "powershell -Command \"Get-CimInstance Win32_Process -Filter \\\"Name='java.exe'\\\" | Where-Object { $_.CommandLine -like '*zombie.network.gameserver*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }\"",
-            () => resolve(),
-          );
-        });
-        return;
-      }
-
-      exec(
-        "pkill -9 -f 'zombie.network.[Gg]ame[Ss]erver|[Pp]roject[Zz]omboid64|[Pp]roject[Zz]omboid32'",
-        () => resolve(),
-      );
-    });
+  async _genericForceStop() {
+    const result = await this._nativeLifecycle().terminateAll();
+    if (!result.success) {
+      log.warn(`_genericForceStop failed: ${result.error}`);
+    }
   }
 
   async restartServer(rconService, warningMinutes = 5) {
