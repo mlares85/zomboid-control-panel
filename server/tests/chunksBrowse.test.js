@@ -14,6 +14,7 @@ vi.mock("../database/init.js", () => ({
 }));
 
 const { default: router } = await import("../routes/chunks.js");
+const { findRouteLayer } = await import("./helpers/routerLayer.js");
 
 function createResponse() {
   const response = { status: vi.fn(), json: vi.fn() };
@@ -22,9 +23,7 @@ function createResponse() {
 }
 
 function getBrowseHandler() {
-  const layer = router.stack.find(
-    (entry) => entry.route?.path === "/browse" && entry.route.methods.get,
-  );
+  const layer = findRouteLayer(router.stack, "/browse", "get");
   return layer.route.stack[0].handle;
 }
 

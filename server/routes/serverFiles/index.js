@@ -32,3 +32,4 @@ export default router;
 // that call into serverFiles' sandbox helpers directly.
 export { persistSandboxValues } from "./sandboxPersist.js";
 export { checkSandboxBraceBalance } from "./sandboxWrite.js";
+export { getServerName } from "./context.js";

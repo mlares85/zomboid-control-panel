@@ -11,6 +11,7 @@ vi.mock("../database/init.js", () => ({
 }));
 
 const { default: router } = await import("../routes/panelBridge.js");
+const { findRouteLayer } = await import("./helpers/routerLayer.js");
 
 function createResponse() {
   const response = { status: vi.fn(), json: vi.fn() };
@@ -19,9 +20,7 @@ function createResponse() {
 }
 
 function getLayer(routePath, method) {
-  return router.stack.find(
-    (entry) => entry.route?.path === routePath && entry.route.methods[method],
-  );
+  return findRouteLayer(router.stack, routePath, method);
 }
 
 async function runRoute(routePath, method, req, res) {
