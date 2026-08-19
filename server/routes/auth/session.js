@@ -19,7 +19,7 @@ const router = Router();
 // Strict rate limit on login attempts — 5 per minute per IP
 const loginLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
-  max: 5,
+  max: process.env.NODE_ENV === "test" ? 500 : 5,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many login attempts. Please try again later." },

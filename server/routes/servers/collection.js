@@ -1,6 +1,10 @@
 import express from "express";
 import { createLogger } from "../../utils/logger.js";
-import { sanitizeError } from "../../utils/sanitize.js";
+import {
+  sanitizeError,
+  sanitizeServerResponse,
+  sanitizeServerResponseList,
+} from "../../utils/sanitize.js";
 import { normalizeRconHost } from "../../services/rcon.js";
 import { getServers, createServer } from "../../database/init.js";
 import { normalizeMemoryGb } from "./shared.js";
@@ -12,7 +16,7 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   try {
     const servers = await getServers();
-    res.json({ servers });
+    res.json({ servers: sanitizeServerResponseList(servers) });
   } catch (error) {
     log.error(`Failed to get servers: ${error.message}`);
     res.status(500).json({ error: sanitizeError(error.message) });
@@ -104,7 +108,12 @@ router.post("/", async (req, res) => {
     });
 
     log.info(`Created new server: ${server.name} (ID: ${server.id})`);
-    res.status(201).json({ server, message: "Server created successfully" });
+    res
+      .status(201)
+      .json({
+        server: sanitizeServerResponse(server),
+        message: "Server created successfully",
+      });
   } catch (error) {
     log.error(`Failed to create server: ${error.message}`);
     res.status(500).json({ error: sanitizeError(error.message) });

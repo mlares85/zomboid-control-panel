@@ -3,13 +3,14 @@ import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 import { sanitizeError } from "../../utils/sanitize.js";
+import { requireRole } from "../../services/auth.js";
 import { parseIni, scanForPzPaths } from "./scanHelpers.js";
 
 const log = createLogger("API:Servers");
 const router = express.Router();
 
 // Auto-scan a folder to find PZ server install paths and data paths
-router.post("/auto-scan", async (req, res) => {
+router.post("/auto-scan", requireRole("admin"), async (req, res) => {
   try {
     const { scanPath, maxDepth = 3 } = req.body;
 

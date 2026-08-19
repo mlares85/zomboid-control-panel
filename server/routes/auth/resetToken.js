@@ -27,6 +27,14 @@ function normalizeIpAddress(address) {
   return withoutZone.startsWith("::ffff:") ? withoutZone.slice(7) : withoutZone;
 }
 
+function isDockerBridgeAddress(address) {
+  const match = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(address);
+  if (!match) return false;
+  const first = Number(match[1]);
+  const second = Number(match[2]);
+  return first === 172 && second >= 16 && second <= 31;
+}
+
 function getLocalPanelAddresses() {
   const addresses = new Set(
     [...LOOPBACK_REMOTE_ADDRESSES]
@@ -38,7 +46,7 @@ function getLocalPanelAddresses() {
   for (const entries of Object.values(interfaces)) {
     for (const entry of entries || []) {
       const normalized = normalizeIpAddress(entry.address);
-      if (normalized) {
+      if (normalized && !isDockerBridgeAddress(normalized)) {
         addresses.add(normalized);
       }
     }

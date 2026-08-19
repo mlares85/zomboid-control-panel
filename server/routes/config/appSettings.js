@@ -9,7 +9,8 @@ import {
   minutesToCheckIntervalMs,
 } from "../../services/modChecker.js";
 import { VALID_SETTINGS_KEYS, validateCorsAllowedOrigins } from "./validators.js";
-import { SENSITIVE_KEYS, isMaskedSecret, maskSensitiveSettings } from "./secrets.js";
+import { SENSITIVE_FIELD_RE, isMaskedSecret, maskSensitiveSettings } from "./secrets.js";
+import { requireRole } from "../../services/auth.js";
 
 const log = createLogger("API:Config");
 const router = express.Router();
@@ -129,8 +130,11 @@ async function reloadServicesAfterSave(req) {
   return reloadWarnings;
 }
 
-// Update application settings
-router.put("/app-settings", async (req, res) => {
+// Update application settings. Admin-gated: this endpoint can flip
+// corsAllowAll (disables CORS origin checking panel-wide) and other
+// security-relevant settings, so any authenticated-but-unprivileged
+// account must not be able to write it.
+router.put("/app-settings", requireRole("admin"), async (req, res) => {
   try {
     const { settings } = req.body;
     log.info(
@@ -163,7 +167,7 @@ router.put("/app-settings", async (req, res) => {
     // RCON passwords, Discord tokens, and Steam cookies. See workshop
     // collection "cookies not configured" bug for the symptom.
     const filtered = validEntries.filter(([key, value]) => {
-      if (SENSITIVE_KEYS.includes(key) && isMaskedSecret(value)) {
+      if (SENSITIVE_FIELD_RE.test(key) && isMaskedSecret(value)) {
         log.info(`Preserving stored value for sensitive key "${key}" (masked input ignored)`);
         return false;
       }

@@ -1,6 +1,6 @@
 import express from "express";
 import { createLogger } from "../../utils/logger.js";
-import { sanitizeError } from "../../utils/sanitize.js";
+import { sanitizeError, sanitizeServerResponse } from "../../utils/sanitize.js";
 import { setActiveServer } from "../../database/init.js";
 import { parseServerId } from "./shared.js";
 
@@ -54,7 +54,10 @@ router.post("/:id/activate", async (req, res) => {
     }
 
     log.info(`Activated server: ${server.name} (ID: ${server.id})`);
-    res.json({ server, message: `Now managing: ${server.name}` });
+    res.json({
+      server: sanitizeServerResponse(server),
+      message: `Now managing: ${server.name}`,
+    });
   } catch (error) {
     log.error(`Failed to activate server: ${error.message}`);
     res.status(500).json({ error: sanitizeError(error.message) });

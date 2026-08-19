@@ -64,12 +64,19 @@ export async function getServerConfigPath() {
 // Get server name from active server
 export async function getServerName() {
   const activeServer = await getActiveServer();
+  let raw;
   if (activeServer?.serverName) {
-    return activeServer.serverName;
+    raw = activeServer.serverName;
+  } else {
+    const settings = await getAllSettings();
+    raw = settings.serverName || "servertest";
   }
 
-  const settings = await getAllSettings();
-  return settings.serverName || "servertest";
+  const safe = path.basename(raw);
+  if (safe !== raw || !safe) {
+    throw new Error("Configured server name contains invalid path characters");
+  }
+  return safe;
 }
 
 // Backup directory

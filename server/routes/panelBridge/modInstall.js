@@ -12,6 +12,7 @@ import { getActiveServer, getServer } from "../../database/init.js";
 import { sanitizeError } from "../../utils/sanitize.js";
 import { createLogger } from "../../utils/logger.js";
 import { writeLuaAtomic } from "../../utils/embeddedLua.js";
+import { requireRole } from "../../services/auth.js";
 import {
   resolveModLuaSource,
   modCandidateDirs,
@@ -62,7 +63,7 @@ router.get("/mod-path", async (req, res) => {
 });
 
 // Auto-install mod to server's Lua folder (optionally specify serverId)
-router.post("/install-mod-auto", async (req, res) => {
+router.post("/install-mod-auto", requireRole("admin"), async (req, res) => {
   try {
     const { serverId } = req.body;
 
@@ -135,7 +136,7 @@ router.post("/install-mod-auto", async (req, res) => {
 });
 
 // Copy mod to server Lua folder (manual path)
-router.post("/install-mod", async (req, res) => {
+router.post("/install-mod", requireRole("admin"), async (req, res) => {
   const { serverLuaPath } = req.body;
 
   // Support legacy field name

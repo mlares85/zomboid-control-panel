@@ -3,13 +3,14 @@ import fs from "fs";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 import { sanitizeError } from "../../utils/sanitize.js";
+import { requireRole } from "../../services/auth.js";
 import { parseIni } from "./scanHelpers.js";
 
 const log = createLogger("API:Servers");
 const router = express.Router();
 
 // Detect server settings from data path (folder containing Server/, Saves/, Logs/)
-router.post("/detect", async (req, res) => {
+router.post("/detect", requireRole("admin"), async (req, res) => {
   try {
     const { dataPath, installPath } = req.body;
     log.info(

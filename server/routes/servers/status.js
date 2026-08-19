@@ -1,6 +1,6 @@
 import express from "express";
 import { createLogger } from "../../utils/logger.js";
-import { sanitizeError } from "../../utils/sanitize.js";
+import { sanitizeError, sanitizeServerResponse } from "../../utils/sanitize.js";
 import { getServers, getActiveServer, getAllSettings } from "../../database/init.js";
 import { isRemoteConfigConfigured } from "../../services/remoteConfigFiles.js";
 
@@ -92,7 +92,9 @@ router.get("/active", async (req, res) => {
     const remoteConfigConfigured = server.isRemote
       ? isRemoteConfigConfigured(await getAllSettings())
       : false;
-    res.json({ server: { ...server, remoteConfigConfigured } });
+    res.json({
+      server: sanitizeServerResponse({ ...server, remoteConfigConfigured }),
+    });
   } catch (error) {
     log.error(`Failed to get active server: ${error.message}`);
     res.status(500).json({ error: sanitizeError(error.message) });

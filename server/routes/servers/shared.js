@@ -1,5 +1,16 @@
 // Shared helpers used across the servers route sub-modules.
 
+// serverName is interpolated into filesystem paths (server-files, backups,
+// chunks) as `${serverName}.ini` etc. — reject anything but a plain,
+// non-traversal-capable name up front instead of relying on every
+// downstream path-building call site to re-validate it.
+const SERVER_NAME_REGEX =
+  /^[a-zA-Z0-9_-][a-zA-Z0-9_\- ]*[a-zA-Z0-9_-]$|^[a-zA-Z0-9_-]$/;
+
+export function isValidServerName(value) {
+  return typeof value === "string" && SERVER_NAME_REGEX.test(value);
+}
+
 export function normalizeMemoryGb(value, fallback) {
   const parsed = parseInt(value, 10);
   if (Number.isNaN(parsed) || parsed <= 0) return fallback;

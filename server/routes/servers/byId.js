@@ -1,9 +1,17 @@
 import express from "express";
 import { createLogger } from "../../utils/logger.js";
-import { sanitizeError } from "../../utils/sanitize.js";
+import {
+  sanitizeError,
+  sanitizeServerResponse,
+  isMaskedSecret,
+} from "../../utils/sanitize.js";
 import { normalizeRconHost } from "../../services/rcon.js";
 import { getServer, updateServer, deleteServer } from "../../database/init.js";
-import { normalizeMemoryGb, parseServerId } from "./shared.js";
+import {
+  normalizeMemoryGb,
+  parseServerId,
+  isValidServerName,
+} from "./shared.js";
 
 const log = createLogger("API:Servers");
 const router = express.Router();
@@ -22,7 +30,7 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ error: "Server not found" });
     }
 
-    res.json({ server });
+    res.json({ server: sanitizeServerResponse(server) });
   } catch (error) {
     log.error(`Failed to get server: ${error.message}`);
     res.status(500).json({ error: sanitizeError(error.message) });
@@ -67,6 +75,29 @@ router.put("/:id", async (req, res) => {
     for (const key of ALLOWED_SERVER_UPDATE_FIELDS) {
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];
+      }
+    }
+
+    // Validate serverName against path traversal — this field is
+    // interpolated into filesystem paths downstream (server-files, backups,
+    // chunks), so it must pass the same check as server creation.
+    if (updates.serverName !== undefined) {
+      const trimmed = String(updates.serverName).trim();
+      if (!isValidServerName(trimmed)) {
+        return res.status(400).json({
+          error:
+            "Invalid server name: only letters, numbers, underscores, hyphens and spaces allowed",
+        });
+      }
+      updates.serverName = trimmed;
+    }
+
+    // GET responses mask rconPassword/adminPassword (sanitizeServerResponse).
+    // If the client echoes that masked value back unmodified, drop the field
+    // so the real stored secret isn't overwritten with bullets.
+    for (const key of ["rconPassword", "adminPassword"]) {
+      if (updates[key] !== undefined && isMaskedSecret(updates[key])) {
+        delete updates[key];
       }
     }
 
@@ -164,7 +195,10 @@ router.put("/:id", async (req, res) => {
       }
     }
 
-    res.json({ server, message: "Server updated successfully" });
+    res.json({
+      server: sanitizeServerResponse(server),
+      message: "Server updated successfully",
+    });
   } catch (error) {
     log.error(`Failed to update server: ${error.message}`);
     res.status(500).json({ error: sanitizeError(error.message) });
