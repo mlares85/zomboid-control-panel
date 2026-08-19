@@ -86,15 +86,15 @@ export function DockerConfigStep({ config, onChange, onBack, onNext }: DockerCon
         </CardContent>
       </Card>
 
-      {/* RCON */}
+      {/* Passwords */}
       <Card className="border-primary/35 bg-card shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-primary" />
-            <CardTitle className="text-lg">Remote Control (RCON)</CardTitle>
+            <CardTitle className="text-lg">Passwords</CardTitle>
             <Badge className="ml-auto">Required</Badge>
           </div>
-          <CardDescription>The panel uses RCON to manage the server.</CardDescription>
+          <CardDescription>RCON lets the panel manage the server. The admin password is for in-game admin access.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -133,9 +133,21 @@ export function DockerConfigStep({ config, onChange, onBack, onNext }: DockerCon
               )}
             </div>
             <div className="space-y-2">
-              <Label>RCON Port</Label>
-              <Input type="number" value={config.rconPort} onChange={(e) => set({ rconPort: parseInt(e.target.value) || 27015 })} className="font-mono" />
+              <Label>Admin Password <span className="text-destructive">*</span></Label>
+              <div className="relative">
+                <Input type={showAdminPassword ? "text" : "password"} value={config.adminPassword} onChange={(e) => set({ adminPassword: e.target.value })} placeholder="For in-game admin access" className="pr-10" maxLength={128} />
+                <Button type="button" variant="ghost" size="sm" className="absolute right-1 top-1 h-9 w-9 p-0" onClick={() => setShowAdminPassword(!showAdminPassword)} aria-label={showAdminPassword ? "Hide" : "Show"}>
+                  {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              {config.adminPassword.trim().length === 0 && (
+                <p className="text-xs text-destructive">Required before server can start</p>
+              )}
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>RCON Port</Label>
+            <Input type="number" value={config.rconPort} onChange={(e) => set({ rconPort: parseInt(e.target.value) || 27015 })} className="font-mono" />
           </div>
         </CardContent>
       </Card>
@@ -177,24 +189,10 @@ export function DockerConfigStep({ config, onChange, onBack, onNext }: DockerCon
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4 space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Game Port</Label>
-                <Input type="number" value={config.gamePort} onChange={(e) => set({ gamePort: parseInt(e.target.value) || 16261 })} className="font-mono" />
-                <p className="text-xs text-muted-foreground">Auto-assigned to avoid conflicts</p>
-              </div>
-              <div className="space-y-2">
-                <Label>Admin Password <span className="text-destructive">*</span></Label>
-                <div className="relative">
-                  <Input type={showAdminPassword ? "text" : "password"} value={config.adminPassword} onChange={(e) => set({ adminPassword: e.target.value })} placeholder="Required for in-game admin" className="pr-10" maxLength={128} />
-                  <Button type="button" variant="ghost" size="sm" className="absolute right-1 top-1 h-9 w-9 p-0" onClick={() => setShowAdminPassword(!showAdminPassword)} aria-label={showAdminPassword ? "Hide" : "Show"}>
-                    {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-                {config.adminPassword.trim().length === 0 && (
-                  <p className="text-xs text-destructive">Required before server can start</p>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label>Game Port</Label>
+              <Input type="number" value={config.gamePort} onChange={(e) => set({ gamePort: parseInt(e.target.value) || 16261 })} className="font-mono" />
+              <p className="text-xs text-muted-foreground">Auto-assigned to avoid conflicts</p>
             </div>
             <div className="space-y-2">
               <Label>Container Image</Label>
