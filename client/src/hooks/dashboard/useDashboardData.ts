@@ -324,7 +324,8 @@ function computeVerdict(v: VerdictInputs): Verdict {
   if (v.diskRatio != null && v.diskFreeGB != null && v.diskRatio >= 0.95) return { level: 'critical', headline: `Disk almost full, ${v.diskFreeGB.toFixed(0)} GB left` }
   if (v.diskRatio != null && v.diskFreeGB != null && v.diskRatio >= 0.9) return { level: 'warning', headline: `Disk ${Math.round(v.diskRatio * 100)}%, ${v.diskFreeGB.toFixed(0)} GB left` }
   if (v.hostCpu != null && v.hostCpu >= 90) return { level: 'warning', headline: `Host CPU ${v.hostCpu}%` }
-  if (v.bridgeStatus?.configured && !v.bridgeStatus.modConnected) return { level: 'warning', headline: 'PanelBridge offline', action: { label: 'Bridge settings', to: '/settings' } }
+  // Skip bridge check for Docker-managed servers — filesystem IPC doesn't work across containers
+  if (v.bridgeStatus?.configured && !v.bridgeStatus.modConnected && v.activeServer?.provider !== 'docker-managed') return { level: 'warning', headline: 'PanelBridge offline', action: { label: 'Bridge settings', to: '/settings' } }
   if (v.modsPending) return { level: 'warning', headline: `${v.maintenance.modUpdatesAvailable} mod update${v.maintenance.modUpdatesAvailable === 1 ? '' : 's'} waiting`, action: { label: 'Review mods', to: '/mods' } }
   if (v.maintenance.schedulerLoaded && v.maintenance.backupCount === 0 && !v.activeServer?.isRemote) return { level: 'warning', headline: 'No backups', action: { label: 'Create backup', onClick: () => { void v.handleAction('Create backup', () => backupApi.createBackup({ includeDb: true }).then(() => v.fetchMaintenance())) }, busy: v.loading === 'Create backup', disabled: v.loading !== null } }
   return { level: 'calm' }
