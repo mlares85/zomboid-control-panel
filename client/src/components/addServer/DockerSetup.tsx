@@ -131,7 +131,7 @@ export function DockerSetup({ onBack }: DockerSetupProps) {
 
   if (currentStep === 1) {
     return <DockerPrereqStep onBack={onBack} onContinue={(basePath) => {
-      if (basePath) setConfig((c) => ({ ...c, basePath }));
+      setConfig((c) => ({ ...c, basePath: basePath || undefined }));
       setCurrentStep(2);
     }} />;
   }
