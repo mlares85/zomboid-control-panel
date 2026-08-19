@@ -56,6 +56,7 @@ import {
   writeLuaAtomic,
 } from "./utils/embeddedLua.js";
 import { isServerObservedRunning } from "./utils/serverStatus.js";
+import { validateStartupConfig } from "./utils/startupValidation.js";
 
 // === Supervisor bootstrap ===
 // If the .exe was double-clicked directly (no PANEL_SUPERVISOR_V env var) and
@@ -2591,6 +2592,14 @@ async function start() {
           });
         }
         logReady(urls);
+
+        // Detect common misconfigurations (UID/GID mismatches, missing
+        // mounts, stale docker-managed containers, container-local RCON
+        // loopback) across every configured server. Best-effort — never
+        // blocks or fails startup.
+        validateStartupConfig(serverManager, dockerClient, log).catch((err) =>
+          log.debug(`Startup validation failed: ${err.message}`),
+        );
 
         // Linux/CentOS: Check for common issues at startup
         if (process.platform !== "win32") {
