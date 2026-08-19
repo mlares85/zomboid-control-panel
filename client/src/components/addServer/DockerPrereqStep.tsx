@@ -89,13 +89,13 @@ export function DockerPrereqStep({ onBack, onContinue }: DockerPrereqStepProps) 
     }
   };
 
-  const handleValidatePath = async () => {
-    if (!existingPath.trim()) return;
+  const validatePath = async (path: string) => {
+    if (!path.trim()) return;
     setValidating(true);
     setPathError(null);
     setPathValid(null);
     try {
-      const result = await dockerApi.validateBasePath(existingPath.trim());
+      const result = await dockerApi.validateBasePath(path.trim());
       setPathValid(result.valid);
       if (!result.valid) setPathError(result.error ?? "Invalid path");
     } catch (e) {
@@ -201,20 +201,20 @@ export function DockerPrereqStep({ onBack, onContinue }: DockerPrereqStepProps) 
                     <Button variant="outline" size="icon" className="shrink-0" onClick={() => setBrowseOpen(true)} aria-label="Browse folders">
                       <FolderOpen className="w-4 h-4" />
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleValidatePath} disabled={!existingPath.trim() || validating}>
+                    <Button variant="outline" size="sm" onClick={() => validatePath(existingPath)} disabled={!existingPath.trim() || validating}>
                       {validating && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
                       Verify
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Browse or type the path to your PZ server folder (should contain start-server.sh or ProjectZomboid64), then click Verify.
+                    Browse or type the path to your PZ server folder (should contain start-server.sh or ProjectZomboid64).
                   </p>
                   <FolderBrowser
                     open={browseOpen}
                     onOpenChange={setBrowseOpen}
                     initialPath={existingPath || "/"}
                     title="Select PZ Server Folder"
-                    onSelect={(path) => { setExistingPath(path); setPathValid(null); setPathError(null); }}
+                    onSelect={(path) => { setExistingPath(path); validatePath(path); }}
                   />
                   {pathValid === true && (
                     <p className="text-xs text-green-600 flex items-center gap-1">
