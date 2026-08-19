@@ -11,6 +11,7 @@ Manage your Project Zomboid dedicated server from one place: server controls, RC
 
 [**📖 Setup**](#quick-start) ·
 [**🆕 Fork Features**](#fork-enhancements) ·
+[**📋 Full Changelog**](FORK_CHANGES.md) ·
 [**🔧 Development**](#development)
 
 </div>
