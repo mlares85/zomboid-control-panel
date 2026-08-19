@@ -2,12 +2,14 @@ import express from "express";
 import resolveRoutes from "./resolve.js";
 import vehiclesRoutes from "./vehicles.js";
 import tilesRoutes from "./tiles.js";
+import settingsRoutes from "./settings.js";
 
 const router = express.Router();
 
 router.use(resolveRoutes);
 router.use(vehiclesRoutes);
 router.use(tilesRoutes);
+router.use(settingsRoutes);
 
 export default router;
 

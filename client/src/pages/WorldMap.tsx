@@ -582,6 +582,11 @@ export default function WorldMap() {
   const [safehouses, setSafehouses] = useState<MapSafehouse[]>([])
   const [showVehicles, setShowVehicles] = useState(true)
   const [showSafehouses, setShowSafehouses] = useState(true)
+  // Map version selector state
+  const [mapVersions, setMapVersions] = useState<Array<{ directory: string; label: string; isDefault: boolean }>>([])
+  const [selectedVersion, setSelectedVersion] = useState<string | null>(null) // null = auto (latest)
+  const [versionMenuOpen, setVersionMenuOpen] = useState(false)
+  const resolvedVersionRef = useRef<string | null>(null)
   const [hoveredVehicle, setHoveredVehicle] = useState<number | null>(null) // vehicle id
   const vehiclesRef = useRef<MapVehicle[]>([])
   const safehousesRef = useRef<MapSafehouse[]>([])
@@ -697,8 +702,10 @@ export default function WorldMap() {
 
       // B42 geometry depends on which map build the backend resolved, so it
       // can only be built once that's known.
-      const targetCfg = isB41 ? MAP_B41 : b42ConfigFor(await mapApi.resolve())
+      const resolveData = await mapApi.resolve(selectedVersion ?? undefined)
+      const targetCfg = isB41 ? MAP_B41 : b42ConfigFor(resolveData)
       if (cancelledRef.current) return
+      resolvedVersionRef.current = resolveData.b42Dir
       // Compare geometry, not just B41/B42: the initial state is a B42
       // placeholder, so a label check alone would skip applying the
       // resolved build's real dimensions.
@@ -741,7 +748,7 @@ export default function WorldMap() {
         })
       }
     } catch { /* best-effort */ }
-  }, [])
+  }, [selectedVersion])
 
   useEffect(() => {
     const cancelledRef = { current: false }
@@ -771,6 +778,42 @@ export default function WorldMap() {
       socket.off('activeServerChanged', handleActiveServerChanged)
     }
   }, [socket, detectServerVersion])
+
+  // Fetch available map versions for the selector
+  useEffect(() => {
+    let cancelled = false
+    mapApi.versions().then((data) => {
+      if (cancelled) return
+      setMapVersions(data.versions)
+      resolvedVersionRef.current = data.current
+    }).catch(() => { /* best-effort */ })
+    return () => { cancelled = true }
+  }, [])
+
+  // Listen for new map version notifications from the backend
+  useEffect(() => {
+    if (!socket) return
+    const handleVersionChanged = (data: { previous: string; current: string; versions: Array<{ directory: string; label: string; isDefault: boolean }> }) => {
+      setMapVersions(data.versions)
+      // If user is on "auto" (null), re-detect to pick up the new version
+      if (!selectedVersion) {
+        const cancelledRef = { current: false }
+        detectServerVersion(cancelledRef)
+      }
+      toast({
+        title: 'New map version available',
+        description: `Map updated from ${data.previous} to ${data.current}`,
+      })
+    }
+    socket.on('map:version-changed', handleVersionChanged)
+    return () => { socket.off('map:version-changed', handleVersionChanged) }
+  }, [socket, selectedVersion, detectServerVersion, toast])
+
+  // Switch to a specific version — or back to auto
+  const switchMapVersion = useCallback((version: string | null) => {
+    setSelectedVersion(version)
+    // detectServerVersion will re-run via its dependency on selectedVersion
+  }, [])
 
   useEffect(() => {
     if (hasActiveServer) return
@@ -2168,6 +2211,15 @@ export default function WorldMap() {
     return () => document.removeEventListener('mousedown', onClick, true)
   }, [contextMenu])
 
+  // Click outside version menu to dismiss
+  useEffect(() => {
+    if (!versionMenuOpen) return
+    const onClick = () => setVersionMenuOpen(false)
+    // Delay so the toggle button's own click doesn't immediately close it
+    const timer = setTimeout(() => document.addEventListener('click', onClick), 0)
+    return () => { clearTimeout(timer); document.removeEventListener('click', onClick) }
+  }, [versionMenuOpen])
+
   // ─── Actions ────────────────────────────────────────────
   const triggerLightningAt = useCallback(
     async (x: number, y: number) => {
@@ -2475,6 +2527,58 @@ export default function WorldMap() {
               <Maximize2 className="w-4 h-4" />
             </button>
           </div>
+
+          {/* Map version selector — B42 only */}
+          {mapCfg.label === 'B42' && mapVersions.length > 0 && (
+            <>
+              <div className="flex items-center justify-center gap-1 px-1.5 py-1 border-y border-border/40 bg-muted/30 font-mono text-[9px] uppercase tracking-[0.24em] text-muted-foreground/70">
+                <span>ver</span>
+              </div>
+              <div className="relative flex flex-col items-center p-1 gap-px">
+                <button
+                  onClick={() => setVersionMenuOpen((v) => !v)}
+                  className={cn(
+                    'h-7 w-9 rounded-sm border flex items-center justify-center transition-colors text-[8px] font-mono font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60',
+                    selectedVersion
+                      ? 'bg-accent/20 border-accent/40 text-accent shadow-[inset_0_0_0_1px_rgba(0,0,0,0.2)]'
+                      : 'bg-muted/30 border-border/40 text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                  )}
+                  title={`Map build: ${selectedVersion || resolvedVersionRef.current || 'auto'}`}
+                >
+                  {(selectedVersion || resolvedVersionRef.current || '?').replace(/^42\./, '')}
+                </button>
+                {versionMenuOpen && (
+                  <div className="absolute top-full left-0 mt-1 w-28 rounded-md border border-border/60 bg-card/95 backdrop-blur-md shadow-lg z-20 overflow-hidden">
+                    <div className="px-2 py-1 border-b border-border/30 font-mono text-[8px] uppercase tracking-[0.2em] text-muted-foreground/60">
+                      map build
+                    </div>
+                    <button
+                      onClick={() => { switchMapVersion(null); setVersionMenuOpen(false) }}
+                      className={cn(
+                        'w-full px-2 py-1.5 text-left text-[11px] font-mono hover:bg-muted/60 transition-colors',
+                        !selectedVersion ? 'text-accent font-semibold' : 'text-foreground'
+                      )}
+                    >
+                      Auto (latest)
+                    </button>
+                    {mapVersions.filter((v) => /^4[2-9]/.test(v.directory)).map((v) => (
+                      <button
+                        key={v.directory}
+                        onClick={() => { switchMapVersion(v.directory); setVersionMenuOpen(false) }}
+                        className={cn(
+                          'w-full px-2 py-1.5 text-left text-[11px] font-mono hover:bg-muted/60 transition-colors',
+                          selectedVersion === v.directory ? 'text-accent font-semibold' : 'text-foreground'
+                        )}
+                      >
+                        {v.directory}
+                        {v.isDefault && <span className="ml-1 text-[9px] text-muted-foreground/60">★</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Floor selector — B42 only (B41 has no multi-level tiles) */}
           {mapCfg.label === 'B42' && (

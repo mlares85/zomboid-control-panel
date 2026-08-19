@@ -3005,7 +3005,46 @@ export const mapApi = {
   }> => apiGet("/map/versions"),
   vehicles: (): Promise<{ vehicles: Array<{ id: number; x: number; y: number }> }> =>
     apiGet("/map/vehicles"),
+  settings: (): Promise<MapSettings> => apiGet("/map/settings"),
+  setCheckInterval: (hours: number): Promise<{ success: boolean; intervalHours: number }> =>
+    apiPut("/map/settings/check-interval", { hours }),
+  checkNow: (): Promise<{ success: boolean; version: string }> =>
+    apiPost("/map/settings/check-now"),
 };
+
+export interface MapVersionCheckerStatus {
+  currentVersion: string | null;
+  intervalMs: number;
+  lastCheckAt: number | null;
+  lastChangeAt: number | null;
+  nextCheckAt: number | null;
+  availableVersions: Array<{ directory: string; label: string; isDefault: boolean }>;
+}
+
+export interface MapResolutionState {
+  currentDirectory: string | null;
+  ttlMs: number;
+  lastResolvedAt: number | null;
+  nextResolveAt: number | null;
+  geometry: {
+    tileSize: number;
+    width: number;
+    height: number;
+    maxLevel: number;
+  } | null;
+}
+
+export interface MapCacheStats {
+  directories: number;
+  files: number;
+  totalBytes: number;
+}
+
+export interface MapSettings {
+  checker: MapVersionCheckerStatus | null;
+  resolution: MapResolutionState;
+  cache: MapCacheStats;
+}
 
 export const panelUpdateApi = {
   check: (): Promise<PanelUpdateStatus> => apiGet("/panel/update-check"),

@@ -9,8 +9,36 @@ const log = createLogger("API:MapProxy");
 // homepage HTML and cache it. Tiles themselves are still at /maps/.
 export const PZ_MAP_ROOT = "https://map.projectzomboid.com";
 const B42_DIR_FALLBACK = "42.20.0";
-const B42_DIR_TTL_MS = 24 * 60 * 60 * 1000; // re-resolve at most once per 24 h
+let B42_DIR_TTL_MS = 24 * 60 * 60 * 1000; // re-resolve at most once per 24 h
 const B42_DIR_RETRY_MS = 5 * 60 * 1000; // ...but retry a failed resolve sooner
+
+/** Allow the MapVersionChecker service to adjust the TTL dynamically. */
+export function setResolutionTtl(ms) {
+  B42_DIR_TTL_MS = Math.max(B42_DIR_RETRY_MS + 1000, ms);
+}
+
+/** Expose internal cache state for diagnostics and the settings UI. */
+export function getResolutionState() {
+  return {
+    currentDirectory: _b42Map?.directory || null,
+    ttlMs: B42_DIR_TTL_MS,
+    lastResolvedAt: _b42DirFetchedAt || null,
+    nextResolveAt: _b42DirFetchedAt ? _b42DirFetchedAt + B42_DIR_TTL_MS : null,
+    geometry: _b42Map
+      ? {
+          tileSize: _b42Map.tileSize,
+          width: _b42Map.width,
+          height: _b42Map.height,
+          maxLevel: _b42Map.maxLevel,
+        }
+      : null,
+  };
+}
+
+/** Force an immediate re-resolve on the next getB42Map() call. */
+export function invalidateResolutionCache() {
+  _b42DirFetchedAt = 0;
+}
 // Geometry of B42_DIR_FALLBACK, used only when layer0.dzi can't be fetched.
 // x0/y0/sqr/scale are the isometric projection origin from the build's own
 // base/map_info.json (skip:0 => scale 1<<0 = 1).

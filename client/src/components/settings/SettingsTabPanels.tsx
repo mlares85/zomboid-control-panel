@@ -13,6 +13,7 @@ import { ModsSettings } from "./ModsSettings";
 import { BackupsSettings } from "./BackupsSettings";
 import { SecuritySettings } from "./SecuritySettings";
 import { AboutSettings } from "./AboutSettings";
+import { MapSettings } from "./MapSettings";
 
 interface AuthUser {
   username: string;
@@ -144,6 +145,10 @@ export function SettingsTabPanels({
 
       <TabsContent value="security" className="mt-0">
         <SecuritySettings authEnabled={authEnabled} user={user} logout={logout} />
+      </TabsContent>
+
+      <TabsContent value="map" className="mt-0">
+        <MapSettings />
       </TabsContent>
 
       <TabsContent value="about" className="mt-0 space-y-5">

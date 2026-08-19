@@ -6,6 +6,7 @@ import {
   Info,
   Link,
   Lock,
+  Map,
   Settings2,
   Shield,
   Zap,
@@ -88,6 +89,15 @@ export const SETTINGS_SECTIONS = [
     group: "Automation",
     tip: "World backup schedule and character exports",
     description: "Automatic world backups and per-character export copies.",
+  },
+  {
+    id: "map",
+    label: "World Map",
+    icon: Map,
+    group: "Panel",
+    tip: "Map tile caching and version checking",
+    description:
+      "How often the panel checks map.projectzomboid.com for new map builds, and local tile cache status.",
   },
   {
     id: "about",
