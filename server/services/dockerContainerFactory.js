@@ -64,13 +64,35 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
     return null;
   }
 
+  // PZ's native libraries need 32-bit compat libs (lib32gcc-s1, libstdc++6).
+  // The default eclipse-temurin:21-jre image doesn't include them, so we wrap
+  // the start script in an inline entrypoint that installs them on first boot.
+  // Subsequent starts skip the install (dpkg -s check) so there's no penalty.
+  const PZ_ENTRYPOINT = [
+    "/bin/bash", "-c",
+    [
+      // Install 32-bit compatibility libraries if not already present
+      "if ! dpkg -s lib32gcc-s1 >/dev/null 2>&1; then",
+      "  echo '[panel] Installing 32-bit compatibility libraries...';",
+      "  dpkg --add-architecture i386;",
+      "  apt-get update -qq;",
+      "  apt-get install -y --no-install-recommends lib32gcc-s1 libstdc++6:i386 >/dev/null 2>&1;",
+      "  rm -rf /var/lib/apt/lists/*;",
+      "  echo '[panel] 32-bit libraries installed.';",
+      "fi;",
+      // Run the PZ start script
+      'exec /opt/pz-server/start-server.sh "$@"',
+    ].join(" "),
+  ];
+
   function buildContainerSpec(config) {
     const image = config.image || DEFAULT_IMAGE;
     const gamePort = config.gamePort || BASE_GAME_PORT;
     const rconPort = config.rconPort || BASE_RCON_PORT;
     return {
       Image: image,
-      Cmd: ["/opt/pz-server/start-server.sh", "-servername", config.serverName],
+      Entrypoint: PZ_ENTRYPOINT,
+      Cmd: ["-servername", config.serverName],
       Env: [
         `HOME=/opt/pz-data`,
         `RCON_PORT=${rconPort}`,
@@ -98,6 +120,9 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
           [`${gamePort + 1}/udp`]: [{ HostPort: String(gamePort + 1) }],
           [`${rconPort}/tcp`]: [{ HostPort: String(rconPort) }],
         },
+        // Tmpfs mount for /tmp — PZ writes temp files during saves and
+        // some Docker runtimes mount / as read-only or noexec.
+        Tmpfs: { "/tmp": "" },
         NetworkMode: PANEL_NETWORK,
         RestartPolicy: { Name: "unless-stopped" },
       },

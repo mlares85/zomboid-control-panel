@@ -3214,6 +3214,21 @@ export const dockerApi = {
       success: boolean;
       error?: string;
     }>,
+  serverHealth: (id: string): Promise<{
+    success: boolean;
+    health?: {
+      running: boolean;
+      status: string;
+      exitCode: number;
+      restartCount: number;
+      startedAt: string;
+      finishedAt: string;
+      healthy: boolean;
+      issues: Array<{ severity: string; message: string; hint: string }>;
+      recentLogs?: string[];
+    };
+    error?: string;
+  }> => apiGet(`/docker/managed/servers/${encodeURIComponent(id)}/health`),
 };
 
 // System storage health — see server/routes/system.js. Polled by

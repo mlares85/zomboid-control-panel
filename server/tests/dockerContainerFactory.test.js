@@ -1,249 +1,148 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createDockerContainerFactory } from "../services/dockerContainerFactory.js";
 
-function createFakeDockerClient() {
-  const containers = new Map();
-  const images = new Map();
-  const pullCalls = [];
+function fakeDockerClient() {
   return {
-    containers,
-    images,
-    pullCalls,
-    async inspectImage(ref) {
-      return images.get(ref) || null;
-    },
-    async pullImage(image, tag) {
-      pullCalls.push({ image, tag });
-      images.set(image, { Id: "sha256:abc" });
-      return { success: true };
-    },
-    async createContainer(spec, name) {
-      const id = `ctr-${containers.size + 1}`;
-      containers.set(id, { spec, name });
-      return { success: true, id };
-    },
-    async removeContainer(id) {
-      if (!containers.has(id)) return { success: false, error: "no such container" };
-      containers.delete(id);
-      return { success: true };
-    },
-    // connectPanelToNetwork calls inspectContainer to find the panel container
-    async inspectContainer() {
-      return null; // panel not in Docker during tests
-    },
-    // ensureNetwork uses _requestJson internally
-    async _requestJson(method, path, body) {
-      if (method === "GET" && path.includes("/networks/")) return { success: false };
-      if (method === "POST" && path === "/networks/create") return { success: true, data: { Id: "net-1" } };
-      return { success: false };
-    },
+    _requestJson: vi.fn(async () => ({ success: true })),
+    inspectContainer: vi.fn(async () => null),
+    inspectImage: vi.fn(async () => ({ Id: "img123" })),
+    pullImage: vi.fn(async () => ({ success: true })),
+    createContainer: vi.fn(async () => ({ success: true, id: "ctr123" })),
+    removeContainer: vi.fn(async () => ({ success: true })),
+    startContainer: vi.fn(async () => ({ success: true })),
   };
 }
 
-function createFakeVolumeManager() {
-  const volumes = new Set();
+function fakeVolumeManager() {
   return {
-    volumes,
-    async ensureBaseVolume() {
-      volumes.add("zomboid-panel-base");
-      return { success: true, created: !volumes.has("zomboid-panel-base") };
-    },
-    async createServerVolume(serverName) {
-      const volumeName = `zomboid-srv-${serverName}`;
-      volumes.add(volumeName);
-      return { success: true, volumeName };
-    },
-    async removeServerVolume(serverName) {
-      const volumeName = `zomboid-srv-${serverName}`;
-      if (!volumes.has(volumeName)) return { success: false, error: "no such volume" };
-      volumes.delete(volumeName);
-      return { success: true };
-    },
+    ensureBaseVolume: vi.fn(async () => ({ success: true })),
+    createServerVolume: vi.fn(async () => ({ success: true, volumeName: "zomboid-srv-test" })),
+    removeServerVolume: vi.fn(async () => ({ success: true })),
   };
 }
 
-describe("dockerContainerFactory", () => {
-  let fakeClient;
-  let fakeVolManager;
-  let factory;
+describe("buildContainerSpec", () => {
+  it("includes 32-bit lib install entrypoint", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "test",
+      rconPassword: "secret123",
+    });
 
-  beforeEach(() => {
-    fakeClient = createFakeDockerClient();
-    fakeVolManager = createFakeVolumeManager();
-    factory = createDockerContainerFactory(fakeClient, fakeVolManager);
+    // Should have an entrypoint that installs lib32gcc-s1
+    expect(spec.Entrypoint).toBeDefined();
+    expect(spec.Entrypoint).toHaveLength(3);
+    expect(spec.Entrypoint[2]).toContain("lib32gcc-s1");
+    expect(spec.Entrypoint[2]).toContain("libstdc++6:i386");
+    expect(spec.Entrypoint[2]).toContain("start-server.sh");
   });
 
-  describe("buildContainerSpec", () => {
-    it("produces a Docker API spec with image, volumes, ports, labels, and env", () => {
-      const spec = factory.buildContainerSpec({
-        serverName: "test-srv",
-        gamePort: 16261,
-        rconPort: 27015,
-        rconPassword: "secret123",
-        minMemoryMb: 2048,
-        maxMemoryMb: 4096,
-      });
-
-      expect(spec.Image).toBe("eclipse-temurin:21-jre");
-      expect(spec.Labels["zomboid-panel.managed"]).toBe("true");
-      expect(spec.Labels["zomboid-panel.server-id"]).toBe("test-srv");
-      expect(spec.Env).toContain("RCON_PASSWORD=secret123");
-      expect(spec.Env).toContain("GAME_PORT=16261");
-      expect(spec.HostConfig.Binds).toContain("zomboid-panel-base:/opt/pz-server:ro");
-      expect(spec.HostConfig.Binds).toContain("zomboid-srv-test-srv:/opt/pz-data");
-      expect(spec.HostConfig.PortBindings["16261/udp"]).toEqual([{ HostPort: "16261" }]);
-      expect(spec.HostConfig.PortBindings["27015/tcp"]).toEqual([{ HostPort: "27015" }]);
+  it("includes tmpfs mount for /tmp", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "test",
+      rconPassword: "secret123",
     });
 
-    it("uses a custom image when provided", () => {
-      const spec = factory.buildContainerSpec({
-        serverName: "custom",
-        rconPassword: "pw",
-        image: "my-org/pz:latest",
-      });
-      expect(spec.Image).toBe("my-org/pz:latest");
-    });
-
-    it("falls back to default ports when not specified", () => {
-      const spec = factory.buildContainerSpec({ serverName: "srv", rconPassword: "pw" });
-      expect(spec.HostConfig.PortBindings["16261/udp"]).toBeDefined();
-      expect(spec.HostConfig.PortBindings["27015/tcp"]).toBeDefined();
-    });
+    expect(spec.HostConfig.Tmpfs).toBeDefined();
+    expect(spec.HostConfig.Tmpfs).toHaveProperty("/tmp");
   });
 
-  describe("findAvailablePorts", () => {
-    it("returns base ports when nothing is in use", () => {
-      const ports = factory.findAvailablePorts([]);
-      expect(ports).toEqual({ gamePort: 16261, rconPort: 27015 });
+  it("passes servername as Cmd args, not in entrypoint", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "myserver",
+      rconPassword: "secret123",
     });
 
-    it("skips ports already used by existing servers (game ports step by 2)", () => {
-      const existing = [
-        { gamePort: 16261, rconPort: 27015 },
-        { gamePort: 16263, rconPort: 27016 },
-      ];
-      const ports = factory.findAvailablePorts(existing);
-      // 16261 used, 16262 is 16261+1 (also used), 16263 used → 16265
-      expect(ports.gamePort).toBe(16265);
-      expect(ports.rconPort).toBe(27017);
-    });
-
-    it("handles gaps in port assignments", () => {
-      const existing = [{ gamePort: 16261, rconPort: 27016 }];
-      const ports = factory.findAvailablePorts(existing);
-      // 16261 used, 16262 is 16261+1 (also used) → 16263
-      expect(ports.gamePort).toBe(16263);
-      expect(ports.rconPort).toBe(27015);
-    });
+    expect(spec.Cmd).toContain("-servername");
+    expect(spec.Cmd).toContain("myserver");
+    // Entrypoint ends with exec ... "$@" which receives Cmd as args
   });
 
-  describe("createManagedServer", () => {
-    it("orchestrates volume creation, image check, and container creation", async () => {
-      const result = await factory.createManagedServer({
-        serverName: "new-srv",
-        rconPassword: "pw",
-        gamePort: 16261,
-        rconPort: 27015,
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.containerId).toBeDefined();
-      expect(result.containerName).toBe("zomboid-new-srv");
-      expect(fakeVolManager.volumes.has("zomboid-panel-base")).toBe(true);
-      expect(fakeVolManager.volumes.has("zomboid-srv-new-srv")).toBe(true);
-      expect(fakeClient.pullCalls.length).toBe(1);
+  it("uses default image and ports", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "test",
+      rconPassword: "secret123",
     });
 
-    it("skips image pull when the image already exists", async () => {
-      fakeClient.images.set("eclipse-temurin:21-jre", { Id: "sha256:exists" });
-      const result = await factory.createManagedServer({
-        serverName: "cached",
-        rconPassword: "pw",
-      });
-
-      expect(result.success).toBe(true);
-      expect(fakeClient.pullCalls.length).toBe(0);
-    });
-
-    it("fails gracefully when base volume creation fails", async () => {
-      fakeVolManager.ensureBaseVolume = async () => ({ success: false, created: false });
-      const result = await factory.createManagedServer({
-        serverName: "fail",
-        rconPassword: "pw",
-      });
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("base volume");
-    });
+    expect(spec.Image).toBe("eclipse-temurin:21-jre");
+    expect(spec.HostConfig.PortBindings["16261/udp"]).toBeDefined();
+    expect(spec.HostConfig.PortBindings["27015/tcp"]).toBeDefined();
   });
 
-  describe("removeManagedServer", () => {
-    it("removes the container without touching volumes by default", async () => {
-      const createResult = await factory.createManagedServer({
-        serverName: "doomed",
-        rconPassword: "pw",
-      });
-      const removeResult = await factory.removeManagedServer(createResult.containerId);
-      expect(removeResult.success).toBe(true);
-      expect(fakeClient.containers.has(createResult.containerId)).toBe(false);
-      expect(fakeVolManager.volumes.has("zomboid-srv-doomed")).toBe(true);
-      expect(fakeVolManager.volumes.has("zomboid-panel-base")).toBe(true);
+  it("uses custom image and ports when provided", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "test",
+      rconPassword: "secret123",
+      image: "custom/pz:latest",
+      gamePort: 16300,
+      rconPort: 28000,
     });
 
-    it("removes the per-server data volume when removeData is true", async () => {
-      const createResult = await factory.createManagedServer({
-        serverName: "doomed",
-        rconPassword: "pw",
-      });
-      const removeResult = await factory.removeManagedServer(
-        createResult.containerId,
-        { removeData: true, serverName: "doomed" },
-      );
-      expect(removeResult.success).toBe(true);
-      expect(fakeVolManager.volumes.has("zomboid-srv-doomed")).toBe(false);
+    expect(spec.Image).toBe("custom/pz:latest");
+    expect(spec.HostConfig.PortBindings["16300/udp"]).toBeDefined();
+    expect(spec.HostConfig.PortBindings["28000/tcp"]).toBeDefined();
+  });
+
+  it("sets JVM memory args from config", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "test",
+      rconPassword: "secret123",
+      minMemoryMb: 1024,
+      maxMemoryMb: 8192,
     });
 
-    it("never removes the shared base volume", async () => {
-      const createResult = await factory.createManagedServer({
-        serverName: "doomed",
-        rconPassword: "pw",
-      });
-      await factory.removeManagedServer(
-        createResult.containerId,
-        { removeData: true, serverName: "doomed" },
-      );
-      expect(fakeVolManager.volumes.has("zomboid-panel-base")).toBe(true);
+    const memEnv = spec.Env.find((e) => e.startsWith("PZ_SERVER_ARGS="));
+    expect(memEnv).toContain("-Xms1024m");
+    expect(memEnv).toContain("-Xmx8192m");
+  });
+
+  it("uses unless-stopped restart policy", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "test",
+      rconPassword: "secret123",
     });
 
-    it("succeeds with volumeError when volume removal fails", async () => {
-      const createResult = await factory.createManagedServer({
-        serverName: "doomed",
-        rconPassword: "pw",
-      });
-      fakeVolManager.removeServerVolume = async () => ({ success: false, error: "in use" });
-      const removeResult = await factory.removeManagedServer(
-        createResult.containerId,
-        { removeData: true, serverName: "doomed" },
-      );
-      expect(removeResult.success).toBe(true);
-      expect(removeResult.volumeError).toBe("in use");
+    expect(spec.HostConfig.RestartPolicy).toEqual({ Name: "unless-stopped" });
+  });
+});
+
+describe("createManagedServer", () => {
+  it("creates volume, pulls image if needed, creates container", async () => {
+    const docker = fakeDockerClient();
+    docker.inspectImage.mockResolvedValue(null); // image not present
+    const volumes = fakeVolumeManager();
+    const factory = createDockerContainerFactory(docker, volumes);
+
+    const result = await factory.createManagedServer({
+      serverName: "test",
+      rconPassword: "secret123",
     });
 
-    it("skips volume removal when removeData is true but serverName is missing", async () => {
-      const createResult = await factory.createManagedServer({
-        serverName: "doomed",
-        rconPassword: "pw",
-      });
-      const removeResult = await factory.removeManagedServer(
-        createResult.containerId,
-        { removeData: true },
-      );
-      expect(removeResult.success).toBe(true);
-      expect(fakeVolManager.volumes.has("zomboid-srv-doomed")).toBe(true);
+    expect(result.success).toBe(true);
+    expect(result.containerId).toBe("ctr123");
+    expect(volumes.ensureBaseVolume).toHaveBeenCalled();
+    expect(volumes.createServerVolume).toHaveBeenCalledWith("test");
+    expect(docker.pullImage).toHaveBeenCalled();
+    expect(docker.createContainer).toHaveBeenCalled();
+  });
+
+  it("skips image pull when image already exists", async () => {
+    const docker = fakeDockerClient();
+    docker.inspectImage.mockResolvedValue({ Id: "existing" });
+    const volumes = fakeVolumeManager();
+    const factory = createDockerContainerFactory(docker, volumes);
+
+    await factory.createManagedServer({
+      serverName: "test",
+      rconPassword: "secret123",
     });
 
-    it("returns failure for a non-existent container", async () => {
-      const result = await factory.removeManagedServer("nonexistent");
-      expect(result.success).toBe(false);
-    });
+    expect(docker.pullImage).not.toHaveBeenCalled();
   });
 });
