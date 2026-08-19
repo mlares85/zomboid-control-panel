@@ -88,7 +88,7 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       "  echo '[panel] Installing 32-bit compatibility libraries...';",
       "  dpkg --add-architecture i386;",
       "  apt-get update -qq;",
-      "  apt-get install -y --no-install-recommends lib32gcc-s1 libstdc++6:i386 >/dev/null 2>&1;",
+      "  apt-get install -y --no-install-recommends lib32gcc-s1 libstdc++6:i386 ca-certificates >/dev/null 2>&1;",
       "  rm -rf /var/lib/apt/lists/*;",
       "  echo '[panel] 32-bit libraries installed.';",
       "fi;",
