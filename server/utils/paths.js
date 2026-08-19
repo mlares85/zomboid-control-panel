@@ -44,8 +44,10 @@ export function getDataPaths() {
     }
   }
   
-  const dataDir = config.dataDir || defaultDataDir;
-  const logsDir = config.logsDir || defaultLogsDir;
+  // DATA_DIR env var overrides the config file — used by E2E tests to
+  // isolate their database from the production data directory.
+  const dataDir = process.env.DATA_DIR || config.dataDir || defaultDataDir;
+  const logsDir = process.env.LOGS_DIR || config.logsDir || defaultLogsDir;
   
   // Ensure directories exist
   if (!fs.existsSync(dataDir)) {

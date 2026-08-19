@@ -28,7 +28,17 @@ export const test = base.extend<{ dashboard: Page }>({
       await page.getByLabel('Username').fill(USERNAME)
       await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
       await page.getByRole('button', { name: /^sign in$/i }).click()
-      await expect(nav).toBeVisible({ timeout: 15_000 })
+      // Wait for either successful login (nav appears) or a login error alert.
+      // Use a login-form-scoped error locator to avoid matching unrelated
+      // destructive elements (e.g. disconnected RCON icons) on the dashboard.
+      const loginError = page.getByRole('alert').filter({ hasText: /couldn.*sign|invalid|incorrect/i })
+      await expect(nav.or(loginError)).toBeVisible({ timeout: 15_000 })
+      if (await loginError.isVisible().catch(() => false)) {
+        throw new Error(
+          `E2E login failed for "${USERNAME}". Ensure the test account exists ` +
+          `(set E2E_USERNAME/E2E_PASSWORD, or delete data/db.json to start fresh).`
+        )
+      }
     }
 
     // Persist the current session so the next test's context starts from a

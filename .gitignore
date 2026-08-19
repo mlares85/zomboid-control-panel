@@ -58,4 +58,5 @@ _artifacts/
 e2e/test-results/
 e2e/html-report/
 e2e/.auth/
+e2e/.test-data/
 /playwright-report/

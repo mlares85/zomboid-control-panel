@@ -87,13 +87,27 @@ export default defineConfig({
 
   // Starts the dev server (backend + Vite) for the test run. Skipped
   // automatically if something is already listening on BASE_URL.
+  // The ensure-ports-free.sh script kills stale processes on 3001/5173
+  // so the server doesn't hit EADDRINUSE and silently fail.
+  // DATA_DIR isolates the test database from production data so the
+  // auth setup can safely create its own admin account.
   webServer: {
-    command: 'npm run dev',
+    command: 'sh e2e/ensure-ports-free.sh && npm run dev',
     url: BASE_URL,
     timeout: 60_000,
-    reuseExistingServer: !process.env.CI,
+    // Reuse an existing dev server in local mode, but NOT when running
+    // with an isolated test data dir (E2E_DATA_DIR) — the tests need the
+    // server that's using the test database, not a stale one.
+    reuseExistingServer: !process.env.CI && !process.env.E2E_DATA_DIR,
     stdout: 'pipe',
     stderr: 'pipe',
-    env: { ...process.env, NODE_ENV: 'test' },
+    env: {
+      ...process.env,
+      NODE_ENV: 'test',
+      // When E2E_DATA_DIR is set, the server uses an isolated database
+      // so the auth setup can create its own admin account from scratch.
+      // Unset by default so local runs reuse the existing dev data.
+      ...(process.env.E2E_DATA_DIR ? { DATA_DIR: process.env.E2E_DATA_DIR } : {}),
+    },
   },
 })
