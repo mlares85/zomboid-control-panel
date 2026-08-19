@@ -89,7 +89,7 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       "  echo '[panel] Installing 32-bit compatibility libraries...';",
       "  dpkg --add-architecture i386;",
       "  apt-get update -qq;",
-      "  apt-get install -y --no-install-recommends lib32gcc-s1 libstdc++6:i386 ca-certificates libssl3 >/dev/null 2>&1;",
+      "  apt-get install -y --no-install-recommends lib32gcc-s1 libstdc++6:i386 ca-certificates libssl3 unzip >/dev/null 2>&1;",
       "  rm -rf /var/lib/apt/lists/*;",
       "  echo '[panel] 32-bit libraries installed.';",
       "fi;",
@@ -99,7 +99,7 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       // it at runtime. Pre-extract it so PZ finds it on the filesystem.
       "if [ ! -f /opt/pz-server/linux64/libsqlitejdbc.so ]; then",
       "  echo '[panel] Extracting SQLite native lib from JAR...';",
-      "  cd /tmp && /opt/pz-server/jre64/bin/jar xf /opt/pz-server/java/projectzomboid.jar org/sqlite/native/Linux/x86_64/libsqlitejdbc.so 2>/dev/null;",
+      "  cd /tmp && unzip -o /opt/pz-server/java/projectzomboid.jar org/sqlite/native/Linux/x86_64/libsqlitejdbc.so >/dev/null 2>&1;",
       "  if [ -f org/sqlite/native/Linux/x86_64/libsqlitejdbc.so ]; then",
       "    cp org/sqlite/native/Linux/x86_64/libsqlitejdbc.so /opt/pz-server/linux64/libsqlitejdbc.so;",
       "    rm -rf org/;",
