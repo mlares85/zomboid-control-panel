@@ -95,6 +95,12 @@ export function registerLifecycleRoutes(router) {
       // Send immediate response
       res.json(result);
     } catch (error) {
+      // "Already running" is not an error — the server is in the desired
+      // state. Return success so the dashboard doesn't show error toasts
+      // when it polls /start for a container that was started during creation.
+      if (error.message === "Server is already running") {
+        return res.json({ success: true, message: "Server is already running" });
+      }
       log.error(`Failed to start server: ${error.message}`);
       res.status(500).json({ error: sanitizeError(error.message) });
     }
