@@ -135,15 +135,31 @@ Modular `FileAccess` interface replaces 200+ direct `fs` calls across 59 files:
 - `fixUrl` field points to the relevant Settings page
 - Frontend renders "Fix this →" links in error toasts
 
+### Startup Validation
+- UID/GID mismatch detection with `PUID`/`PGID` fix suggestion
+- Missing mount path warnings (`installPath`, `zomboidDataPath`)
+- Docker-managed provider sanity check (validates `zomboid-panel.managed` label)
+- RCON loopback hint when running containerized
+
+### Monolith Route Elimination
+All 7 remaining monolith route files converted to 2-line re-export shims:
+- 14,740 lines of duplicated code removed
+- `auth.js` (676→3), `servers.js` (889→2), `config.js` (652→2), `panelBridge.js` (3,684→2), `debug.js` (4,641→3), `serverFiles.js` (2,091→3), `chunks.js` (2,092→3)
+- Decomposed modules are now the live code — security-hardened to match monolith protections before cutover
+
 ---
 
 ## Security Fixes
 - Masked leaked secrets in error responses
-- Closed path traversal vulnerability in file routes
+- Closed path traversal vulnerability in file routes (monolith + decomposed copies)
 - Fixed auth gaps in several endpoints
 - Timing-safe dummy-hash comparison on "user not found" (prevents username enumeration)
 - SHA-256 hashed recovery codes
 - `tokenGen` counter invalidates all tokens on password change
+- Docker bridge NAT bypass prevention on password reset tokens
+- Pattern-based secret masking (`SENSITIVE_FIELD_RE`) replaces brittle allowlists
+- `requireRole("admin")` on all sensitive endpoints (mod install, auto-scan, app settings)
+- Path-traversal guard on `getServerName()` and chunk browser
 
 ---
 
