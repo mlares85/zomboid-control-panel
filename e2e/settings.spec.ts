@@ -14,7 +14,7 @@ test.describe('Panel Settings page', () => {
 
   test('settings tab list is visible with all sections', async ({ dashboard: page }) => {
     await goToSettings(page)
-    const sections = ['General', 'Updates', 'HTTPS', 'Remote access', 'Security', 'RCON', 'PanelBridge', 'Mods & Workshop', 'Backups', 'About']
+    const sections = ['General', 'Updates', 'HTTPS', 'Remote access', 'Security', 'RCON', 'PanelBridge', 'Mods & Workshop', 'Backups', 'World Map', 'About']
     for (const label of sections) {
       await expect(page.getByRole('tab', { name: label })).toBeVisible()
     }

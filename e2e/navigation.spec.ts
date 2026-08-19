@@ -21,6 +21,7 @@ const ROUTES: { navLabel: string; path: string; heading: string | RegExp }[] = [
   { navLabel: 'Discord', path: '/discord', heading: /Discord Bot/ },
   { navLabel: 'Panel Settings', path: '/settings', heading: 'Settings' },
   { navLabel: 'Debug Logs', path: '/debug', heading: 'Debug & Logs' },
+  { navLabel: 'Help & Wiki', path: '/wiki', heading: 'Help & Wiki' },
 ]
 
 test.describe('navigation', () => {
