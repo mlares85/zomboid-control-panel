@@ -18,6 +18,7 @@ import { escapeRegExp } from "../utils/regex.js";
 import { getDataPaths } from "../utils/paths.js";
 import { LocalFiles } from "./fileAccess/index.js";
 import { isRemoteProvider } from "../utils/serverProvider.js";
+import { DockerLifecycle } from "./lifecycle/DockerLifecycle.js";
 
 const isWindows = process.platform === "win32";
 // How long a live-looked-up public IP is trusted before re-checking.
@@ -267,6 +268,16 @@ export class ServerManager {
 
   _dockerRef() {
     return this.dockerContainerId || this.dockerContainerName || null;
+  }
+
+  // Builds the launch()/terminate() lifecycle capability for the currently
+  // configured container. Kept as a helper (rather than a cached instance
+  // field) because the container ref can change on reloadConfig().
+  _dockerLifecycle() {
+    return new DockerLifecycle({
+      dockerClient: this.dockerClient,
+      containerRef: this._dockerRef(),
+    });
   }
 
   // Load settings from a specific server (serverId), the active server, or
@@ -965,8 +976,12 @@ export class ServerManager {
     if (!skipRunningCheck && (await this.dockerClient.isContainerRunning(ref))) {
       throw new Error("Server is already running");
     }
-    const result = await this.dockerClient.startContainer(ref);
-    if (!result.success) {
+    // DockerLifecycle.launch() also checks isRunning() internally; when
+    // skipRunningCheck is true we've deliberately skipped the guard above,
+    // so tolerate a race where it detects "already running" between here
+    // and there instead of failing a start the caller explicitly forced.
+    const result = await this._dockerLifecycle().launch();
+    if (!result.success && result.error !== "Server is already running") {
       throw new Error(result.error || "Failed to start Docker container");
     }
     this.isRunning = true;
@@ -1169,7 +1184,7 @@ export class ServerManager {
   // rather than anything on the host.
   async _stopDockerContainer() {
     const ref = this._dockerRef();
-    const result = await this.dockerClient.stopContainer(ref);
+    const result = await this._dockerLifecycle().terminate();
     this._clearRunState();
     if (!result.success) {
       throw new Error(result.error || "Failed to stop Docker container");
