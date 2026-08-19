@@ -7423,6 +7423,21 @@
       "memoryTotal": 51986432,
       "playerCount": 0,
       "serverRunning": false
+    },
+    {
+      "timestamp": "2026-08-19T22:57:33.358Z",
+      "hostMemTotal": 17179869184,
+      "hostMemUsed": 17096687616,
+      "cpuUsage": 41,
+      "hostDiskTotal": 494384795648,
+      "hostDiskUsed": 413659131904,
+      "panelMemHeap": 53198400,
+      "panelMemRss": 65945600,
+      "pzMemUsed": null,
+      "memoryUsed": 53198400,
+      "memoryTotal": 89473024,
+      "playerCount": 0,
+      "serverRunning": false
     }
   ],
   "bridge_logs": [],

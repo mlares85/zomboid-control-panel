@@ -6,10 +6,9 @@ const log = createLogger("DockerContainerFactory");
 // Debian Bullseye provides glibc + the base libs PZ expects. Using a
 // JRE image (e.g. eclipse-temurin) puts a different Java on PATH that
 // conflicts with PZ's bundled JRE and native library loading.
-// Use the ich777 steamcmd PZ image — it's a proven Debian Bookworm base
-// with the exact lib versions PZ expects. Our entrypoint overrides its
-// start scripts, so only the OS layer matters.
-const DEFAULT_IMAGE = "ghcr.io/ich777/steamcmd:projectzomboid";
+// Debian Bookworm provides GLIBCXX_3.4.29+ required by PZ Build 42.
+// PZ bundles its own JRE — no image-provided Java needed.
+const DEFAULT_IMAGE = "debian:bookworm-slim";
 const BASE_GAME_PORT = 16261;
 const BASE_RCON_PORT = 27015;
 const MANAGED_LABEL = "zomboid-panel.managed";
@@ -90,7 +89,7 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       "  echo '[panel] Installing 32-bit compatibility libraries...';",
       "  dpkg --add-architecture i386;",
       "  apt-get update -qq;",
-      "  apt-get install -y --no-install-recommends lib32gcc-s1 libstdc++6:i386 ca-certificates >/dev/null 2>&1;",
+      "  apt-get install -y --no-install-recommends lib32gcc-s1 libstdc++6:i386 ca-certificates libssl3 >/dev/null 2>&1;",
       "  rm -rf /var/lib/apt/lists/*;",
       "  echo '[panel] 32-bit libraries installed.';",
       "fi;",
