@@ -42,14 +42,25 @@ Two-tier Playwright test suite:
 
 Plus 830+ unit tests (723 server + 107 client).
 
+### 🎮 Simulation Template System
+Portable JSON templates with sparse SandboxVars + INI overrides (only keys that differ from defaults). 6 built-in templates ship out of the box. Diff-preview against a server's live config before applying. Mandatory backup before apply. Mod capture/apply for template import/export.
+
+### 🛡️ Security Hardening
+9 security findings fixed: path traversal in file routes, auth gaps on several endpoints, leaked secrets in error responses. Timing-safe username enumeration prevention. SHA-256 hashed recovery codes. Token generation counter invalidates all sessions on password change.
+
+### 💾 Disk Monitoring & Health
+Free-space polling every 60 seconds. Warning at 90%, critical at 95%. Combined with circuit-breaker status. Persistent frontend banner for critical disk states — full disk during a PZ save means world corruption.
+
 ### 🏗️ Structural Improvements
-- Dashboard decomposed from 1,556 → 131-line shell + 12 components
-- Backups decomposed from 1,077 → 160-line shell + 7 components
+- **Backend**: 7 monolith route files (28,000+ lines) → 200+ focused modules. Shared middleware replaces 95+ copy-pasted guards.
+- **Frontend**: Settings (6,822→146), ServerConfig (3,879→165), Dashboard (1,556→131), Backups (1,077→160) — all decomposed into shell + components + hooks.
 - Per-server RCON status probing across all configured servers
 - Container resource stats polling (CPU/memory/disk/network)
 - Backup server snapshots with curated config data
 - Mount auto-discovery with guided server creation
 - Platform-specific onboarding (macOS Docker guidance, Windows firewall hints)
+- No-dead-end errors: every error message includes an actionable fix suggestion
+- Upstream sync: 4 fixes ported from v1.1.42–v1.1.47
 
 ---
 
