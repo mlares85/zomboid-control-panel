@@ -1,7 +1,6 @@
 import { spawn, execFile } from "child_process";
 import path from "path";
 import fs from "fs";
-import os from "os";
 import net from "net";
 import { createLogger } from "../utils/logger.js";
 const log = createLogger("Server");
@@ -13,8 +12,6 @@ import {
   getServer,
   getServers,
 } from "../database/init.js";
-import { withFileLock } from "../utils/fileWriteQueue.js";
-import { escapeRegExp } from "../utils/regex.js";
 import { getDataPaths } from "../utils/paths.js";
 import { LocalFiles } from "./fileAccess/index.js";
 import { isRemoteProvider } from "../utils/serverProvider.js";
@@ -24,6 +21,20 @@ import {
   scanDedicatedServerProcesses,
   scoreServerProcessOwnership,
 } from "./processDetection.js";
+import {
+  getConfiguredIpv4Address,
+  listNetworkInterfaces as listInterfaces,
+  getLocalIp as resolveLocalIp,
+  fetchPublicIp as fetchPublicIpFromApi,
+  PUBLIC_IP_CACHE_TTL_MS,
+} from "./serverNetwork.js";
+import {
+  parseIni,
+  readServerConfig,
+  writeServerConfig,
+  extractModList,
+  extractGamePort,
+} from "./serverConfigIo.js";
 
 // Re-exported for backward compatibility — callers and tests still
 // import these process-detection helpers from serverManager.js.
@@ -33,15 +44,6 @@ export {
 } from "./processDetection.js";
 
 const isWindows = process.platform === "win32";
-// How long a live-looked-up public IP is trusted before re-checking.
-// Residential ISPs rotate dynamic WAN IPs periodically; without a TTL the
-// dashboard would show a stale, no-longer-yours address indefinitely.
-const PUBLIC_IP_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
-
-function getConfiguredIpv4Address(variableName) {
-  const address = process.env[variableName]?.trim();
-  return address && net.isIP(address) === 4 ? address : null;
-}
 
 // Build LD_LIBRARY_PATH from server directory, filtering to only existing paths
 function buildLdLibraryPath(serverDir) {
@@ -1132,233 +1134,55 @@ export class ServerManager {
   // per VPN mesh (Tailscale, ZeroTier) plus the real LAN adapter — so the
   // Settings UI can offer a choice instead of the panel guessing.
   listNetworkInterfaces() {
-    const interfaces = os.networkInterfaces();
-    const result = [];
-    for (const name of Object.keys(interfaces)) {
-      for (const iface of interfaces[name]) {
-        if (iface.family === "IPv4" && !iface.internal) {
-          result.push({ name, address: iface.address });
-        }
-      }
-    }
-    return result;
+    return listInterfaces();
   }
 
   async getLocalIp() {
-    const interfaces = this.listNetworkInterfaces();
-
-    // A user-picked interface (Settings > Network) wins over the env var:
-    // it's the more recent, explicit choice. But only while that address is
-    // still actually present, so an unplugged VPN doesn't leave the
-    // dashboard stuck showing a dead IP forever.
-    try {
-      const selected = await getSetting("lanIpAddress");
-      if (selected && interfaces.some((iface) => iface.address === selected)) {
-        return selected;
-      }
-    } catch (err) {
-      log.debug(`lanIpAddress setting lookup failed: ${err.message}`);
-    }
-
-    const configuredLanIp = getConfiguredIpv4Address("PANEL_LAN_IP");
-    if (configuredLanIp) return configuredLanIp;
-
-    return interfaces[0]?.address || "127.0.0.1";
+    return resolveLocalIp(getSetting);
   }
 
   async loadGamePort() {
     try {
       const config = await this.getServerConfig();
-      if (config && config.DefaultPort) {
-        this.gamePort = parseInt(config.DefaultPort, 10);
-      }
-    } catch (e) {
-      // ignore
-    }
+      const port = extractGamePort(config);
+      if (port) this.gamePort = port;
+    } catch { /* ignore */ }
   }
 
   async fetchPublicIp() {
     if (this.fetchingIp) return;
     this.fetchingIp = true;
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-      const response = await fetch("https://api.ipify.org?format=json", {
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = await response.json();
-        this.publicIp = data.ip;
-        // Cache to DB so we don't need to call out to ipify again on every
-        // restart — only when the cached value is missing or stale (see
-        // getServerStatus's PUBLIC_IP_CACHE_TTL_MS check).
-        try {
-          await setSetting("cachedPublicIp", data.ip);
-          await setSetting("cachedPublicIpAt", String(Date.now()));
-        } catch (_) {
-          /* best effort */
-        }
-      }
-    } catch (e) {
-      // silent fail
+      const ip = await fetchPublicIpFromApi(setSetting);
+      if (ip) this.publicIp = ip;
     } finally {
       this.fetchingIp = false;
     }
   }
 
   async getServerConfig() {
-    await this.loadConfig(); // Ensure config is loaded
-
-    if (!this.savePath) {
-      return null;
-    }
-
-    // Try the actual server name first (proper path: savePath/Server/{serverName}.ini)
-    const serverConfigDir = path.join(this.savePath, "Server");
-    const serverNameIniPath = path.join(
-      serverConfigDir,
-      `${this.serverName}.ini`,
-    );
-
-    if (await this._files.exists(serverNameIniPath)) {
-      log.debug(`Reading config from ${serverNameIniPath}`);
-      return await this.parseIniFile(serverNameIniPath);
-    }
-
-    // Fallback: try old path directly in savePath (for backwards compatibility)
-    const configPath = path.join(this.savePath, `${this.serverName}.ini`);
-    if (await this._files.exists(configPath)) {
-      log.debug(`Reading config from fallback ${configPath}`);
-      return await this.parseIniFile(configPath);
-    }
-
-    // Legacy fallback: servertest.ini
-    const legacyPath = path.join(this.savePath, "servertest.ini");
-    if (await this._files.exists(legacyPath)) {
-      log.debug(`Reading config from legacy ${legacyPath}`);
-      return await this.parseIniFile(legacyPath);
-    }
-
-    // Try alternative path
-    const altPath = path.join(this.savePath, "serveroptions.ini");
-    if (await this._files.exists(altPath)) {
-      return await this.parseIniFile(altPath);
-    }
-
-    log.warn(
-      `No config file found. Tried: ${serverNameIniPath}, ${configPath}, ${legacyPath}`,
-    );
-    return null;
+    await this.loadConfig();
+    return readServerConfig(this.savePath, this.serverName, this._files);
   }
 
   async parseIniFile(filePath) {
-    try {
-      const result = await this._files.readFile(filePath, "utf-8");
-      if (!result.success) throw new Error(result.error);
-      const content = result.data;
-      const config = {};
-      const lines = content.split("\n");
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed && !trimmed.startsWith("#") && !trimmed.startsWith(";")) {
-          const [key, ...valueParts] = trimmed.split("=");
-          if (key && valueParts.length > 0) {
-            config[key.trim()] = valueParts.join("=").trim();
-          }
-        }
-      }
-
-      return config;
-    } catch (error) {
-      log.error(`Failed to parse config file: ${error.message}`);
-      return null;
-    }
+    const result = await this._files.readFile(filePath, "utf-8");
+    if (!result.success) { log.error(`Failed to parse config: ${result.error}`); return null; }
+    return parseIni(result.data);
   }
 
   async saveServerConfig(config) {
-    if (!this.savePath) {
-      throw new Error("Save path not configured");
-    }
-
-    // Match getServerConfig logic: check Server/ subdirectory first, then fallback paths
-    const serverIni = this.serverName
-      ? `${this.serverName}.ini`
-      : "servertest.ini";
-    const serverSubdirPath = path.join(this.savePath, "Server", serverIni);
-    let configPath;
-    if (await this._files.exists(serverSubdirPath)) {
-      configPath = serverSubdirPath;
-    } else {
-      configPath = path.join(this.savePath, serverIni);
-      if (!(await this._files.exists(configPath))) {
-        configPath = path.join(this.savePath, "servertest.ini");
-      }
-    }
-
-    try {
-      // Read existing file to preserve comments and structure. Locked per-path
-      // so an overlapping save can't interleave its read-modify-write with
-      // this one and clobber part of the change.
-      await withFileLock(configPath, async () => {
-        let content = "";
-        if (await this._files.exists(configPath)) {
-          const readResult = await this._files.readFile(configPath, "utf-8");
-          content = readResult.success ? readResult.data : "";
-        }
-
-        // Update values
-        for (const [key, value] of Object.entries(config)) {
-          // Validate key is a valid identifier (alphanumeric and underscore only)
-          if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
-            log.warn(`Invalid config key skipped: ${key}`);
-            continue;
-          }
-          const escapedKey = escapeRegExp(key);
-          const regex = new RegExp(`^${escapedKey}=.*$`, "m");
-          // Strip newlines from values to prevent INI injection
-          const safeValue = String(value).replace(/[\r\n]/g, "");
-          if (content.match(regex)) {
-            content = content.replace(regex, `${key}=${safeValue}`);
-          } else {
-            content += `\n${key}=${safeValue}`;
-          }
-        }
-
-        const writeResult = await this._files.writeFile(configPath, content, { atomic: true });
-        if (!writeResult.success) throw new Error(writeResult.error);
-      });
-      log.info("Server config saved");
-      return { success: true };
-    } catch (error) {
-      log.error(`Failed to save config: ${error.message}`);
-      throw error;
-    }
+    if (!this.savePath) throw new Error("Save path not configured");
+    await writeServerConfig(this.savePath, this.serverName, config, this._files);
+    log.info("Server config saved");
+    return { success: true };
   }
 
   async getModList() {
-    if (!this.savePath) {
-      return [];
-    }
-
+    if (!this.savePath) return [];
     try {
       const config = await this.getServerConfig();
-      if (!config || !config.Mods) {
-        return [];
-      }
-
-      const mods = config.Mods.split(";").filter((m) => m.trim());
-      const workshopIds = config.WorkshopItems
-        ? config.WorkshopItems.split(";").filter((m) => m.trim())
-        : [];
-
-      return mods.map((mod, index) => ({
-        name: mod,
-        workshopId: workshopIds[index] || null,
-      }));
+      return extractModList(config);
     } catch (error) {
       log.error(`Failed to get mod list: ${error.message}`);
       return [];
