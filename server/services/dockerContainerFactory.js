@@ -11,9 +11,13 @@ const PANEL_NETWORK = "zomboid-panel-net";
 
 export function createDockerContainerFactory(dockerClient, volumeManager) {
   // Bind-mounts an existing host directory or the shared named volume.
+  // Not read-only: PZ writes temp files, logs, and extracts native libs
+  // (SQLite JNI) into its install directory at runtime. Multi-server
+  // isolation comes from separate data volumes (/opt/pz-data), not from
+  // protecting the base — PZ's runtime writes are ephemeral.
   function baseMount(config) {
-    if (config.basePath) return `${config.basePath}:/opt/pz-server:ro`;
-    return "zomboid-panel-base:/opt/pz-server:ro";
+    if (config.basePath) return `${config.basePath}:/opt/pz-server`;
+    return "zomboid-panel-base:/opt/pz-server";
   }
 
   // Ensure the panel network exists for internal RCON traffic.
