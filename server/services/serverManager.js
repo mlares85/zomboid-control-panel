@@ -35,6 +35,7 @@ import {
   extractModList,
   extractGamePort,
 } from "./serverConfigIo.js";
+import { buildLaunchConfig } from "./launchConfigBuilder.js";
 
 // Re-exported for backward compatibility — callers and tests still
 // import these process-detection helpers from serverManager.js.
@@ -44,58 +45,6 @@ export {
 } from "./processDetection.js";
 
 const isWindows = process.platform === "win32";
-
-// Build LD_LIBRARY_PATH from server directory, filtering to only existing paths
-function buildLdLibraryPath(serverDir) {
-  log.debug(
-    `buildLdLibraryPath: scanning candidates for serverDir=${serverDir}`,
-  );
-  const candidates = [
-    path.join(serverDir, "linux64"),
-    path.join(serverDir, "natives", "linux64"),
-    path.join(serverDir, "natives"),
-    serverDir,
-    path.join(serverDir, "jre64", "lib", "amd64"),
-    path.join(serverDir, "jre64", "lib", "x86_64"), // CentOS uses x86_64 instead of amd64
-    "/usr/lib64", // CentOS system 64-bit libs
-  ];
-  const existing = candidates.filter((p) => {
-    try {
-      return fs.existsSync(p);
-    } catch {
-      return false;
-    }
-  });
-  const extra = process.env.LD_LIBRARY_PATH || "";
-  const result = [...existing, extra].filter(Boolean).join(":");
-  log.debug(
-    `buildLdLibraryPath: ${existing.length}/${candidates.length} dirs exist → LD_LIBRARY_PATH=${result}`,
-  );
-  return result;
-}
-
-// Allowed extensions for custom start commands
-const ALLOWED_CMD_EXTENSIONS = isWindows
-  ? [".bat", ".cmd", ".exe"]
-  : [".sh", ""];
-
-// Validate a custom start command string for safety
-function validateStartCommand(cmd) {
-  if (!cmd || typeof cmd !== "string")
-    return { valid: false, reason: "Command is empty" };
-  if (cmd.length > 1024)
-    return { valid: false, reason: "Command exceeds 1024 characters" };
-  // Block obvious shell metacharacters that enable chaining/injection
-  // Allow quotes, spaces, hyphens, equals, slashes, dots, colons (drive letters)
-  if (/[&|;<>`${}()!\[\]\n\r]/.test(cmd)) {
-    return {
-      valid: false,
-      reason:
-        "Command contains disallowed shell characters: & | ; < > ` $ { } ( ) ! [ ]",
-    };
-  }
-  return { valid: true };
-}
 
 // Get the default startup script name for the current platform
 function getDefaultStartupScript() {
@@ -542,153 +491,22 @@ export class ServerManager {
         `Starting server process (platform=${process.platform}, serverPath=${this.serverPath}, startCommand=${this.startCommand || "none"}, serverBat=${this.serverBat})`,
       );
 
-      if (this.startCommand) {
-        // Validate the custom command before executing
-        const validation = validateStartCommand(this.startCommand);
-        if (!validation.valid) {
-          throw new Error(`Invalid start command: ${validation.reason}`);
-        }
-
-        // Custom start command — split into command and arguments
-        const parts = this.startCommand.match(/(?:[^\s"]+|"[^"]*")+/g) || [
-          this.startCommand,
-        ];
-        const cmd = parts[0].replace(/^"|"$/g, "");
-        const args = parts.slice(1).map((a) => a.replace(/^"|"$/g, ""));
-        const cwd = this.serverPath || path.dirname(path.resolve(cmd));
-
-        // Validate the command file extension is allowed
-        const ext = path.extname(cmd).toLowerCase();
-        if (!ALLOWED_CMD_EXTENSIONS.includes(ext)) {
-          throw new Error(
-            `Start command has disallowed extension '${ext}'. Allowed: ${ALLOWED_CMD_EXTENSIONS.join(", ")}`,
-          );
-        }
-
-        // Resolve to absolute path and verify it exists
-        const resolvedCmd = path.isAbsolute(cmd) ? cmd : path.resolve(cwd, cmd);
-        if (!fs.existsSync(resolvedCmd)) {
-          throw new Error(`Start command not found: ${resolvedCmd}`);
-        }
-
-        log.info(
-          `Using custom start command: ${resolvedCmd} ${args.join(" ")} (ext=${ext}, cwd=${cwd})`,
-        );
-
-        // Redirect stdout/stderr to a log file (instead of discarding them)
-        // so an immediate startup failure can be captured and reported right
-        // away, rather than only surfacing as an opaque 30s "polling timed
-        // out" (see GitHub issue #14). A file descriptor keeps the child
-        // fully detached from this process's own stdio.
-        const launchLogPath = this._openLaunchLog();
-        const launchStdio = ["ignore", this._launchLogFd, this._launchLogFd];
-
-        if (isWindows && (ext === ".bat" || ext === ".cmd")) {
-          this.serverProcess = spawn("cmd.exe", ["/c", resolvedCmd, ...args], {
-            cwd,
-            detached: true,
-            stdio: launchStdio,
-          });
-        } else if (!isWindows && ext === ".sh") {
-          try {
-            fs.chmodSync(resolvedCmd, 0o750);
-          } catch (e) {
-            log.debug(`chmod on custom .sh failed: ${e.message}`);
-          }
-          const serverAbsPath = path.resolve(cwd);
-          const ldPath = buildLdLibraryPath(serverAbsPath);
-          log.debug(
-            `Spawning custom .sh: bash ${resolvedCmd} ${args.join(" ")} (cwd=${cwd}, LD_LIBRARY_PATH=${ldPath})`,
-          );
-          this.serverProcess = spawn("bash", [resolvedCmd, ...args], {
-            cwd,
-            detached: true,
-            stdio: launchStdio,
-            env: { ...process.env, LD_LIBRARY_PATH: ldPath },
-          });
-        } else {
-          const spawnEnv = isWindows
-            ? process.env
-            : (() => {
-                const serverAbsPath = path.resolve(cwd);
-                return {
-                  ...process.env,
-                  LD_LIBRARY_PATH: buildLdLibraryPath(serverAbsPath),
-                };
-              })();
-          this.serverProcess = spawn(resolvedCmd, args, {
-            cwd,
-            detached: true,
-            stdio: launchStdio,
-            env: spawnEnv,
-          });
-        }
-        this._closeLaunchLogFd();
-
-        // Handle spawn errors (e.g., invalid path, permissions)
-        this.serverProcess.on("error", (error) => {
-          log.error(`Server process error: ${error.message}`);
-          this.isRunning = false;
-          this.serverProcess = null;
-        });
-
-        this.serverProcess.unref();
-        this.isRunning = true;
-        this.startTime = new Date();
-
-        const crash = await this._waitForImmediateCrash(launchLogPath);
-        if (crash) {
-          this.isRunning = false;
-          this.serverProcess = null;
-          throw new Error(
-            `Server process exited immediately after starting (code=${crash.exitCode}, signal=${crash.signal || "none"}) — startup failed.${crash.tail ? `\n${crash.tail}` : ""}`,
-          );
-        }
-
-        await logServerEvent("server_start", "Server started via manager");
-        log.info("Server start command executed");
-
-        return { success: true, message: "Server start command executed" };
-      }
-
-      const batPath = path.join(this.serverPath, this.serverBat);
-
-      if (!fs.existsSync(batPath)) {
-        throw new Error(`Server startup script not found: ${batPath}`);
-      }
+      const { config: launchConfig, error: configError } = buildLaunchConfig({
+        startCommand: this.startCommand,
+        serverPath: this.serverPath,
+        serverBat: this.serverBat,
+      });
+      if (configError) throw new Error(configError);
 
       const launchLogPath = this._openLaunchLog();
       const launchStdio = ["ignore", this._launchLogFd, this._launchLogFd];
 
-      if (isWindows) {
-        this.serverProcess = spawn("cmd.exe", ["/c", this.serverBat], {
-          cwd: this.serverPath,
-          detached: true,
-          stdio: launchStdio,
-        });
-      } else {
-        // Ensure the script is executable
-        try {
-          fs.chmodSync(batPath, 0o750);
-        } catch (e) {
-          log.warn(`Could not chmod startup script: ${e.message}`);
-        }
-        // On Linux, ensure LD_LIBRARY_PATH includes the server's native library dirs
-        // so the JVM can find libsteam_api.so and its transitive dependencies.
-        // Without this, services/non-login shells won't have the paths set.
-        const serverAbsPath = path.resolve(this.serverPath);
-        const ldPath = buildLdLibraryPath(serverAbsPath);
-        log.debug(
-          `Spawning default .sh: bash ${this.serverBat} (cwd=${this.serverPath}, LD_LIBRARY_PATH=${ldPath})`,
-        );
-
-        this.serverProcess = spawn("bash", [this.serverBat], {
-          cwd: this.serverPath,
-          detached: true,
-          stdio: launchStdio,
-          env: { ...process.env, LD_LIBRARY_PATH: ldPath },
-        });
-      }
+      this.serverProcess = spawn(launchConfig.command, launchConfig.args, {
+        cwd: launchConfig.cwd,
+        detached: true,
+        stdio: launchStdio,
+        env: launchConfig.env,
+      });
       this._closeLaunchLogFd();
 
       // Handle spawn errors (e.g., invalid path, permissions)
