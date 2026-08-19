@@ -75,8 +75,14 @@ describe("dockerVolumeManager", () => {
   describe("createServerVolume", () => {
     it("creates a volume with the correct naming convention", async () => {
       const result = await manager.createServerVolume("alpha");
-      expect(result).toEqual({ success: true, volumeName: "zomboid-srv-alpha" });
+      expect(result).toEqual({ success: true, volumeName: "zomboid-srv-alpha", created: true });
       expect(fakeClient.volumes.has("zomboid-srv-alpha")).toBe(true);
+    });
+
+    it("succeeds when the volume already exists", async () => {
+      await fakeClient.createVolume("zomboid-srv-alpha");
+      const result = await manager.createServerVolume("alpha");
+      expect(result).toEqual({ success: true, volumeName: "zomboid-srv-alpha", created: false });
     });
   });
 

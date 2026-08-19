@@ -29,12 +29,14 @@ export function createDockerVolumeManager(dockerClient) {
 
   async function createServerVolume(serverName) {
     const volumeName = serverVolumeName(serverName);
+    const existing = await dockerClient.inspectVolume(volumeName);
+    if (existing) return { success: true, volumeName, created: false };
     const result = await dockerClient.createVolume(volumeName);
     if (!result.success) {
       log.warn(`Failed to create server volume ${volumeName}: ${result.error}`);
       return { success: false, volumeName };
     }
-    return { success: true, volumeName };
+    return { success: true, volumeName, created: true };
   }
 
   async function removeServerVolume(serverName) {
