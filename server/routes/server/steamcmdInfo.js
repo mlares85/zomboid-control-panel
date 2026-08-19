@@ -15,11 +15,13 @@ import {
   isWindows,
 } from "./steamcmd.js";
 import { registerSteamcmdDownloadRoute } from "./steamcmdDownload.js";
+import { detectSetupEnvironment } from "../../services/installer/detectInstall.js";
 
 const log = createLogger("API:Server");
 
 export function registerSteamcmdInfoRoutes(router) {
   registerDetectRoute(router);
+  registerSetupDetectRoute(router);
   registerBranchesRoute(router);
   registerCheckRoute(router);
   registerSteamcmdDownloadRoute(router);
@@ -46,6 +48,18 @@ function registerDetectRoute(router) {
       });
     } catch (error) {
       log.warn(`Failed to detect SteamCMD: ${error.message}`);
+      res.status(500).json({ error: sanitizeError(error.message) });
+    }
+  });
+}
+
+function registerSetupDetectRoute(router) {
+  // Auto-detect SteamCMD, existing PZ installs, and suggest paths
+  router.get("/setup/detect", (_req, res) => {
+    try {
+      res.json(detectSetupEnvironment());
+    } catch (error) {
+      log.warn(`Setup detection failed: ${error.message}`);
       res.status(500).json({ error: sanitizeError(error.message) });
     }
   });
