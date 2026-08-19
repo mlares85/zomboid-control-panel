@@ -6,7 +6,8 @@ const log = createLogger("DockerContainerFactory");
 // Debian Bullseye provides glibc + the base libs PZ expects. Using a
 // JRE image (e.g. eclipse-temurin) puts a different Java on PATH that
 // conflicts with PZ's bundled JRE and native library loading.
-const DEFAULT_IMAGE = "debian:bullseye-slim";
+// PZ Build 42 requires GLIBCXX_3.4.29+ (Bookworm). Bullseye is too old.
+const DEFAULT_IMAGE = "debian:bookworm-slim";
 const BASE_GAME_PORT = 16261;
 const BASE_RCON_PORT = 27015;
 const MANAGED_LABEL = "zomboid-panel.managed";

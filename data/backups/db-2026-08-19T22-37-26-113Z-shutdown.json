@@ -7153,6 +7153,36 @@
       "memoryTotal": 90259456,
       "playerCount": 0,
       "serverRunning": false
+    },
+    {
+      "timestamp": "2026-08-19T22:35:20.930Z",
+      "hostMemTotal": 17179869184,
+      "hostMemUsed": 17101750272,
+      "cpuUsage": 39,
+      "hostDiskTotal": 494384795648,
+      "hostDiskUsed": 413605912576,
+      "panelMemHeap": 48328864,
+      "panelMemRss": 101679104,
+      "pzMemUsed": null,
+      "memoryUsed": 48328864,
+      "memoryTotal": 50675712,
+      "playerCount": 0,
+      "serverRunning": false
+    },
+    {
+      "timestamp": "2026-08-19T22:36:20.938Z",
+      "hostMemTotal": 17179869184,
+      "hostMemUsed": 16842063872,
+      "cpuUsage": 39,
+      "hostDiskTotal": 494384795648,
+      "hostDiskUsed": 413606277120,
+      "panelMemHeap": 48949040,
+      "panelMemRss": 67141632,
+      "pzMemUsed": null,
+      "memoryUsed": 48949040,
+      "memoryTotal": 52248576,
+      "playerCount": 0,
+      "serverRunning": false
     }
   ],
   "bridge_logs": [],

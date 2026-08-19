@@ -67,7 +67,7 @@ describe("buildContainerSpec", () => {
       rconPassword: "secret123",
     });
 
-    expect(spec.Image).toBe("debian:bullseye-slim");
+    expect(spec.Image).toBe("debian:bookworm-slim");
     expect(spec.HostConfig.PortBindings["16261/udp"]).toBeDefined();
     expect(spec.HostConfig.PortBindings["27015/tcp"]).toBeDefined();
   });
