@@ -120,11 +120,15 @@ export function AddServerFlow({ mode, onComplete, open = true, onClose }: AddSer
     )
   }
 
+  // Install flows need more horizontal room than the narrow auth card
+  const isInstallFlow = step === 'configure' && selection?.intent === 'new'
+
   return (
     <AuthScreenLayout
       badge="First-Run Setup"
       title="Bring in your server"
       description="A couple of automated checks, then you're managing a live Project Zomboid server."
+      wide={isInstallFlow}
     >
       <ProgressBar step={step} />
       {content}

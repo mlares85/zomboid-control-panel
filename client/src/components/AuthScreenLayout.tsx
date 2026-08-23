@@ -13,6 +13,8 @@ interface AuthScreenLayoutProps {
   children: ReactNode
   /** Optional fine-print rendered below the card. Kept short — anything longer belongs in the form itself. */
   footer?: ReactNode
+  /** Widens the layout for multi-step flows that need more room (e.g. install wizards). */
+  wide?: boolean
 }
 
 type PanelStatus = 'checking' | 'online' | 'unreachable'
@@ -33,6 +35,7 @@ export function AuthScreenLayout({
   cardDescription,
   children,
   footer,
+  wide,
 }: AuthScreenLayoutProps) {
   const [status, setStatus] = useState<PanelStatus>('checking')
   const [version, setVersion] = useState<string | null>(null)
@@ -109,7 +112,7 @@ export function AuthScreenLayout({
 
       <main
         id="auth-content"
-        className="relative mx-auto flex min-h-screen w-full max-w-md flex-col items-stretch justify-center px-4 py-12 sm:px-6"
+        className={`relative mx-auto flex min-h-screen w-full ${wide ? 'max-w-3xl' : 'max-w-md'} flex-col items-stretch justify-center px-4 py-12 sm:px-6 transition-[max-width]`}
       >
         {/* Hero — stencilled brand mark + ONE supporting line */}
         <div className="mb-8 flex flex-col items-center text-center">
