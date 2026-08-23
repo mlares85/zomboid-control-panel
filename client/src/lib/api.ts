@@ -3096,7 +3096,7 @@ export interface EnvironmentSnapshot {
 }
 
 export const environmentApi = {
-  get: (): Promise<EnvironmentSnapshot> => apiGet("/system/environment"),
+  get: (): Promise<EnvironmentSnapshot> => apiGet("/system"),
 };
 
 // Docker mount auto-discovery — see server/routes/discovery.js and
