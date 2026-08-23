@@ -4,7 +4,7 @@ import {
   Container, Settings2, CheckCircle, Loader2, ChevronLeft,
   Play, ArrowRight, AlertTriangle,
 } from "lucide-react";
-import { dockerApi } from "@/lib/api";
+import { dockerApi, serversApi } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -120,7 +120,13 @@ export function DockerSetup({ onBack }: DockerSetupProps) {
         ...(config.image ? { image: config.image } : {}),
       });
       clearInterval(phaseTimer);
-      if (result.success) { setCreatePhase("done"); }
+      if (result.success) {
+        // Activate so the panel's RCON service picks up the new server's config
+        if (result.server?.id) {
+          await serversApi.activate(result.server.id).catch(() => {});
+        }
+        setCreatePhase("done");
+      }
       else { setCreatePhase("idle"); setCreateError(result.error ?? "Failed to create server"); }
     } catch (e) {
       clearInterval(phaseTimer);

@@ -2,7 +2,7 @@ import express from "express";
 import { existsSync, readdirSync } from "fs";
 import { createLogger } from "../../utils/logger.js";
 import { sanitizeError, sanitizeServerResponse } from "../../utils/sanitize.js";
-import { getServer, getServers, createServer, deleteServer } from "../../database/init.js";
+import { getServer, getServers, createServer, deleteServer, setActiveServer } from "../../database/init.js";
 import { createDockerVolumeManager } from "../../services/dockerVolumeManager.js";
 import { createDockerContainerFactory } from "../../services/dockerContainerFactory.js";
 import { PROVIDERS } from "../../utils/serverProvider.js";
@@ -14,6 +14,25 @@ import { registerManagedHealthRoutes } from "./managedHealth.js";
 const log = createLogger("API:DockerManaged");
 const router = express.Router();
 registerManagedHealthRoutes(router);
+
+/** Activate a server: set it as active, reload ServerManager + RCON config. */
+async function activateServer(req, server) {
+  await setActiveServer(server.id);
+  const serverManager = req.app.get("serverManager");
+  const rconService = req.app.get("rconService");
+  const io = req.app.get("io");
+
+  if (serverManager?.reloadConfig) await serverManager.reloadConfig();
+  if (rconService) {
+    try {
+      await rconService.reloadConfig();
+    } catch (e) {
+      log.warn(`RCON config reload after activation failed: ${e.message}`);
+    }
+  }
+  if (io) io.emit("activeServerChanged", { server });
+  log.info(`Activated managed server: ${server.name}`);
+}
 
 function getDockerClient(req) {
   return req.app.get("dockerClient");
@@ -238,6 +257,12 @@ router.post("/servers", requireRole("admin"), async (req, res) => {
       await deleteServer(server.id).catch(() => {});
       return res.status(502).json({ success: false, error: `Container created but failed to start: ${startResult.error}` });
     }
+
+    // Activate the newly created server so ServerManager and RCON service
+    // pick up its config. Without this, the RCON service keeps whatever
+    // stale password it loaded at startup and auth fails.
+    await activateServer(req, server);
+
     res.status(201).json({ success: true, server: sanitizeServerResponse(server), containerId: result.containerId });
   } catch (error) {
     log.error(`Failed to create managed server: ${error.message}`);
