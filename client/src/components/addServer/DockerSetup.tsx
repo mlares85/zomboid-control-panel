@@ -41,6 +41,10 @@ export interface DockerConfig {
   adminPassword: string;
   basePath?: string;
   image?: string;
+  restartPolicy: string;
+  dockerMemoryLimit?: number; // GB — container-level cap (0 = unlimited)
+  cpuLimit?: number;          // cores (0 = unlimited)
+  timezone?: string;
 }
 
 const STEPS = [
@@ -87,6 +91,7 @@ export function DockerSetup({ onBack }: DockerSetupProps) {
   const [config, setConfig] = useState<DockerConfig>({
     serverName: "zomboid", gamePort: 16261, rconPort: 27015,
     rconPassword: "", minMemory: 4, maxMemory: 8, adminPassword: "",
+    restartPolicy: "unless-stopped",
   });
   const [createPhase, setCreatePhase] = useState<CreatePhase>("idle");
   const [createError, setCreateError] = useState<string | null>(null);
@@ -118,6 +123,10 @@ export function DockerSetup({ onBack }: DockerSetupProps) {
         adminPassword: config.adminPassword,
         ...(config.basePath ? { basePath: config.basePath } : {}),
         ...(config.image ? { image: config.image } : {}),
+        ...(config.restartPolicy !== "unless-stopped" ? { restartPolicy: config.restartPolicy } : {}),
+        ...(config.dockerMemoryLimit ? { dockerMemoryMb: config.dockerMemoryLimit * 1024 } : {}),
+        ...(config.cpuLimit ? { cpuLimit: config.cpuLimit } : {}),
+        ...(config.timezone ? { timezone: config.timezone } : {}),
       });
       clearInterval(phaseTimer);
       if (result.success) {
@@ -173,8 +182,24 @@ export function DockerSetup({ onBack }: DockerSetupProps) {
                 <dd className="font-mono">{config.gamePort}</dd>
                 <dt className="text-muted-foreground">RCON Port</dt>
                 <dd className="font-mono">{config.rconPort}</dd>
-                <dt className="text-muted-foreground">Memory</dt>
+                <dt className="text-muted-foreground">JVM Memory</dt>
                 <dd className="font-mono">{config.minMemory}GB &ndash; {config.maxMemory}GB</dd>
+                {config.restartPolicy !== "unless-stopped" && <>
+                  <dt className="text-muted-foreground">Restart Policy</dt>
+                  <dd className="font-mono">{config.restartPolicy}</dd>
+                </>}
+                {config.dockerMemoryLimit ? <>
+                  <dt className="text-muted-foreground">Container Memory</dt>
+                  <dd className="font-mono">{config.dockerMemoryLimit}GB</dd>
+                </> : null}
+                {config.cpuLimit ? <>
+                  <dt className="text-muted-foreground">CPU Limit</dt>
+                  <dd className="font-mono">{config.cpuLimit} {config.cpuLimit === 1 ? "core" : "cores"}</dd>
+                </> : null}
+                {config.timezone ? <>
+                  <dt className="text-muted-foreground">Timezone</dt>
+                  <dd className="font-mono">{config.timezone}</dd>
+                </> : null}
               </dl>
             </CardContent>
           </Card>

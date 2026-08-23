@@ -102,7 +102,7 @@ describe("buildContainerSpec", () => {
     expect(memEnv).toContain("-Xmx8192m");
   });
 
-  it("uses unless-stopped restart policy", () => {
+  it("uses unless-stopped restart policy by default", () => {
     const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
     const spec = factory.buildContainerSpec({
       serverName: "test",
@@ -110,6 +110,81 @@ describe("buildContainerSpec", () => {
     });
 
     expect(spec.HostConfig.RestartPolicy).toEqual({ Name: "unless-stopped" });
+  });
+
+  it("uses custom restart policy when provided", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "test",
+      rconPassword: "secret123",
+      restartPolicy: "always",
+    });
+
+    expect(spec.HostConfig.RestartPolicy).toEqual({ Name: "always" });
+  });
+
+  it("sets Docker memory limit when provided", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "test",
+      rconPassword: "secret123",
+      dockerMemoryMb: 8192,
+    });
+
+    // 8192 MB in bytes
+    expect(spec.HostConfig.Memory).toBe(8192 * 1024 * 1024);
+  });
+
+  it("omits Memory when dockerMemoryMb is not set", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "test",
+      rconPassword: "secret123",
+    });
+
+    expect(spec.HostConfig.Memory).toBeUndefined();
+  });
+
+  it("sets CPU limit via NanoCpus when provided", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "test",
+      rconPassword: "secret123",
+      cpuLimit: 2.5,
+    });
+
+    expect(spec.HostConfig.NanoCpus).toBe(2_500_000_000);
+  });
+
+  it("omits NanoCpus when cpuLimit is not set", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "test",
+      rconPassword: "secret123",
+    });
+
+    expect(spec.HostConfig.NanoCpus).toBeUndefined();
+  });
+
+  it("includes TZ env var when timezone is set", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "test",
+      rconPassword: "secret123",
+      timezone: "America/Chicago",
+    });
+
+    expect(spec.Env).toContain("TZ=America/Chicago");
+  });
+
+  it("omits TZ env var when timezone is not set", () => {
+    const factory = createDockerContainerFactory(fakeDockerClient(), fakeVolumeManager());
+    const spec = factory.buildContainerSpec({
+      serverName: "test",
+      rconPassword: "secret123",
+    });
+
+    expect(spec.Env.some((e) => e.startsWith("TZ="))).toBe(false);
   });
 });
 

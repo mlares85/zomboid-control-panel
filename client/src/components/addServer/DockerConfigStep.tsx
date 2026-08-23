@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Server, Shield, Cpu, Settings2, ChevronLeft, ArrowRight,
-  Eye, EyeOff, Copy, Check, RefreshCw, AlertTriangle,
+  Eye, EyeOff, Copy, Check, RefreshCw, AlertTriangle, Globe,
 } from "lucide-react";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -14,6 +14,9 @@ import { Slider } from "@/components/ui/slider";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
@@ -189,14 +192,69 @@ export function DockerConfigStep({ config, onChange, onBack, onNext }: DockerCon
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4 space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Game Port</Label>
+                <Input type="number" value={config.gamePort} onChange={(e) => set({ gamePort: parseInt(e.target.value) || 16261 })} className="font-mono" />
+                <p className="text-xs text-muted-foreground">Auto-assigned to avoid conflicts</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Restart Policy</Label>
+                <Select value={config.restartPolicy} onValueChange={(v) => set({ restartPolicy: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unless-stopped">Unless stopped</SelectItem>
+                    <SelectItem value="always">Always</SelectItem>
+                    <SelectItem value="on-failure">On failure</SelectItem>
+                    <SelectItem value="no">Never</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">When to auto-restart the container</p>
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Container Memory Limit</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number" min={0} max={128} step={1}
+                    value={config.dockerMemoryLimit ?? ""}
+                    onChange={(e) => set({ dockerMemoryLimit: e.target.value ? Number(e.target.value) : undefined })}
+                    placeholder="Unlimited" className="font-mono"
+                  />
+                  <span className="text-sm text-muted-foreground shrink-0">GB</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Hard cap on container RAM (should exceed JVM max)</p>
+              </div>
+              <div className="space-y-2">
+                <Label>CPU Limit</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number" min={0} max={64} step={0.5}
+                    value={config.cpuLimit ?? ""}
+                    onChange={(e) => set({ cpuLimit: e.target.value ? Number(e.target.value) : undefined })}
+                    placeholder="Unlimited" className="font-mono"
+                  />
+                  <span className="text-sm text-muted-foreground shrink-0">cores</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Max CPU cores the container can use</p>
+              </div>
+            </div>
             <div className="space-y-2">
-              <Label>Game Port</Label>
-              <Input type="number" value={config.gamePort} onChange={(e) => set({ gamePort: parseInt(e.target.value) || 16261 })} className="font-mono" />
-              <p className="text-xs text-muted-foreground">Auto-assigned to avoid conflicts</p>
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-muted-foreground" />
+                <Label>Timezone</Label>
+              </div>
+              <Input
+                value={config.timezone ?? ""}
+                onChange={(e) => set({ timezone: e.target.value || undefined })}
+                placeholder="America/New_York" className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">Sets TZ inside the container (affects in-game clock and log timestamps)</p>
             </div>
             <div className="space-y-2">
               <Label>Container Image</Label>
-              <Input value={config.image || ""} onChange={(e) => set({ image: e.target.value || undefined })} placeholder="eclipse-temurin:21-jre (default)" className="font-mono text-sm" />
+              <Input value={config.image || ""} onChange={(e) => set({ image: e.target.value || undefined })} placeholder="debian:bookworm-slim (default)" className="font-mono text-sm" />
               <div className="flex items-start gap-2 text-xs text-muted-foreground">
                 <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0 text-amber-500" />
                 <span>Only change this if you know what you're doing. The image must be glibc-based (not Alpine) with Linux x86_64 support. PZ bundles its own Java runtime.</span>

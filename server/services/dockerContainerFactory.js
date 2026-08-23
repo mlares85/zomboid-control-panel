@@ -141,6 +141,42 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
     const image = config.image || DEFAULT_IMAGE;
     const gamePort = config.gamePort || BASE_GAME_PORT;
     const rconPort = config.rconPort || BASE_RCON_PORT;
+    const restartPolicy = config.restartPolicy || "unless-stopped";
+
+    const env = [
+      // No HOME override needed — PZ running as root uses /root/Zomboid
+      // for data (mounted as the persistent data volume).
+      `RCON_PORT=${rconPort}`,
+      `RCON_PASSWORD=${config.rconPassword}`,
+      `GAME_PORT=${gamePort}`,
+      `PZ_SERVER_ARGS=-Xms${config.minMemoryMb || 2048}m -Xmx${config.maxMemoryMb || 4096}m`,
+      ...(config.adminPassword ? [`ADMIN_PASSWORD=${config.adminPassword}`] : []),
+      ...(config.timezone ? [`TZ=${config.timezone}`] : []),
+    ];
+
+    const hostConfig = {
+      Binds: [
+        baseMount(config),
+        // PZ running as root writes saves/configs to /root/Zomboid.
+        // Mount the data volume there directly for persistence.
+        `zomboid-srv-${config.serverName}:/root/Zomboid`,
+      ],
+      PortBindings: {
+        [`${gamePort}/udp`]: [{ HostPort: String(gamePort) }],
+        [`${gamePort + 1}/udp`]: [{ HostPort: String(gamePort + 1) }],
+        [`${rconPort}/tcp`]: [{ HostPort: String(rconPort) }],
+      },
+      // Tmpfs mount for /tmp — PZ writes temp files during saves and
+      // some Docker runtimes mount / as read-only or noexec.
+      Tmpfs: { "/tmp": "" },
+      NetworkMode: PANEL_NETWORK,
+      RestartPolicy: { Name: restartPolicy },
+    };
+
+    // Docker container-level resource limits (separate from JVM heap)
+    if (config.dockerMemoryMb) hostConfig.Memory = config.dockerMemoryMb * 1024 * 1024;
+    if (config.cpuLimit) hostConfig.NanoCpus = Math.round(config.cpuLimit * 1e9);
+
     return {
       Image: image,
       Entrypoint: PZ_ENTRYPOINT,
@@ -148,15 +184,7 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
         "-servername", config.serverName,
         ...(config.adminPassword ? ["-adminpassword", config.adminPassword] : []),
       ],
-      Env: [
-        // No HOME override needed — PZ running as root uses /root/Zomboid
-        // for data (mounted as the persistent data volume).
-        `RCON_PORT=${rconPort}`,
-        `RCON_PASSWORD=${config.rconPassword}`,
-        `GAME_PORT=${gamePort}`,
-        `PZ_SERVER_ARGS=-Xms${config.minMemoryMb || 2048}m -Xmx${config.maxMemoryMb || 4096}m`,
-        ...(config.adminPassword ? [`ADMIN_PASSWORD=${config.adminPassword}`] : []),
-      ],
+      Env: env,
       Labels: {
         [MANAGED_LABEL]: "true",
         [SERVER_ID_LABEL]: config.serverName,
@@ -166,24 +194,7 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
         [`${gamePort + 1}/udp`]: {},
         [`${rconPort}/tcp`]: {},
       },
-      HostConfig: {
-        Binds: [
-          baseMount(config),
-          // PZ running as root writes saves/configs to /root/Zomboid.
-          // Mount the data volume there directly for persistence.
-          `zomboid-srv-${config.serverName}:/root/Zomboid`,
-        ],
-        PortBindings: {
-          [`${gamePort}/udp`]: [{ HostPort: String(gamePort) }],
-          [`${gamePort + 1}/udp`]: [{ HostPort: String(gamePort + 1) }],
-          [`${rconPort}/tcp`]: [{ HostPort: String(rconPort) }],
-        },
-        // Tmpfs mount for /tmp — PZ writes temp files during saves and
-        // some Docker runtimes mount / as read-only or noexec.
-        Tmpfs: { "/tmp": "" },
-        NetworkMode: PANEL_NETWORK,
-        RestartPolicy: { Name: "unless-stopped" },
-      },
+      HostConfig: hostConfig,
     };
   }
 

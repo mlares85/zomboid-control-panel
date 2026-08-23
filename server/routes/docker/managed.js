@@ -10,6 +10,7 @@ import { ContainerSteamCmdInstaller } from "../../services/installer/ContainerSt
 import { installPanelBridgeMod } from "../server/installHelpers.js";
 import { requireRole } from "../../services/auth.js";
 import { registerManagedHealthRoutes } from "./managedHealth.js";
+import { validateManagedServerInput, resolveHostPath } from "./managedValidation.js";
 
 const log = createLogger("API:DockerManaged");
 const router = express.Router();
@@ -38,58 +39,12 @@ function getDockerClient(req) {
   return req.app.get("dockerClient");
 }
 
-// When the panel runs in a container, paths the user enters (e.g. /pz-server)
-// are container-internal. Docker bind mounts resolve against the HOST.
-// Resolve by inspecting the panel container's mounts via the Docker API.
-// Gap 9: TTL so cache refreshes if panel container's mounts change.
-let hostPathCache = null;
-let hostPathCacheAt = 0;
-const HOST_PATH_CACHE_TTL = 60 * 60 * 1000; // 1 hour
-
-async function resolveHostPath(containerPath, dockerClient) {
-  if (!containerPath) return containerPath;
-  if (!hostPathCache || Date.now() - hostPathCacheAt > HOST_PATH_CACHE_TTL) {
-    hostPathCache = new Map();
-    hostPathCacheAt = Date.now();
-    // Try common panel container names
-    for (const name of ["zomboid-panel", "zomboid-control-panel"]) {
-      const info = await dockerClient.inspectContainer(name);
-      if (!info?.Mounts) continue;
-      for (const m of info.Mounts) {
-        if (m.Destination && m.Source) hostPathCache.set(m.Destination, m.Source);
-      }
-      break;
-    }
-  }
-  // Exact match first, then longest prefix match
-  if (hostPathCache.has(containerPath)) return hostPathCache.get(containerPath);
-  let bestMount = "";
-  let bestHost = "";
-  for (const [dest, src] of hostPathCache) {
-    if (containerPath.startsWith(dest + "/") && dest.length > bestMount.length) {
-      bestMount = dest;
-      bestHost = src;
-    }
-  }
-  if (bestMount) return containerPath.replace(bestMount, bestHost);
-  return containerPath;
-}
-
-
 function getManagedDeps(req) {
   const dockerClient = getDockerClient(req);
   if (!dockerClient?.available) return null;
   const volumeManager = createDockerVolumeManager(dockerClient);
   const containerFactory = createDockerContainerFactory(dockerClient, volumeManager);
   return { dockerClient, containerFactory, volumeManager };
-}
-
-function validateManagedServerInput(body) {
-  if (!body.serverName || typeof body.serverName !== "string") return "serverName is required";
-  if (body.gamePort !== undefined && typeof body.gamePort !== "number") return "gamePort must be a number";
-  if (body.rconPort !== undefined && typeof body.rconPort !== "number") return "rconPort must be a number";
-  if (!body.rconPassword || body.rconPassword.length < 6) return "rconPassword must be at least 6 characters";
-  return null;
 }
 
 const PZ_SERVER_SIGNATURES = ["ProjectZomboid64", "start-server.sh", "StartServer64.bat"];
@@ -209,15 +164,16 @@ router.post("/servers", requireRole("admin"), async (req, res) => {
     const deps = getManagedDeps(req);
     if (!deps) return res.status(503).json({ success: false, error: "Docker unavailable" });
 
-    const { serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb, adminPassword, basePath, image } = req.body;
+    const {
+      serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb,
+      adminPassword, basePath, image, restartPolicy, dockerMemoryMb, cpuLimit, timezone,
+    } = req.body;
     // Resolve container-internal paths to host paths for bind mounts
     const hostBasePath = basePath ? await resolveHostPath(basePath, deps.dockerClient) : undefined;
-    if (basePath && hostBasePath !== basePath) {
-      log.info(`Resolved container path ${basePath} → host path ${hostBasePath}`);
-    }
     const result = await deps.containerFactory.createManagedServer({
       serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb,
       basePath: hostBasePath, containerBasePath: basePath, image, adminPassword,
+      restartPolicy, dockerMemoryMb, cpuLimit, timezone,
     });
     if (!result.success) return res.status(502).json({ success: false, error: result.error });
 

@@ -38,7 +38,8 @@ async function loadItems(): Promise<ChecklistItem[]> {
 
 /**
  * Persistent dashboard card for anyone who chose "Skip for now" in the
- * onboarding wizard. Only dismissable once every item is done.
+ * onboarding wizard. Always dismissable — users shouldn't be forced to
+ * complete every step before hiding the card.
  */
 export function SetupChecklist() {
   const [items, setItems] = useState<ChecklistItem[] | null>(null)
@@ -109,10 +110,9 @@ export function SetupChecklist() {
         <button
           type="button"
           onClick={dismiss}
-          disabled={!allDone}
-          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
           aria-label="Dismiss setup checklist"
-          title={allDone ? 'Dismiss' : 'Complete every item to dismiss'}
+          title="Dismiss"
         >
           <X className="h-3.5 w-3.5" />
         </button>

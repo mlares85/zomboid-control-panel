@@ -3186,6 +3186,10 @@ export const dockerApi = {
     adminPassword: string;
     basePath?: string;
     image?: string;
+    restartPolicy?: string;
+    dockerMemoryMb?: number;
+    cpuLimit?: number;
+    timezone?: string;
   }) =>
     apiPost("/docker/managed/servers", config) as Promise<{
       success: boolean;
