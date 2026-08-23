@@ -644,8 +644,10 @@ class AuthService {
           return next();
         }
 
-        // Allow health check
-        if (req.path === "/api/health") {
+        // Allow health check and environment snapshot (onboarding wizard
+        // calls this immediately after account creation, before the access
+        // token roundtrip is guaranteed to have settled in the client).
+        if (req.path === "/api/health" || req.path === "/api/system/environment") {
           return next();
         }
 
