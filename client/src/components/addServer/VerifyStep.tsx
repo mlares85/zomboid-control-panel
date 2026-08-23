@@ -49,7 +49,10 @@ async function checkFiles(server: ServerInstance): Promise<Partial<CheckItem>> {
 
 async function checkRcon(server: ServerInstance): Promise<Partial<CheckItem>> {
   try {
-    await rconApi.connect(server.rconHost, server.rconPort, server.rconPassword)
+    // Don't pass credentials — the RCON service already has the config
+    // from activateServer(). The server record's password is masked by
+    // sanitizeServerResponse, so passing it would send "••••••••".
+    await rconApi.connect()
     return { status: 'ok', detail: `${server.rconHost}:${server.rconPort}` }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Connection failed'

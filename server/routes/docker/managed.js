@@ -221,9 +221,9 @@ router.post("/servers", requireRole("admin"), async (req, res) => {
       return res.status(502).json({ success: false, error: `Container created but failed to start: ${startResult.error}` });
     }
 
-    // The entrypoint patches RCONEnabled=true into the INI — on first boot
-    // it runs in the background, waiting for PZ to generate the INI before
-    // patching. No stop+start needed from the route handler.
+    // The entrypoint pre-seeds RCONPort + RCONPassword in a stub INI. PZ
+    // inflates it into a full INI preserving those values. No post-boot
+    // patching or restart needed.
 
     // Activate the newly created server so ServerManager and RCON service
     // pick up its config. Without this, the RCON service keeps whatever
