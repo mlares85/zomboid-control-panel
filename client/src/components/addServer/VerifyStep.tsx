@@ -29,7 +29,7 @@ const BOOT_STAGES: Array<{ pattern: RegExp; label: string; done?: boolean }> = [
   { pattern: /\[panel\] Installing 32-bit/i, label: 'Installing 32-bit compatibility libraries…' },
   { pattern: /\[panel\] 32-bit libraries installed/i, label: '32-bit libraries installed' },
   { pattern: /\[panel\] Extracting SQLite/i, label: 'Extracting SQLite native library…' },
-  { pattern: /\[panel\] Pre-creating RCON config/i, label: 'Configuring RCON…' },
+  { pattern: /\[panel\] Pre-seeding RCON/i, label: 'Seeding RCON config…' },
   { pattern: /pzexe.*mainClass/i, label: 'PZ server process starting…' },
   { pattern: /SERVER STARTED/i, label: 'PZ server started, waiting for RCON…' },
   { pattern: /RCON.*listening/i, label: 'RCON is listening', done: true },

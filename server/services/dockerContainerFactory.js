@@ -110,10 +110,10 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       "fi;",
       // No symlink needed — the data volume mounts directly at /root/Zomboid
       // (where PZ writes saves/configs when running as root).
-      // Configure RCON in the server INI. On first boot PZ generates a full
-      // default INI (overwriting any pre-created stub), so we ensure the keys
-      // exist AFTER the INI is fully generated. On subsequent boots the INI
-      // already exists with the right keys, so the patch is a fast no-op.
+      // Pre-seed RCON config in the server INI. PZ enables RCON when
+      // RCONPassword is non-empty (there is no RCONEnabled key — it's
+      // implicit). PZ preserves existing key values when it inflates a
+      // stub INI into its full ~420-line default on first boot.
       "SRV_NAME='servertest';",
       "for arg in \"$@\"; do",
       "  if [ \"$prev\" = '-servername' ]; then SRV_NAME=\"$arg\"; fi;",
@@ -122,32 +122,18 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       "INI_DIR=\"/root/Zomboid/Server\";",
       "INI_FILE=\"${INI_DIR}/${SRV_NAME}.ini\";",
       "mkdir -p \"$INI_DIR\";",
-      // Patch RCON keys into the INI. Runs immediately if the INI exists
-      // (subsequent boots) or waits for PZ to generate it (first boot).
-      "patch_rcon() {",
-      "  if [ -z \"$RCON_PASSWORD\" ]; then return; fi;",
-      "  if [ ! -f \"$INI_FILE\" ]; then",
-      "    echo '[panel] Waiting for PZ to generate server INI...';",
-      "    for i in $(seq 1 60); do [ -f \"$INI_FILE\" ] && break; sleep 2; done;",
-      "    if [ ! -f \"$INI_FILE\" ]; then echo '[panel] INI not generated after 120s'; return; fi;",
-      // Wait a moment for PZ to finish writing (it writes progressively)
-      "    sleep 3;",
-      "  fi;",
-      "  if grep -q '^RCONEnabled=true' \"$INI_FILE\" && grep -q \"^RCONPassword=$RCON_PASSWORD\" \"$INI_FILE\"; then return; fi;",
-      "  echo '[panel] Patching RCON config in server INI';",
-      "  if grep -q '^RCONEnabled=' \"$INI_FILE\"; then",
-      "    sed -i 's/^RCONEnabled=.*/RCONEnabled=true/' \"$INI_FILE\";",
-      "  else printf '\\nRCONEnabled=true\\n' >> \"$INI_FILE\"; fi;",
-      "  if grep -q '^RCONPassword=' \"$INI_FILE\"; then",
+      // First boot: create a stub INI with RCON keys. PZ inflates it,
+      // preserving these values. Subsequent boots: ensure password matches
+      // (in case it was changed via env var).
+      "if [ ! -f \"$INI_FILE\" ] && [ -n \"$RCON_PASSWORD\" ]; then",
+      "  echo \"[panel] Pre-seeding RCON config at $INI_FILE\";",
+      "  printf 'RCONPort=%s\\nRCONPassword=%s\\n' \"${RCON_PORT:-27015}\" \"$RCON_PASSWORD\" > \"$INI_FILE\";",
+      "elif [ -f \"$INI_FILE\" ] && [ -n \"$RCON_PASSWORD\" ]; then",
+      "  if ! grep -q \"^RCONPassword=$RCON_PASSWORD\" \"$INI_FILE\"; then",
+      "    echo '[panel] Updating RCON password in server INI';",
       "    sed -i \"s/^RCONPassword=.*/RCONPassword=$RCON_PASSWORD/\" \"$INI_FILE\";",
-      "  else printf 'RCONPassword=%s\\n' \"$RCON_PASSWORD\" >> \"$INI_FILE\"; fi;",
-      "};",
-      // On first boot: patch runs in background, waits for PZ to generate
-      // the INI, patches it. PZ reads RCON config at the point it opens the
-      // RCON port — if the patch lands before that, RCON works on first boot.
-      // If not, the next container restart picks it up (patch_rcon is instant
-      // when the INI already has the right keys).
-      "if [ -f \"$INI_FILE\" ]; then patch_rcon; else patch_rcon & fi;",
+      "  fi;",
+      "fi;",
       // Fix LD_LIBRARY_PATH for JRE 25 (lib/amd64 moved to lib/server)
       "export JAVA_HOME=/opt/pz-server/jre64;",
       "export LD_LIBRARY_PATH=/opt/pz-server/linux64:/opt/pz-server:${JAVA_HOME}/lib/server:${JAVA_HOME}/lib:${LD_LIBRARY_PATH:-};",
