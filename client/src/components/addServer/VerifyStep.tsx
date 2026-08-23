@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CheckCircle2, Loader2, RefreshCw, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ interface VerifyStepProps {
   onVerified: () => void
 }
 
-type CheckStatus = 'pending' | 'running' | 'ok' | 'fail'
+type CheckStatus = 'pending' | 'running' | 'ok' | 'fail' | 'waiting'
 
 interface CheckItem {
   id: string
@@ -25,8 +25,12 @@ const INITIAL_CHECKS: CheckItem[] = [
   { id: 'bridge', label: 'PanelBridge installed', status: 'pending' },
 ]
 
+const RCON_MAX_ATTEMPTS = 12
+const RCON_RETRY_INTERVAL_MS = 5000
+
 async function checkFiles(server: ServerInstance): Promise<Partial<CheckItem>> {
   if (server.isRemote) return { status: 'ok', detail: 'Remote server — no local files to check' }
+  if (server.provider === 'docker-managed') return { status: 'ok', detail: 'Managed container — files inside container' }
   try {
     const status = await serverApi.getStatus()
     if (status?.configured) return { status: 'ok', detail: status.serverPath }
@@ -55,7 +59,7 @@ async function checkBridge(serverId: string | number): Promise<Partial<CheckItem
   try {
     await panelBridgeApi.autoConfigure(serverId)
   } catch {
-    // auto-configure may legitimately fail before the mod has ever run — status check below decides pass/fail
+    // auto-configure may legitimately fail before the mod has ever run
   }
   try {
     const status = await panelBridgeApi.getStatus()
@@ -68,14 +72,21 @@ async function checkBridge(serverId: string | number): Promise<Partial<CheckItem
   }
 }
 
-/** THE MISSING STEP — live probes with a distinct cause and fix link per failure. */
+function updateCheck(checks: CheckItem[], id: string, patch: Partial<CheckItem>): CheckItem[] {
+  return checks.map((c) => (c.id === id ? { ...c, ...patch } : c))
+}
+
 export function VerifyStep({ serverId, onVerified }: VerifyStepProps) {
   const [checks, setChecks] = useState<CheckItem[]>(INITIAL_CHECKS)
   const [running, setRunning] = useState(false)
+  const cancelledRef = useRef(false)
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const runAll = useCallback(async () => {
+    cancelledRef.current = false
     setRunning(true)
     setChecks(INITIAL_CHECKS.map((c) => ({ ...c, status: 'running' })))
+
     let server: ServerInstance
     try {
       server = (await serversApi.get(serverId)).server
@@ -85,13 +96,65 @@ export function VerifyStep({ serverId, onVerified }: VerifyStepProps) {
       return
     }
 
-    const results = await Promise.all([checkFiles(server), checkRcon(server), checkBridge(serverId)])
-    setChecks(INITIAL_CHECKS.map((c, i) => ({ ...c, ...results[i] } as CheckItem)))
+    // Files check — instant
+    const filesResult = await checkFiles(server)
+    if (cancelledRef.current) return
+    setChecks((prev) => updateCheck(prev, 'files', filesResult))
+
+    // RCON check — retry with backoff for servers still booting
+    let rconResult: Partial<CheckItem> = { status: 'fail' }
+    for (let attempt = 1; attempt <= RCON_MAX_ATTEMPTS; attempt++) {
+      if (cancelledRef.current) return
+      const label = attempt === 1 ? 'RCON reachable' : `RCON reachable (attempt ${attempt}/${RCON_MAX_ATTEMPTS})`
+      setChecks((prev) => updateCheck(prev, 'rcon', {
+        status: 'waiting',
+        label,
+        detail: attempt === 1 ? 'Connecting…' : 'Waiting for server to finish starting…',
+      }))
+
+      rconResult = await checkRcon(server)
+      if (cancelledRef.current) return
+
+      if (rconResult.status === 'ok') {
+        setChecks((prev) => updateCheck(prev, 'rcon', { ...rconResult, label: 'RCON reachable' }))
+        break
+      }
+
+      // Auth failure means server IS up but password is wrong — don't retry
+      if (rconResult.detail && /password rejected/i.test(rconResult.detail)) {
+        setChecks((prev) => updateCheck(prev, 'rcon', { ...rconResult, label: 'RCON reachable' }))
+        break
+      }
+
+      if (attempt < RCON_MAX_ATTEMPTS) {
+        await new Promise<void>((resolve) => {
+          retryTimerRef.current = setTimeout(resolve, RCON_RETRY_INTERVAL_MS)
+        })
+      } else {
+        setChecks((prev) => updateCheck(prev, 'rcon', {
+          ...rconResult,
+          label: 'RCON reachable',
+          detail: `Server did not respond after ${RCON_MAX_ATTEMPTS} attempts — it may still be starting. Try Retry.`,
+        }))
+      }
+    }
+
+    // Bridge check — only after RCON
+    if (cancelledRef.current) return
+    setChecks((prev) => updateCheck(prev, 'bridge', { status: 'running' }))
+    const bridgeResult = await checkBridge(serverId)
+    if (cancelledRef.current) return
+    setChecks((prev) => updateCheck(prev, 'bridge', bridgeResult))
+
     setRunning(false)
   }, [serverId])
 
   useEffect(() => {
     runAll()
+    return () => {
+      cancelledRef.current = true
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+    }
   }, [runAll])
 
   const allOk = checks.every((c) => c.status === 'ok')
@@ -107,7 +170,7 @@ export function VerifyStep({ serverId, onVerified }: VerifyStepProps) {
       <ul className="space-y-2">
         {checks.map((check) => (
           <li key={check.id} className="flex items-start gap-3 rounded-lg border border-border/50 bg-muted/15 px-3 py-2.5">
-            {check.status === 'running' && <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />}
+            {(check.status === 'running' || check.status === 'waiting') && <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />}
             {check.status === 'ok' && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
             {check.status === 'fail' && <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />}
             {check.status === 'pending' && <div className="mt-1 h-3 w-3 shrink-0 rounded-full border border-muted-foreground/40" />}
