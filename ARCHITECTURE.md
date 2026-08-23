@@ -68,6 +68,14 @@ JWT-authenticated in handshake middleware. Room-based pub/sub: `server-status`, 
 
 Pages are decomposed into `components/{page}/` directories. The main page file becomes a thin shell (tab management + component composition). Shared state extracted into hooks. Target: no file over 300 lines.
 
+## Onboarding / Add Server flow
+
+`AddServerFlow` is a single state machine: `environment → server-type → configure → verify → complete`. It runs full-screen on first install (`/welcome`) or as a dialog from the Servers page. All install paths — Fresh Install (SteamCMD), Quick Setup (existing files), and Docker — render inline within the `configure` step via `ConfigureStep`, which shows a sub-mode picker for intent='new' and renders the chosen flow component (`FullInstallFlow`, `QuickSetupFlow`, or `DockerSetup`). Every path eventually calls `onServerCreated(serverId)`, advancing through `VerifyStep` (RCON/bridge/files checks) and `CompleteStep` (guided essentials: template, mods, backups).
+
+The install flows are also rendered standalone on `/server-setup` via a thin `ServerSetup.tsx` shell (mode selector → chosen flow). `DockerSetup` accepts an optional `onServerCreated` prop for embedded mode; when absent, it handles completion itself (standalone mode).
+
+`FullInstallFlow` decomposes into `fullInstall/` with per-step hooks (`useSteamCmdStep`, `useInstallConfigStep`, `usePerformanceStep`, `useInstallProcess`) and per-step UI components. `QuickSetupFlow` follows the same pattern in `quickSetup/`.
+
 ## E2E testing
 
 Playwright (`@playwright/test`) with chromium. `e2e/auth.setup.ts` handles both first-run (account creation) and login, saving auth state to `e2e/.auth/user.json` for reuse. Credentials via `E2E_USERNAME`/`E2E_PASSWORD` env vars (defaults: `admin`/`testpassword123`). Specs in `e2e/`: smoke, dashboard, navigation. Run `npx playwright install chromium` once, then `npm run test:e2e`. The dev server (`npm run dev`, Vite on port 5173 proxying to Express on 3001) is started automatically by the Playwright `webServer` config.
