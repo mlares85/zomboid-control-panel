@@ -93,7 +93,6 @@ export function AddServerFlow({ mode, onComplete, open = true, onClose }: AddSer
     content = (
       <ConfigureStep
         selection={selection}
-        platform={environment?.platform}
         onCreated={handleCreated}
         onBack={() => setStep('server-type')}
       />
@@ -105,9 +104,12 @@ export function AddServerFlow({ mode, onComplete, open = true, onClose }: AddSer
   }
 
   if (mode === 'dialog') {
+    // Install flows (configure with intent='new') need more room than
+    // the simple detection/connection forms.
+    const isInstallFlow = step === 'configure' && selection?.intent === 'new'
     return (
       <Dialog open={open} onOpenChange={(o) => !o && onClose?.()}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className={`${isInstallFlow ? 'max-w-3xl' : 'max-w-lg'} max-h-[90vh] overflow-y-auto transition-[max-width]`}>
           <DialogHeader>
             <DialogTitle>Add Server</DialogTitle>
           </DialogHeader>

@@ -1,45 +1,23 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Container, Download, Loader2 } from 'lucide-react'
+import { ArrowLeft, Container, Download, FolderOpen, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PasswordInput } from '@/components/PasswordInput'
 import { RconTestConnection } from '@/components/RconTestConnection'
-import { BranchSelector } from './BranchSelector'
 import { serversApi, serversDetectApi } from '@/lib/api'
 import { useToast } from '@/components/ui/use-toast'
+import { FullInstallFlow } from './FullInstallFlow'
+import { QuickSetupFlow } from './QuickSetupFlow'
+import { DockerSetup } from './DockerSetup'
 import type { WizardSelection } from './types'
+
+type NewServerMode = 'select' | 'full' | 'quick' | 'docker'
 
 interface ConfigureStepProps {
   selection: WizardSelection
-  /** Drives the "install a new server" copy — Docker on macOS, SteamCMD on Windows. */
-  platform?: string
   onCreated: (serverId: string | number) => void
   onBack: () => void
-}
-
-/** New-install copy for the "new" intent — what actually happens differs per platform. */
-function newInstallCopy(platform?: string) {
-  if (platform === 'darwin') {
-    return {
-      icon: Container,
-      title: 'Set up a Docker container',
-      description: 'The installer will configure a PZ dedicated server running in a Linux container.',
-    }
-  }
-  if (platform === 'win32') {
-    return {
-      icon: Download,
-      title: 'Install a new server',
-      description: 'SteamCMD downloads the dedicated server files to a folder on this machine, then the installer walks you through paths, ports, and startup.',
-    }
-  }
-  return {
-    icon: Download,
-    title: 'Install a new server',
-    description: 'Fresh installs use the full installer — paths, ports, memory, and startup all in one guided flow.',
-  }
 }
 
 interface FormState {
@@ -65,11 +43,10 @@ function initialForm(selection: WizardSelection): FormState {
     rconPort: 27015,
     rconPassword: '',
     serverPort: 16261,
-    isRemote: selection.intent === 'existing' ? false : false,
+    isRemote: false,
   }
 }
 
-/** Auto-detect RCON settings for a detected local mount, same signature scan Servers.tsx uses. */
 function useAutoDetect(selection: WizardSelection, setForm: (fn: (f: FormState) => FormState) => void) {
   const [detecting, setDetecting] = useState(false)
   useEffect(() => {
@@ -80,7 +57,7 @@ function useAutoDetect(selection: WizardSelection, setForm: (fn: (f: FormState) 
         dataPath: selection.mount.type === 'data' ? selection.mount.path : '',
         installPath: selection.mount.type === 'install' ? selection.mount.path : undefined,
       })
-      .then((data: any) => {
+      .then((data: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any -- untyped detect response
         const first = data?.detectedServers?.[0]
         if (first) {
           setForm((f) => ({
@@ -94,49 +71,75 @@ function useAutoDetect(selection: WizardSelection, setForm: (fn: (f: FormState) 
           }))
         }
       })
-      .catch(() => {
-        /* fall back to manual entry below */
-      })
+      .catch(() => { /* fall back to manual entry */ })
       .finally(() => setDetecting(false))
   }, [selection, setForm])
   return detecting
 }
 
-export function ConfigureStep({ selection, platform, onCreated, onBack }: ConfigureStepProps) {
+const MODE_CARDS: Array<{ mode: NewServerMode; icon: typeof Download; title: string; description: string }> = [
+  { mode: 'full', icon: Download, title: 'Fresh Install', description: 'Download server files via SteamCMD' },
+  { mode: 'quick', icon: FolderOpen, title: 'Existing Files', description: 'Point at PZ server files you already have' },
+  { mode: 'docker', icon: Container, title: 'Docker', description: 'Run PZ inside a managed container' },
+]
+
+function NewServerModePicker({ onSelect, onBack }: { onSelect: (m: NewServerMode) => void; onBack: () => void }) {
+  return (
+    <div className="space-y-4">
+      <div className="text-center">
+        <h2 className="text-lg font-semibold text-foreground">How do you want to set up?</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Choose an install method for your new server.</p>
+      </div>
+      <div className="grid gap-2">
+        {MODE_CARDS.map(({ mode, icon: Icon, title, description }) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => onSelect(mode)}
+            className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/40 p-3.5 text-left transition-colors hover:border-primary/40 hover:bg-muted/20"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/30 text-muted-foreground">
+              <Icon className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">{title}</p>
+              <p className="text-xs text-muted-foreground">{description}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+      <Button variant="outline" onClick={onBack}>
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back
+      </Button>
+    </div>
+  )
+}
+
+export function ConfigureStep({ selection, onCreated, onBack }: ConfigureStepProps) {
   const [form, setForm] = useState<FormState>(() => initialForm(selection))
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
-  const navigate = useNavigate()
   const detecting = useAutoDetect(selection, setForm)
 
-  const [branch, setBranch] = useState('public')
+  const [newMode, setNewMode] = useState<NewServerMode>('select')
 
+  // ── intent = 'new': embed the install flow inline ──
   if (selection.intent === 'new') {
-    const { icon: Icon, title, description } = newInstallCopy(platform)
-    return (
-      <div className="space-y-4">
-        <div className="text-center">
-          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
-            <Icon className="h-5 w-5" />
-          </div>
-          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        </div>
-
-        <BranchSelector value={branch} onChange={setBranch} />
-
-        <div className="flex gap-2 pt-1">
-          <Button variant="outline" onClick={onBack}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back
-          </Button>
-          <Button className="flex-1 onboarding-cta" onClick={() => navigate('/server-setup', { state: { branch } })}>
-            <Download className="mr-2 h-4 w-4" /> Continue to installer
-          </Button>
-        </div>
-      </div>
-    )
+    if (newMode === 'select') {
+      return <NewServerModePicker onSelect={setNewMode} onBack={onBack} />
+    }
+    if (newMode === 'docker') {
+      return <DockerSetup onBack={() => setNewMode('select')} onServerCreated={onCreated} />
+    }
+    if (newMode === 'full') {
+      return <FullInstallFlow onBack={() => setNewMode('select')} onServerCreated={onCreated} />
+    }
+    if (newMode === 'quick') {
+      return <QuickSetupFlow onBack={() => setNewMode('select')} onServerCreated={onCreated} />
+    }
   }
 
+  // ── intent = 'detected' or 'existing': connection form ──
   const canSubmit = form.rconPassword.trim() && (form.isRemote ? form.rconHost.trim() : true)
 
   const handleSubmit = async () => {

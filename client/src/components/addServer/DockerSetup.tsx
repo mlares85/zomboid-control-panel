@@ -14,6 +14,7 @@ import { DockerConfigStep } from "./DockerConfigStep";
 
 interface DockerSetupProps {
   onBack: () => void;
+  onServerCreated?: (serverId: string | number) => void;
 }
 
 type CreatePhase =
@@ -85,7 +86,7 @@ export function DockerStepIndicator({ currentStep }: { currentStep: number }) {
   );
 }
 
-export function DockerSetup({ onBack }: DockerSetupProps) {
+export function DockerSetup({ onBack, onServerCreated }: DockerSetupProps) {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [config, setConfig] = useState<DockerConfig>({
@@ -133,6 +134,10 @@ export function DockerSetup({ onBack }: DockerSetupProps) {
         // Activate so the panel's RCON service picks up the new server's config
         if (result.server?.id) {
           await serversApi.activate(result.server.id).catch(() => {});
+          if (onServerCreated) {
+            onServerCreated(result.server.id);
+            return; // Parent handles post-creation flow
+          }
         }
         setCreatePhase("done");
       }
