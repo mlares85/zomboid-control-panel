@@ -13,8 +13,9 @@ export function useInstallConfigStep(
   hasSteamCmd: boolean,
   steamCmdPath: string,
   initialBranch?: string,
+  initialInstallPath?: string,
 ) {
-  const [installPath, setInstallPath] = useState("");
+  const [installPath, setInstallPath] = useState(initialInstallPath || "");
   const [serverName, setServerName] = useState("myserver");
   const [branch, setBranch] = useState(initialBranch || "public");
   const [availableBranches, setAvailableBranches] =

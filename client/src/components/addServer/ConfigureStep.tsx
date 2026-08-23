@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PasswordInput } from '@/components/PasswordInput'
 import { RconTestConnection } from '@/components/RconTestConnection'
-import { serversApi, serversDetectApi } from '@/lib/api'
+import { serversApi, serversDetectApi, type EnvironmentSnapshot } from '@/lib/api'
 import { useToast } from '@/components/ui/use-toast'
 import { FullInstallFlow } from './FullInstallFlow'
 import { QuickSetupFlow } from './QuickSetupFlow'
@@ -16,6 +16,7 @@ type NewServerMode = 'select' | 'full' | 'quick' | 'docker'
 
 interface ConfigureStepProps {
   selection: WizardSelection
+  environment?: EnvironmentSnapshot | null
   onCreated: (serverId: string | number) => void
   onBack: () => void
 }
@@ -115,13 +116,16 @@ function NewServerModePicker({ onSelect, onBack }: { onSelect: (m: NewServerMode
   )
 }
 
-export function ConfigureStep({ selection, onCreated, onBack }: ConfigureStepProps) {
+export function ConfigureStep({ selection, environment, onCreated, onBack }: ConfigureStepProps) {
   const [form, setForm] = useState<FormState>(() => initialForm(selection))
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
   const detecting = useAutoDetect(selection, setForm)
 
   const [newMode, setNewMode] = useState<NewServerMode>('select')
+
+  // Pre-fill install path from environment scan if one was discovered
+  const discoveredInstallPath = environment?.discoveredMounts?.find((m) => m.type === 'install')?.path
 
   // ── intent = 'new': embed the install flow inline ──
   if (selection.intent === 'new') {
@@ -132,10 +136,10 @@ export function ConfigureStep({ selection, onCreated, onBack }: ConfigureStepPro
       return <DockerSetup onBack={() => setNewMode('select')} onServerCreated={onCreated} />
     }
     if (newMode === 'full') {
-      return <FullInstallFlow onBack={() => setNewMode('select')} onServerCreated={onCreated} />
+      return <FullInstallFlow onBack={() => setNewMode('select')} onServerCreated={onCreated} initialInstallPath={discoveredInstallPath} />
     }
     if (newMode === 'quick') {
-      return <QuickSetupFlow onBack={() => setNewMode('select')} onServerCreated={onCreated} />
+      return <QuickSetupFlow onBack={() => setNewMode('select')} onServerCreated={onCreated} initialInstallPath={discoveredInstallPath} />
     }
   }
 

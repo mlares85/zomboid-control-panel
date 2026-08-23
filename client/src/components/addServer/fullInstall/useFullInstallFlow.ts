@@ -9,17 +9,18 @@ const STEP_COUNT = 4;
 interface UseFullInstallFlowOptions {
   onServerCreated: (serverId: string | number) => void;
   initialBranch?: string;
+  initialInstallPath?: string;
 }
 
 // Composes the four per-step hooks into the single state/handler surface
 // FullInstallFlow.tsx renders. Each step's state lives in its own hook;
 // this hook only wires cross-step concerns (validation, install payload,
 // folder browser dialog, step navigation).
-export function useFullInstallFlow({ onServerCreated, initialBranch }: UseFullInstallFlowOptions) {
+export function useFullInstallFlow({ onServerCreated, initialBranch, initialInstallPath }: UseFullInstallFlowOptions) {
   const [currentStep, setCurrentStep] = useState(1);
 
   const steamCmd = useSteamCmdStep();
-  const config = useInstallConfigStep(steamCmd.hasSteamCmd, steamCmd.steamCmdPath, initialBranch);
+  const config = useInstallConfigStep(steamCmd.hasSteamCmd, steamCmd.steamCmdPath, initialBranch, initialInstallPath);
   const performance = usePerformanceStep();
 
   const process = useInstallProcess(

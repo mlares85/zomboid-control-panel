@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CheckCircle2, Loader2, RefreshCw, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { serverApi, serversApi, rconApi, panelBridgeApi, type ServerInstance } from '@/lib/api'
+import { dockerApi, serverApi, serversApi, rconApi, panelBridgeApi, type ServerInstance } from '@/lib/api'
 
 interface VerifyStepProps {
   serverId: string | number
@@ -19,14 +19,20 @@ interface CheckItem {
   fixUrl?: string
 }
 
-const INITIAL_CHECKS: CheckItem[] = [
-  { id: 'files', label: 'Server files accessible', status: 'pending' },
-  { id: 'rcon', label: 'RCON reachable', status: 'pending' },
-  { id: 'bridge', label: 'PanelBridge installed', status: 'pending' },
-]
-
 const RCON_MAX_ATTEMPTS = 12
 const RCON_RETRY_INTERVAL_MS = 5000
+const BOOT_POLL_INTERVAL_MS = 3000
+const BOOT_MAX_POLLS = 40 // ~2 minutes
+
+// Entrypoint log markers from dockerContainerFactory.js PZ_ENTRYPOINT
+const BOOT_STAGES: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /Installing 32-bit/i, label: 'Installing 32-bit compatibility libraries…' },
+  { pattern: /32-bit libraries installed/i, label: '32-bit libraries installed' },
+  { pattern: /Extracting SQLite/i, label: 'Extracting SQLite native library…' },
+  { pattern: /SQLite native lib extracted/i, label: 'SQLite library ready' },
+  { pattern: /Pre-creating RCON config/i, label: 'Configuring RCON…' },
+  { pattern: /start-server\.sh/i, label: 'Launching PZ server…' },
+]
 
 async function checkFiles(server: ServerInstance): Promise<Partial<CheckItem>> {
   if (server.isRemote) return { status: 'ok', detail: 'Remote server — no local files to check' }
@@ -56,11 +62,7 @@ async function checkRcon(server: ServerInstance): Promise<Partial<CheckItem>> {
 }
 
 async function checkBridge(serverId: string | number): Promise<Partial<CheckItem>> {
-  try {
-    await panelBridgeApi.autoConfigure(serverId)
-  } catch {
-    // auto-configure may legitimately fail before the mod has ever run
-  }
+  try { await panelBridgeApi.autoConfigure(serverId) } catch { /* OK */ }
   try {
     const status = await panelBridgeApi.getStatus()
     if (status.isRunning || status.modStatus?.alive) {
@@ -72,12 +74,51 @@ async function checkBridge(serverId: string | number): Promise<Partial<CheckItem
   }
 }
 
+/** Poll container logs for boot progress markers. Resolves when PZ start-server.sh is reached or times out. */
+async function waitForContainerBoot(
+  containerId: string,
+  onProgress: (detail: string) => void,
+  cancelled: { current: boolean },
+): Promise<boolean> {
+  for (let i = 0; i < BOOT_MAX_POLLS; i++) {
+    if (cancelled.current) return false
+    try {
+      const result = await dockerApi.getLogs(containerId, 50)
+      if (result.success) {
+        const text = result.lines.join('\n')
+        let latestStage = ''
+        for (const stage of BOOT_STAGES) {
+          if (stage.pattern.test(text)) latestStage = stage.label
+        }
+        if (latestStage) onProgress(latestStage)
+        if (/start-server\.sh/i.test(text)) return true
+      }
+    } catch { /* keep polling */ }
+    await new Promise<void>((r) => setTimeout(r, BOOT_POLL_INTERVAL_MS))
+  }
+  return false
+}
+
 function updateCheck(checks: CheckItem[], id: string, patch: Partial<CheckItem>): CheckItem[] {
   return checks.map((c) => (c.id === id ? { ...c, ...patch } : c))
 }
 
+function buildInitialChecks(isDocker: boolean): CheckItem[] {
+  const checks: CheckItem[] = [
+    { id: 'files', label: 'Server files accessible', status: 'pending' },
+  ]
+  if (isDocker) {
+    checks.push({ id: 'boot', label: 'Container starting', status: 'pending' })
+  }
+  checks.push(
+    { id: 'rcon', label: 'RCON reachable', status: 'pending' },
+    { id: 'bridge', label: 'PanelBridge installed', status: 'pending' },
+  )
+  return checks
+}
+
 export function VerifyStep({ serverId, onVerified }: VerifyStepProps) {
-  const [checks, setChecks] = useState<CheckItem[]>(INITIAL_CHECKS)
+  const [checks, setChecks] = useState<CheckItem[]>([])
   const [running, setRunning] = useState(false)
   const cancelledRef = useRef(false)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -85,31 +126,48 @@ export function VerifyStep({ serverId, onVerified }: VerifyStepProps) {
   const runAll = useCallback(async () => {
     cancelledRef.current = false
     setRunning(true)
-    setChecks(INITIAL_CHECKS.map((c) => ({ ...c, status: 'running' })))
 
     let server: ServerInstance
     try {
       server = (await serversApi.get(serverId)).server
     } catch {
-      setChecks(INITIAL_CHECKS.map((c) => ({ ...c, status: 'fail', detail: 'Could not load server record' })))
+      setChecks([{ id: 'error', label: 'Server record', status: 'fail', detail: 'Could not load server record' }])
       setRunning(false)
       return
     }
 
-    // Files check — instant
+    const isDocker = server.provider === 'docker-managed'
+    const initial = buildInitialChecks(isDocker)
+    setChecks(initial.map((c) => ({ ...c, status: 'running' })))
+
+    // Files check
     const filesResult = await checkFiles(server)
     if (cancelledRef.current) return
     setChecks((prev) => updateCheck(prev, 'files', filesResult))
 
-    // RCON check — retry with backoff for servers still booting
+    // Docker boot check — wait for the container entrypoint to finish
+    if (isDocker && server.dockerContainerId) {
+      setChecks((prev) => updateCheck(prev, 'boot', { status: 'waiting', detail: 'Waiting for container to start…' }))
+      const booted = await waitForContainerBoot(
+        server.dockerContainerId,
+        (detail) => setChecks((prev) => updateCheck(prev, 'boot', { status: 'waiting', detail })),
+        cancelledRef,
+      )
+      if (cancelledRef.current) return
+      setChecks((prev) => updateCheck(prev, 'boot', booted
+        ? { status: 'ok', detail: 'PZ server process launched' }
+        : { status: 'ok', detail: 'Container running (boot check timed out — continuing)' },
+      ))
+    }
+
+    // RCON check — retry with backoff
     let rconResult: Partial<CheckItem> = { status: 'fail' }
     for (let attempt = 1; attempt <= RCON_MAX_ATTEMPTS; attempt++) {
       if (cancelledRef.current) return
       const label = attempt === 1 ? 'RCON reachable' : `RCON reachable (attempt ${attempt}/${RCON_MAX_ATTEMPTS})`
       setChecks((prev) => updateCheck(prev, 'rcon', {
-        status: 'waiting',
-        label,
-        detail: attempt === 1 ? 'Connecting…' : 'Waiting for server to finish starting…',
+        status: 'waiting', label,
+        detail: attempt === 1 ? 'Connecting…' : 'Waiting for RCON to become available…',
       }))
 
       rconResult = await checkRcon(server)
@@ -119,27 +177,23 @@ export function VerifyStep({ serverId, onVerified }: VerifyStepProps) {
         setChecks((prev) => updateCheck(prev, 'rcon', { ...rconResult, label: 'RCON reachable' }))
         break
       }
-
-      // Auth failure means server IS up but password is wrong — don't retry
       if (rconResult.detail && /password rejected/i.test(rconResult.detail)) {
         setChecks((prev) => updateCheck(prev, 'rcon', { ...rconResult, label: 'RCON reachable' }))
         break
       }
-
       if (attempt < RCON_MAX_ATTEMPTS) {
         await new Promise<void>((resolve) => {
           retryTimerRef.current = setTimeout(resolve, RCON_RETRY_INTERVAL_MS)
         })
       } else {
         setChecks((prev) => updateCheck(prev, 'rcon', {
-          ...rconResult,
-          label: 'RCON reachable',
+          ...rconResult, label: 'RCON reachable',
           detail: `Server did not respond after ${RCON_MAX_ATTEMPTS} attempts — it may still be starting. Try Retry.`,
         }))
       }
     }
 
-    // Bridge check — only after RCON
+    // Bridge check
     if (cancelledRef.current) return
     setChecks((prev) => updateCheck(prev, 'bridge', { status: 'running' }))
     const bridgeResult = await checkBridge(serverId)
@@ -157,7 +211,7 @@ export function VerifyStep({ serverId, onVerified }: VerifyStepProps) {
     }
   }, [runAll])
 
-  const allOk = checks.every((c) => c.status === 'ok')
+  const allOk = checks.length > 0 && checks.every((c) => c.status === 'ok')
   const anyFailed = checks.some((c) => c.status === 'fail')
 
   return (

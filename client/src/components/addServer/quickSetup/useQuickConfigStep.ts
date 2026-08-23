@@ -14,8 +14,8 @@ type SystemRam = {
 
 // Steps 1-2 state: server files location, identity, RCON/admin credentials,
 // memory allocation, and advanced runtime options.
-export function useQuickConfigStep() {
-  const [installPath, setInstallPath] = useState("");
+export function useQuickConfigStep({ initialInstallPath }: { initialInstallPath?: string } = {}) {
+  const [installPath, setInstallPath] = useState(initialInstallPath || "");
   const [serverName, setServerName] = useState("myserver");
   const [rconPassword, setRconPassword] = useState("");
   const [rconPort, setRconPort] = useState(27015);

@@ -23,6 +23,7 @@ interface FullInstallFlowProps {
   onServerCreated: (serverId: string | number) => void;
   onBack: () => void;
   initialBranch?: string;
+  initialInstallPath?: string;
 }
 
 const STEPS = [
@@ -35,8 +36,8 @@ const STEPS = [
 // Shell for the 4-step "Fresh Install" (SteamCMD) server setup flow.
 // All state/effects/handlers live in useFullInstallFlow + its per-step hooks;
 // this component only wires props and renders the current step.
-export function FullInstallFlow({ onServerCreated, onBack, initialBranch }: FullInstallFlowProps) {
-  const flow = useFullInstallFlow({ onServerCreated, initialBranch });
+export function FullInstallFlow({ onServerCreated, onBack, initialBranch, initialInstallPath }: FullInstallFlowProps) {
+  const flow = useFullInstallFlow({ onServerCreated, initialBranch, initialInstallPath });
   const { steamCmd, config, performance, process, currentStep, setCurrentStep, stepValidation } = flow;
 
   const renderStepContent = () => {

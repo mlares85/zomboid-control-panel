@@ -20,6 +20,8 @@ export type { InstallLog } from "@/components/addServer/quickSetup/types";
 interface QuickSetupFlowProps {
   onServerCreated: (serverId: string | number) => void;
   onBack: () => void;
+  /** Pre-fill install path from environment scan. */
+  initialInstallPath?: string;
 }
 
 const STEPS = [
@@ -32,8 +34,8 @@ const STEPS = [
 // All state/effects/handlers live in useQuickSetupFlow + its per-step hooks;
 // this component only wires props and renders the current step. Mirrors
 // FullInstallFlow.tsx's shape for the equivalent "Fresh Install" flow.
-export function QuickSetupFlow({ onServerCreated, onBack }: QuickSetupFlowProps) {
-  const flow = useQuickSetupFlow({ onServerCreated });
+export function QuickSetupFlow({ onServerCreated, onBack, initialInstallPath }: QuickSetupFlowProps) {
+  const flow = useQuickSetupFlow({ onServerCreated, initialInstallPath });
   const { config, process, currentStep, setCurrentStep, stepValidation } = flow;
 
   const renderStepContent = () => {

@@ -6,14 +6,15 @@ const STEP_COUNT = 3;
 
 interface UseQuickSetupFlowOptions {
   onServerCreated: (serverId: string | number) => void;
+  initialInstallPath?: string;
 }
 
 // Composes the config + process hooks into the single state/handler surface
 // QuickSetupFlow.tsx renders. Mirrors useFullInstallFlow's composition.
-export function useQuickSetupFlow({ onServerCreated }: UseQuickSetupFlowOptions) {
+export function useQuickSetupFlow({ onServerCreated, initialInstallPath }: UseQuickSetupFlowOptions) {
   const [currentStep, setCurrentStep] = useState(1);
 
-  const config = useQuickConfigStep();
+  const config = useQuickConfigStep({ initialInstallPath });
   const process = useQuickSetupProcess(onServerCreated);
 
   const [browseOpen, setBrowseOpen] = useState(false);

@@ -93,6 +93,7 @@ export function AddServerFlow({ mode, onComplete, open = true, onClose }: AddSer
     content = (
       <ConfigureStep
         selection={selection}
+        environment={environment}
         onCreated={handleCreated}
         onBack={() => setStep('server-type')}
       />
