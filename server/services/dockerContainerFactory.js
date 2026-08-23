@@ -125,8 +125,14 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
       "  echo \"[panel] Pre-creating RCON config at $INI_FILE\";",
       "  printf 'RCONEnabled=true\\nRCONPort=%s\\nRCONPassword=%s\\n' \"${RCON_PORT:-27015}\" \"$RCON_PASSWORD\" > \"$INI_FILE\";",
       "elif [ -f \"$INI_FILE\" ] && [ -n \"$RCON_PASSWORD\" ]; then",
-      "  grep -q 'RCONEnabled=true' \"$INI_FILE\" || { sed -i 's/^RCONEnabled=.*/RCONEnabled=true/' \"$INI_FILE\" 2>/dev/null || printf '\\nRCONEnabled=true\\n' >> \"$INI_FILE\"; };",
-      "  grep -q \"RCONPassword=$RCON_PASSWORD\" \"$INI_FILE\" || sed -i \"s/^RCONPassword=.*/RCONPassword=$RCON_PASSWORD/\" \"$INI_FILE\";",
+      // Ensure RCONEnabled=true — sed returns 0 even with no match, so
+      // check separately: if a line exists, replace it; otherwise append.
+      "  if grep -q '^RCONEnabled=' \"$INI_FILE\"; then",
+      "    sed -i 's/^RCONEnabled=.*/RCONEnabled=true/' \"$INI_FILE\";",
+      "  else printf '\\nRCONEnabled=true\\n' >> \"$INI_FILE\"; fi;",
+      "  if grep -q '^RCONPassword=' \"$INI_FILE\"; then",
+      "    sed -i \"s/^RCONPassword=.*/RCONPassword=$RCON_PASSWORD/\" \"$INI_FILE\";",
+      "  else printf 'RCONPassword=%s\\n' \"$RCON_PASSWORD\" >> \"$INI_FILE\"; fi;",
       "fi;",
       // Fix LD_LIBRARY_PATH for JRE 25 (lib/amd64 moved to lib/server)
       "export JAVA_HOME=/opt/pz-server/jre64;",
