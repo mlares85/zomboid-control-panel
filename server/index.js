@@ -43,6 +43,7 @@ import { BackupService } from "./services/backupService.js";
 import { UpdateChecker } from "./services/updateChecker.js";
 import { PanelUpdateChecker } from "./services/panelUpdateChecker.js";
 import { ContainerStatsPoller } from "./services/containerStatsPoller.js";
+import { ContainerLogStreamer } from "./services/containerLogStreamer.js";
 import { MapVersionChecker } from "./services/mapVersionChecker.js";
 import { LogTailer } from "./services/logTailer.js";
 import authService from "./services/auth.js";
@@ -178,9 +179,12 @@ async function gracefulShutdown(signal) {
       panelUpdateChecker.stop();
     }
 
-    // Stop container stats poller
+    // Stop container stats poller and log streamer
     if (containerStatsPoller) {
       containerStatsPoller.stop();
+    }
+    if (containerLogStreamer) {
+      containerLogStreamer.stop();
     }
 
     // Stop map version checker
@@ -1093,6 +1097,14 @@ const containerStatsPoller = new ContainerStatsPoller(io, dockerClient);
 containerStatsPoller.start();
 app.set("containerStatsPoller", containerStatsPoller);
 
+// Stream Docker container logs to subscribers. Subscriber-driven: only
+// active when at least one client has joined the container:logs room.
+// Reattaches when the active server changes via the server-side event
+// hook on io.sockets — any "activeServerChanged" emission from routes
+// reaches this listener so the streamer switches containers.
+const containerLogStreamer = new ContainerLogStreamer(io, dockerClient);
+app.set("containerLogStreamer", containerLogStreamer);
+
 // Stream Docker container events (start/stop/die/oom) so the frontend
 // gets instant state updates instead of polling every 8 seconds.
 if (dockerClient?.available) {
@@ -1690,6 +1702,16 @@ io.on("connection", (socket) => {
   });
   socket.on("unsubscribe:perf", () => {
     socket.leave("perf");
+  });
+
+  // Container log streaming — subscriber-driven start/stop
+  socket.on("subscribe:container-logs", () => {
+    const streamer = app.get("containerLogStreamer");
+    if (streamer) streamer.subscribe(socket);
+  });
+  socket.on("unsubscribe:container-logs", () => {
+    const streamer = app.get("containerLogStreamer");
+    if (streamer) streamer.unsubscribe(socket);
   });
 });
 

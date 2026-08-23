@@ -5,6 +5,7 @@ import { useDashboardData } from '@/hooks/dashboard/useDashboardData'
 import { DiscoverySetup } from '@/components/DiscoverySetup'
 import { SetupChecklist } from '@/components/SetupChecklist'
 import { ServerCards } from '@/components/dashboard/ServerCards'
+import { ContainerLogs } from '@/components/dashboard/ContainerLogs'
 import { VerdictBand } from '@/components/dashboard/DashboardVerdict'
 import { StatusHeader } from '@/components/dashboard/StatusHeader'
 import { PanelUpdateBanner, ErrorBanner, NotConfiguredBanner } from '@/components/dashboard/DashboardBanners'
@@ -99,6 +100,15 @@ export default function Dashboard() {
             onOpenWipe={() => { setWipePreview(null); setWipeDialog(true) }}
           />
         </div>
+
+        {d.activeServer?.provider === 'docker-managed' && d.activeServer?.dockerContainerId && (
+          <div className="mt-4">
+            <ContainerLogs
+              containerId={d.activeServer.dockerContainerId}
+              containerName={d.activeServer.dockerContainerName ?? d.activeServer.name}
+            />
+          </div>
+        )}
       </>
       )}
 

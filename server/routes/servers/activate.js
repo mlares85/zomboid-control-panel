@@ -52,6 +52,9 @@ router.post("/:id/activate", async (req, res) => {
     if (io) {
       io.emit("activeServerChanged", { server });
     }
+    // Reattach container log stream to the new active server
+    const logStreamer = req.app.get("containerLogStreamer");
+    if (logStreamer) logStreamer.onActiveServerChanged().catch(() => {});
 
     log.info(`Activated server: ${server.name} (ID: ${server.id})`);
     res.json({

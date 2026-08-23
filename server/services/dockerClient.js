@@ -337,6 +337,65 @@ export class DockerClient {
     return result.success ? result.data : null;
   }
 
+  // Stream container logs with follow=true. Calls onLine({ line, stream })
+  // for each log line as it arrives. Returns a cancel function.
+  // Reconnects automatically on disconnect (same pattern as watchEvents).
+  streamContainerLogs(id, onLine, { tail = 200 } = {}) {
+    if (!this.available || !id) return () => {};
+    let cancelled = false;
+    let currentReq = null;
+
+    const connect = () => {
+      if (cancelled) return;
+      const query = `stdout=true&stderr=true&follow=true&tail=${tail}`;
+      const path = `/containers/${encodeURIComponent(id)}/logs?${query}`;
+      const req = http.request(
+        { socketPath: this.socketPath, method: "GET", path },
+        (res) => {
+          if (res.statusCode >= 400) {
+            log.debug(`Log stream returned ${res.statusCode} for ${id}`);
+            res.resume();
+            if (!cancelled) setTimeout(connect, 5000);
+            return;
+          }
+          let pending = Buffer.alloc(0);
+          res.on("data", (chunk) => {
+            pending = Buffer.concat([pending, chunk]);
+            // Parse complete frames from the accumulated buffer
+            let offset = 0;
+            while (offset + 8 <= pending.length) {
+              const streamType = pending[offset];
+              if (streamType > 2) { offset++; continue; } // skip unknown
+              const frameSize = pending.readUInt32BE(offset + 4);
+              if (offset + 8 + frameSize > pending.length) break;
+              const text = pending.toString("utf8", offset + 8, offset + 8 + frameSize);
+              const stream = streamType === 2 ? "stderr" : "stdout";
+              for (const line of text.split("\n")) {
+                if (line) onLine({ line, stream });
+              }
+              offset += 8 + frameSize;
+            }
+            if (offset > 0) pending = pending.subarray(offset);
+          });
+          res.on("end", () => {
+            if (!cancelled) setTimeout(connect, 2000);
+          });
+        },
+      );
+      req.on("error", () => {
+        if (!cancelled) setTimeout(connect, 5000);
+      });
+      req.end();
+      currentReq = req;
+    };
+
+    connect();
+    return () => {
+      cancelled = true;
+      if (currentReq) currentReq.destroy();
+    };
+  }
+
   // Gap 11: stream Docker events for real-time state change detection.
   // Calls `onEvent({Type, Action, Actor, time})` for each event.
   // Returns a cancel function. Reconnects automatically on disconnect.
