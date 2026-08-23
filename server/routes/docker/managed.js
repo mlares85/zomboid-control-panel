@@ -212,7 +212,7 @@ router.post("/servers", requireRole("admin"), async (req, res) => {
 
     // Gap 1: rollback on start failure — if startContainer fails, clean up
     // the container and DB record so nothing is orphaned.
-    emitProgress("starting-server", "Starting container…");
+    emitProgress("starting-server", "Starting container — first boot installs dependencies…");
     const startResult = await deps.dockerClient.startContainer(result.containerId);
     if (!startResult.success) {
       log.warn(`Container start failed, rolling back: ${startResult.error}`);
@@ -220,6 +220,14 @@ router.post("/servers", requireRole("admin"), async (req, res) => {
       await deleteServer(server.id).catch(() => {});
       return res.status(502).json({ success: false, error: `Container created but failed to start: ${startResult.error}` });
     }
+
+    // On first boot PZ generates its default INI, overwriting the minimal
+    // pre-created one and losing RCONEnabled=true. A restart re-runs the
+    // entrypoint which appends the missing key to PZ's full INI.
+    emitProgress("starting-server", "Waiting for first-boot INI generation…");
+    await new Promise((r) => setTimeout(r, 8000));
+    emitProgress("starting-server", "Restarting container to apply RCON config…");
+    await deps.dockerClient.restartContainer(result.containerId);
 
     // Activate the newly created server so ServerManager and RCON service
     // pick up its config. Without this, the RCON service keeps whatever
