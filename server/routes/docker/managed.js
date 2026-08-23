@@ -222,12 +222,15 @@ router.post("/servers", requireRole("admin"), async (req, res) => {
     }
 
     // On first boot PZ generates its default INI, overwriting the minimal
-    // pre-created one and losing RCONEnabled=true. A restart re-runs the
-    // entrypoint which appends the missing key to PZ's full INI.
+    // pre-created one and losing RCONEnabled=true. Wait for PZ to write
+    // the INI, stop the container, then start it again — the entrypoint
+    // re-runs and appends the missing RCON keys to PZ's full INI.
+    // Stop+start is faster than restart (no stop-timeout negotiation).
     emitProgress("starting-server", "Waiting for first-boot INI generation…");
-    await new Promise((r) => setTimeout(r, 8000));
-    emitProgress("starting-server", "Restarting container to apply RCON config…");
-    await deps.dockerClient.restartContainer(result.containerId);
+    await new Promise((r) => setTimeout(r, 10000));
+    emitProgress("starting-server", "Applying RCON config…");
+    await deps.dockerClient.stopContainer(result.containerId);
+    await deps.dockerClient.startContainer(result.containerId);
 
     // Activate the newly created server so ServerManager and RCON service
     // pick up its config. Without this, the RCON service keeps whatever
