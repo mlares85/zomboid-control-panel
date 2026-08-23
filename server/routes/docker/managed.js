@@ -170,11 +170,17 @@ router.post("/servers", requireRole("admin"), async (req, res) => {
     } = req.body;
     // Resolve container-internal paths to host paths for bind mounts
     const hostBasePath = basePath ? await resolveHostPath(basePath, deps.dockerClient) : undefined;
+    const io = req.app.get("io");
+    const emitProgress = (phase, message) => {
+      if (io) io.emit("docker:create-progress", { phase, message });
+    };
+
+    emitProgress("creating-volumes", "Preparing storage volumes…");
     const result = await deps.containerFactory.createManagedServer({
       serverName, gamePort, rconPort, rconPassword, minMemoryMb, maxMemoryMb,
       basePath: hostBasePath, containerBasePath: basePath, image, adminPassword,
       restartPolicy, dockerMemoryMb, cpuLimit, timezone,
-    });
+    }, emitProgress);
     if (!result.success) return res.status(502).json({ success: false, error: result.error });
 
     // Gap 2: use the container name as RCON host — Docker DNS resolves it
@@ -206,6 +212,7 @@ router.post("/servers", requireRole("admin"), async (req, res) => {
 
     // Gap 1: rollback on start failure — if startContainer fails, clean up
     // the container and DB record so nothing is orphaned.
+    emitProgress("starting-server", "Starting container…");
     const startResult = await deps.dockerClient.startContainer(result.containerId);
     if (!startResult.success) {
       log.warn(`Container start failed, rolling back: ${startResult.error}`);
@@ -217,8 +224,10 @@ router.post("/servers", requireRole("admin"), async (req, res) => {
     // Activate the newly created server so ServerManager and RCON service
     // pick up its config. Without this, the RCON service keeps whatever
     // stale password it loaded at startup and auth fails.
+    emitProgress("activating", "Activating server…");
     await activateServer(req, server);
 
+    emitProgress("done", "Server created successfully!");
     res.status(201).json({ success: true, server: sanitizeServerResponse(server), containerId: result.containerId });
   } catch (error) {
     log.error(`Failed to create managed server: ${error.message}`);

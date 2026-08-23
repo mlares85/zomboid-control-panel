@@ -208,13 +208,13 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
     return { gamePort, rconPort };
   }
 
-  async function createManagedServer(config) {
-    // Gap 6: preflight check — validate base has PZ server files
+  async function createManagedServer(config, onProgress = () => {}) {
     const preflightError = await preflightBaseCheck(config);
     if (preflightError) {
       return { success: false, error: preflightError };
     }
 
+    onProgress("creating-volumes", "Creating storage volumes…");
     if (!config.basePath) {
       const volumeResult = await volumeManager.ensureBaseVolume();
       if (!volumeResult.success) {
@@ -229,16 +229,17 @@ export function createDockerContainerFactory(dockerClient, volumeManager) {
     const imageRef = config.image || DEFAULT_IMAGE;
     const imageCheck = await dockerClient.inspectImage(imageRef);
     if (!imageCheck) {
-      log.info(`Pulling image ${imageRef}...`);
+      onProgress("pulling-image", `Pulling image ${imageRef}…`);
       const pullResult = await dockerClient.pullImage(imageRef);
       if (!pullResult.success) {
         return { success: false, error: `Image pull failed: ${pullResult.error}` };
       }
+    } else {
+      onProgress("pulling-image", `Image ${imageRef} ready`);
     }
 
+    onProgress("creating-container", "Setting up network and creating container…");
     await ensureNetwork();
-    // Gap 2: connect panel container to the managed network so Docker DNS
-    // resolves the managed container name for RCON.
     await connectPanelToNetwork();
     const spec = buildContainerSpec(config);
     const containerName = `zomboid-${config.serverName}`;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Container, Settings2, CheckCircle, Loader2, ChevronLeft,
@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { SocketContext } from "@/contexts/SocketContext";
 import { DockerPrereqStep } from "./DockerPrereqStep";
 import { DockerConfigStep } from "./DockerConfigStep";
 
@@ -88,6 +89,7 @@ export function DockerStepIndicator({ currentStep }: { currentStep: number }) {
 
 export function DockerSetup({ onBack, onServerCreated }: DockerSetupProps) {
   const navigate = useNavigate();
+  const socket = useContext(SocketContext);
   const [currentStep, setCurrentStep] = useState(1);
   const [config, setConfig] = useState<DockerConfig>({
     serverName: "zomboid", gamePort: 16261, rconPort: 27015,
@@ -95,6 +97,7 @@ export function DockerSetup({ onBack, onServerCreated }: DockerSetupProps) {
     restartPolicy: "unless-stopped",
   });
   const [createPhase, setCreatePhase] = useState<CreatePhase>("idle");
+  const [createMessage, setCreateMessage] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
 
   // Prefill available ports
@@ -104,17 +107,29 @@ export function DockerSetup({ onBack, onServerCreated }: DockerSetupProps) {
       .catch(() => {});
   }, []);
 
+  // Listen for real progress events from the backend
+  useEffect(() => {
+    if (!socket) return;
+    const onProgress = (data: { phase: string; message: string }) => {
+      const phaseMap: Record<string, CreatePhase> = {
+        "creating-volumes": "creating-volumes",
+        "pulling-image": "pulling-image",
+        "creating-container": "creating-container",
+        "starting-server": "starting-server",
+        "activating": "starting-server",
+      };
+      const mapped = phaseMap[data.phase];
+      if (mapped) setCreatePhase(mapped);
+      if (data.message) setCreateMessage(data.message);
+    };
+    socket.on("docker:create-progress", onProgress);
+    return () => { socket.off("docker:create-progress", onProgress); };
+  }, [socket]);
+
   const handleCreate = async () => {
     setCreateError(null);
+    setCreateMessage("Preparing…");
     setCreatePhase("creating-volumes");
-    const phaseTimer = setInterval(() => {
-      setCreatePhase((prev) => {
-        if (prev === "creating-volumes") return "pulling-image";
-        if (prev === "pulling-image") return "creating-container";
-        if (prev === "creating-container") return "starting-server";
-        return prev;
-      });
-    }, 3000);
 
     try {
       const result = await dockerApi.createManagedServer({
@@ -129,21 +144,18 @@ export function DockerSetup({ onBack, onServerCreated }: DockerSetupProps) {
         ...(config.cpuLimit ? { cpuLimit: config.cpuLimit } : {}),
         ...(config.timezone ? { timezone: config.timezone } : {}),
       });
-      clearInterval(phaseTimer);
       if (result.success) {
-        // Activate so the panel's RCON service picks up the new server's config
         if (result.server?.id) {
           await serversApi.activate(result.server.id).catch(() => {});
           if (onServerCreated) {
             onServerCreated(result.server.id);
-            return; // Parent handles post-creation flow
+            return;
           }
         }
         setCreatePhase("done");
       }
       else { setCreatePhase("idle"); setCreateError(result.error ?? "Failed to create server"); }
     } catch (e) {
-      clearInterval(phaseTimer);
       setCreatePhase("idle");
       setCreateError(e instanceof Error ? e.message : "Unexpected error creating server");
     }
@@ -243,7 +255,7 @@ export function DockerSetup({ onBack, onServerCreated }: DockerSetupProps) {
             </div>
             <Progress value={PHASE_PROGRESS[createPhase]} className="h-2" />
             <p className="text-sm text-muted-foreground">
-              This may take a few minutes if base files need to download.
+              {createMessage || "This may take a few minutes if the image needs to download."}
             </p>
           </CardContent>
         </Card>
