@@ -24,14 +24,15 @@ const RCON_RETRY_INTERVAL_MS = 5000
 const BOOT_POLL_INTERVAL_MS = 3000
 const BOOT_MAX_POLLS = 40 // ~2 minutes
 
-// Entrypoint log markers from dockerContainerFactory.js PZ_ENTRYPOINT
-const BOOT_STAGES: Array<{ pattern: RegExp; label: string }> = [
-  { pattern: /Installing 32-bit/i, label: 'Installing 32-bit compatibility libraries…' },
-  { pattern: /32-bit libraries installed/i, label: '32-bit libraries installed' },
-  { pattern: /Extracting SQLite/i, label: 'Extracting SQLite native library…' },
-  { pattern: /SQLite native lib extracted/i, label: 'SQLite library ready' },
-  { pattern: /Pre-creating RCON config/i, label: 'Configuring RCON…' },
-  { pattern: /start-server\.sh/i, label: 'Launching PZ server…' },
+// Boot progress markers — panel entrypoint prefixes with [panel], then PZ logs its own startup
+const BOOT_STAGES: Array<{ pattern: RegExp; label: string; done?: boolean }> = [
+  { pattern: /\[panel\] Installing 32-bit/i, label: 'Installing 32-bit compatibility libraries…' },
+  { pattern: /\[panel\] 32-bit libraries installed/i, label: '32-bit libraries installed' },
+  { pattern: /\[panel\] Extracting SQLite/i, label: 'Extracting SQLite native library…' },
+  { pattern: /\[panel\] Pre-creating RCON config/i, label: 'Configuring RCON…' },
+  { pattern: /pzexe.*mainClass/i, label: 'PZ server process starting…' },
+  { pattern: /SERVER STARTED/i, label: 'PZ server started, waiting for RCON…' },
+  { pattern: /RCON.*listening/i, label: 'RCON is listening', done: true },
 ]
 
 async function checkFiles(server: ServerInstance): Promise<Partial<CheckItem>> {
@@ -74,7 +75,7 @@ async function checkBridge(serverId: string | number): Promise<Partial<CheckItem
   }
 }
 
-/** Poll container logs for boot progress markers. Resolves when PZ start-server.sh is reached or times out. */
+/** Poll container logs for boot progress markers. Resolves when RCON is listening or times out. */
 async function waitForContainerBoot(
   containerId: string,
   onProgress: (detail: string) => void,
@@ -83,15 +84,19 @@ async function waitForContainerBoot(
   for (let i = 0; i < BOOT_MAX_POLLS; i++) {
     if (cancelled.current) return false
     try {
-      const result = await dockerApi.getLogs(containerId, 50)
+      const result = await dockerApi.getLogs(containerId, 100)
       if (result.success) {
         const text = result.lines.join('\n')
         let latestStage = ''
+        let bootDone = false
         for (const stage of BOOT_STAGES) {
-          if (stage.pattern.test(text)) latestStage = stage.label
+          if (stage.pattern.test(text)) {
+            latestStage = stage.label
+            if (stage.done) bootDone = true
+          }
         }
         if (latestStage) onProgress(latestStage)
-        if (/start-server\.sh/i.test(text)) return true
+        if (bootDone) return true
       }
     } catch { /* keep polling */ }
     await new Promise<void>((r) => setTimeout(r, BOOT_POLL_INTERVAL_MS))
