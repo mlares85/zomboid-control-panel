@@ -269,4 +269,62 @@ describe('RconService', () => {
       expect(executeSpy).toHaveBeenCalledWith('setaccesslevel "Safe Player" "admin"');
     });
   });
+
+  describe('kickPlayer reason', () => {
+    it('sends -r "<reason>" via the same sanitizeForBanReason() pipeline banPlayer() uses', async () => {
+      const liveRcon = new RconService();
+      const executeSpy = vi.spyOn(liveRcon, 'execute').mockResolvedValue({ success: true, response: 'ok' });
+
+      await liveRcon.kickPlayer('Bob', 'Comportement toxique répété');
+
+      expect(executeSpy).toHaveBeenCalledWith('kickuser "Bob" -r "Comportement toxique rpt"');
+    });
+
+    it('omits -r entirely when no reason is given', async () => {
+      const liveRcon = new RconService();
+      const executeSpy = vi.spyOn(liveRcon, 'execute').mockResolvedValue({ success: true, response: 'ok' });
+
+      await liveRcon.kickPlayer('Bob');
+
+      expect(executeSpy).toHaveBeenCalledWith('kickuser "Bob"');
+    });
+  });
+
+  describe('setGodMode / setInvisible player targeting', () => {
+    it('setGodMode sends godmodplayer (not the self-only godmod) when a username is given', async () => {
+      const liveRcon = new RconService();
+      const executeSpy = vi.spyOn(liveRcon, 'execute').mockResolvedValue({ success: true, response: 'ok' });
+
+      await liveRcon.setGodMode('Bob', true);
+
+      expect(executeSpy).toHaveBeenCalledWith('godmodplayer "Bob" -true');
+    });
+
+    it('setGodMode still sends the self-only godmod when no username is given', async () => {
+      const liveRcon = new RconService();
+      const executeSpy = vi.spyOn(liveRcon, 'execute').mockResolvedValue({ success: true, response: 'ok' });
+
+      await liveRcon.setGodMode(null, false);
+
+      expect(executeSpy).toHaveBeenCalledWith('godmod -false');
+    });
+
+    it('setInvisible sends invisibleplayer (not the self-only invisible) when a username is given', async () => {
+      const liveRcon = new RconService();
+      const executeSpy = vi.spyOn(liveRcon, 'execute').mockResolvedValue({ success: true, response: 'ok' });
+
+      await liveRcon.setInvisible('Bob', true);
+
+      expect(executeSpy).toHaveBeenCalledWith('invisibleplayer "Bob" -true');
+    });
+
+    it('setInvisible still sends the self-only invisible when no username is given', async () => {
+      const liveRcon = new RconService();
+      const executeSpy = vi.spyOn(liveRcon, 'execute').mockResolvedValue({ success: true, response: 'ok' });
+
+      await liveRcon.setInvisible(null, false);
+
+      expect(executeSpy).toHaveBeenCalledWith('invisible -false');
+    });
+  });
 });
