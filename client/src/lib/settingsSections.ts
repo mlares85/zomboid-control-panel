@@ -1,5 +1,6 @@
 import {
   Archive,
+  Bell,
   Clock,
   Download,
   Globe,
@@ -89,6 +90,15 @@ export const SETTINGS_SECTIONS = [
     group: "Automation",
     tip: "World backup schedule and character exports",
     description: "Automatic world backups and per-character export copies.",
+  },
+  {
+    id: "notifications",
+    label: "Notifications",
+    icon: Bell,
+    group: "Automation",
+    tip: "Pushover alerts for server and resource conditions",
+    description:
+      "Pushover push notifications, and the alert conditions that trigger them.",
   },
   {
     id: "map",

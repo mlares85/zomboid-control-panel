@@ -2,132 +2,31 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CheckCircle2, Loader2, RefreshCw, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { dockerApi, serverApi, serversApi, rconApi, panelBridgeApi, type ServerInstance } from '@/lib/api'
+import { serversApi, type ServerInstance } from '@/lib/api'
+import { BridgeSftpInstallForm } from './BridgeSftpInstallForm'
+import {
+  RCON_MAX_ATTEMPTS,
+  RCON_RETRY_INTERVAL_MS,
+  buildInitialChecks,
+  checkBridgeDocker,
+  checkBridgeNative,
+  checkBridgeStatus,
+  checkFiles,
+  checkRcon,
+  updateCheck,
+  waitForContainerBoot,
+  type CheckItem,
+} from './verifyStepChecks'
 
 interface VerifyStepProps {
   serverId: string | number
   onVerified: () => void
 }
 
-type CheckStatus = 'pending' | 'running' | 'ok' | 'fail' | 'waiting'
-
-interface CheckItem {
-  id: string
-  label: string
-  status: CheckStatus
-  detail?: string
-  fixUrl?: string
-}
-
-const RCON_MAX_ATTEMPTS = 12
-const RCON_RETRY_INTERVAL_MS = 5000
-const BOOT_POLL_INTERVAL_MS = 3000
-const BOOT_MAX_POLLS = 40 // ~2 minutes
-
-// Boot progress markers — panel entrypoint prefixes with [panel], then PZ logs its own startup
-const BOOT_STAGES: Array<{ pattern: RegExp; label: string; done?: boolean }> = [
-  { pattern: /\[panel\] Installing 32-bit/i, label: 'Installing 32-bit compatibility libraries…' },
-  { pattern: /\[panel\] 32-bit libraries installed/i, label: '32-bit libraries installed' },
-  { pattern: /\[panel\] Extracting SQLite/i, label: 'Extracting SQLite native library…' },
-  { pattern: /\[panel\] Pre-seeding RCON/i, label: 'Seeding RCON config…' },
-  { pattern: /pzexe.*mainClass/i, label: 'PZ server process starting…' },
-  { pattern: /SERVER STARTED/i, label: 'PZ server started, waiting for RCON…' },
-  { pattern: /RCON.*listening/i, label: 'RCON is listening', done: true },
-]
-
-async function checkFiles(server: ServerInstance): Promise<Partial<CheckItem>> {
-  if (server.isRemote) return { status: 'ok', detail: 'Remote server — no local files to check' }
-  if (server.provider === 'docker-managed') return { status: 'ok', detail: 'Managed container — files inside container' }
-  try {
-    const status = await serverApi.getStatus()
-    if (status?.configured) return { status: 'ok', detail: status.serverPath }
-    return { status: 'fail', detail: 'Server path is not configured', fixUrl: '/servers' }
-  } catch (err) {
-    return { status: 'fail', detail: err instanceof Error ? err.message : 'Could not read server status', fixUrl: '/servers' }
-  }
-}
-
-async function checkRcon(server: ServerInstance): Promise<Partial<CheckItem>> {
-  try {
-    // Don't pass credentials — the RCON service already has the config
-    // from activateServer(). The server record's password is masked by
-    // sanitizeServerResponse, so passing it would send "••••••••".
-    await rconApi.connect()
-    return { status: 'ok', detail: `${server.rconHost}:${server.rconPort}` }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Connection failed'
-    const authFailed = /authentication|password/i.test(msg)
-    return {
-      status: 'fail',
-      detail: authFailed ? 'RCON password rejected' : msg,
-      fixUrl: '/servers',
-    }
-  }
-}
-
-async function checkBridge(serverId: string | number): Promise<Partial<CheckItem>> {
-  try { await panelBridgeApi.autoConfigure(serverId) } catch { /* OK */ }
-  try {
-    const status = await panelBridgeApi.getStatus()
-    if (status.isRunning || status.modStatus?.alive) {
-      return { status: 'ok', detail: status.modStatus?.alive ? 'Mod connected' : 'Bridge running, waiting for mod' }
-    }
-    return { status: 'fail', detail: 'Not installed yet — install the PanelBridge mod on the server', fixUrl: '/settings' }
-  } catch (err) {
-    return { status: 'fail', detail: err instanceof Error ? err.message : 'Could not read bridge status', fixUrl: '/settings' }
-  }
-}
-
-/** Poll container logs for boot progress markers. Resolves when RCON is listening or times out. */
-async function waitForContainerBoot(
-  containerId: string,
-  onProgress: (detail: string) => void,
-  cancelled: { current: boolean },
-): Promise<boolean> {
-  for (let i = 0; i < BOOT_MAX_POLLS; i++) {
-    if (cancelled.current) return false
-    try {
-      const result = await dockerApi.getLogs(containerId, 100)
-      if (result.success) {
-        const text = result.lines.join('\n')
-        let latestStage = ''
-        let bootDone = false
-        for (const stage of BOOT_STAGES) {
-          if (stage.pattern.test(text)) {
-            latestStage = stage.label
-            if (stage.done) bootDone = true
-          }
-        }
-        if (latestStage) onProgress(latestStage)
-        if (bootDone) return true
-      }
-    } catch { /* keep polling */ }
-    await new Promise<void>((r) => setTimeout(r, BOOT_POLL_INTERVAL_MS))
-  }
-  return false
-}
-
-function updateCheck(checks: CheckItem[], id: string, patch: Partial<CheckItem>): CheckItem[] {
-  return checks.map((c) => (c.id === id ? { ...c, ...patch } : c))
-}
-
-function buildInitialChecks(isDocker: boolean): CheckItem[] {
-  const checks: CheckItem[] = [
-    { id: 'files', label: 'Server files accessible', status: 'pending' },
-  ]
-  if (isDocker) {
-    checks.push({ id: 'boot', label: 'Container starting', status: 'pending' })
-  }
-  checks.push(
-    { id: 'rcon', label: 'RCON reachable', status: 'pending' },
-    { id: 'bridge', label: 'PanelBridge installed', status: 'pending' },
-  )
-  return checks
-}
-
 export function VerifyStep({ serverId, onVerified }: VerifyStepProps) {
   const [checks, setChecks] = useState<CheckItem[]>([])
   const [running, setRunning] = useState(false)
+  const [provider, setProvider] = useState<string | undefined>(undefined)
   const cancelledRef = useRef(false)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -144,6 +43,7 @@ export function VerifyStep({ serverId, onVerified }: VerifyStepProps) {
       return
     }
 
+    setProvider(server.provider)
     const isDocker = server.provider === 'docker-managed'
     const initial = buildInitialChecks(isDocker)
     setChecks(initial.map((c) => ({ ...c, status: 'running' })))
@@ -201,15 +101,33 @@ export function VerifyStep({ serverId, onVerified }: VerifyStepProps) {
       }
     }
 
-    // Bridge check
+    // Bridge check — behavior depends on how the server files are reached
     if (cancelledRef.current) return
-    setChecks((prev) => updateCheck(prev, 'bridge', { status: 'running' }))
-    const bridgeResult = await checkBridge(serverId)
-    if (cancelledRef.current) return
-    setChecks((prev) => updateCheck(prev, 'bridge', bridgeResult))
+    if (server.provider === 'remote-sftp') {
+      // Don't auto-install over SFTP — wait for the user to supply credentials.
+      setChecks((prev) => updateCheck(prev, 'bridge', {
+        status: 'waiting',
+        detail: 'Enter SFTP credentials below to install the PanelBridge mod',
+      }))
+    } else {
+      setChecks((prev) => updateCheck(prev, 'bridge', { status: 'running', detail: isDocker ? 'Installing PanelBridge mod into container…' : undefined }))
+      const bridgeResult = isDocker ? await checkBridgeDocker(serverId) : await checkBridgeNative(serverId)
+      if (cancelledRef.current) return
+      setChecks((prev) => updateCheck(prev, 'bridge', bridgeResult))
+    }
 
     setRunning(false)
   }, [serverId])
+
+  const handleSftpInstalled = useCallback(async (result: { success: boolean; message?: string }) => {
+    if (!result.success) {
+      setChecks((prev) => updateCheck(prev, 'bridge', { status: 'fail', detail: result.message || 'SFTP install failed' }))
+      return
+    }
+    setChecks((prev) => updateCheck(prev, 'bridge', { status: 'running', detail: 'Verifying mod connection…' }))
+    const statusResult = await checkBridgeStatus()
+    setChecks((prev) => updateCheck(prev, 'bridge', statusResult))
+  }, [])
 
   useEffect(() => {
     runAll()
@@ -221,6 +139,8 @@ export function VerifyStep({ serverId, onVerified }: VerifyStepProps) {
 
   const allOk = checks.length > 0 && checks.every((c) => c.status === 'ok')
   const anyFailed = checks.some((c) => c.status === 'fail')
+  const bridgeCheck = checks.find((c) => c.id === 'bridge')
+  const showSftpForm = provider === 'remote-sftp' && bridgeCheck && bridgeCheck.status !== 'ok'
 
   return (
     <div className="space-y-4">
@@ -231,23 +151,28 @@ export function VerifyStep({ serverId, onVerified }: VerifyStepProps) {
 
       <ul className="space-y-2">
         {checks.map((check) => (
-          <li key={check.id} className="flex items-start gap-3 rounded-lg border border-border/50 bg-muted/15 px-3 py-2.5">
-            {(check.status === 'running' || check.status === 'waiting') && <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />}
-            {check.status === 'ok' && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
-            {check.status === 'fail' && <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />}
-            {check.status === 'pending' && <div className="mt-1 h-3 w-3 shrink-0 rounded-full border border-muted-foreground/40" />}
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">{check.label}</p>
-              {check.detail && (
-                <p className={`mt-0.5 text-xs ${check.status === 'fail' ? 'text-destructive' : 'text-muted-foreground'}`}>
-                  {check.detail}
-                </p>
+          <li key={check.id} className="flex flex-col gap-2 rounded-lg border border-border/50 bg-muted/15 px-3 py-2.5">
+            <div className="flex items-start gap-3">
+              {(check.status === 'running' || check.status === 'waiting') && <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />}
+              {check.status === 'ok' && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
+              {check.status === 'fail' && <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />}
+              {check.status === 'pending' && <div className="mt-1 h-3 w-3 shrink-0 rounded-full border border-muted-foreground/40" />}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-foreground">{check.label}</p>
+                {check.detail && (
+                  <p className={`mt-0.5 text-xs ${check.status === 'fail' ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {check.detail}
+                  </p>
+                )}
+              </div>
+              {check.status === 'fail' && check.fixUrl && (
+                <Link to={check.fixUrl} className="shrink-0 text-xs font-medium text-primary hover:underline">
+                  Fix this
+                </Link>
               )}
             </div>
-            {check.status === 'fail' && check.fixUrl && (
-              <Link to={check.fixUrl} className="shrink-0 text-xs font-medium text-primary hover:underline">
-                Fix this
-              </Link>
+            {check.id === 'bridge' && showSftpForm && (
+              <BridgeSftpInstallForm serverId={serverId} onInstalled={handleSftpInstalled} />
             )}
           </li>
         ))}

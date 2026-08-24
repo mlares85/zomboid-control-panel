@@ -11,6 +11,7 @@ import { ConnectionSettings } from "./ConnectionSettings";
 import { BridgeSettings } from "./BridgeSettings";
 import { ModsSettings } from "./ModsSettings";
 import { BackupsSettings } from "./BackupsSettings";
+import { PushoverSettings } from "./PushoverSettings";
 import { SecuritySettings } from "./SecuritySettings";
 import { AboutSettings } from "./AboutSettings";
 import { MapSettings } from "./MapSettings";
@@ -141,6 +142,10 @@ export function SettingsTabPanels({
 
       <TabsContent value="backups" className="mt-0 space-y-5">
         <BackupsSettings settings={core.settings} updateSetting={core.updateSetting} />
+      </TabsContent>
+
+      <TabsContent value="notifications" className="mt-0 space-y-5">
+        <PushoverSettings />
       </TabsContent>
 
       <TabsContent value="security" className="mt-0">

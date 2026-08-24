@@ -1977,6 +1977,29 @@ export const panelBridgeApi = {
     transport: { type: "sftp"; running: boolean; lastLatencyMs?: number | null };
   }>,
 
+  // Install the PanelBridge mod directly into a panel-managed Docker container.
+  installDocker: (serverId: string | number) =>
+    apiPost("/panel-bridge/install-docker", { serverId }) as Promise<{
+      success: boolean;
+      message?: string;
+      error?: string;
+    }>,
+
+  // Install the PanelBridge mod onto a remote server reachable over SFTP.
+  installSftp: (config: {
+    serverId?: string | number;
+    host: string;
+    port: string | number;
+    username: string;
+    password: string;
+    installPath: string;
+  }) =>
+    apiPost("/panel-bridge/install-sftp", config) as Promise<{
+      success: boolean;
+      message?: string;
+      error?: string;
+    }>,
+
   listSftpLogs: (config: {
     host?: string;
     port?: string;
@@ -3396,4 +3419,59 @@ export const templatesApi = {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   },
+};
+
+// Pushover notification settings
+export interface PushoverSettings {
+  enabled: boolean;
+  userKey: string;
+  // Masked by the server response once configured (e.g. "••••••••").
+  apiToken: string;
+}
+
+export type PushoverMetric =
+  | "cpu"
+  | "memory"
+  | "disk"
+  | "playerCount"
+  | "serverOffline"
+  | "bridgeOffline";
+export type PushoverOperator = ">" | ">=" | "<" | "<=" | "==";
+export type PushoverSeverity = "low" | "normal" | "high" | "emergency";
+
+export interface PushoverCondition {
+  id: string;
+  metric: PushoverMetric;
+  operator: PushoverOperator;
+  threshold: number;
+  severity: PushoverSeverity;
+  cooldownMinutes: number;
+  enabled: boolean;
+}
+
+export const pushoverApi = {
+  getSettings: () =>
+    apiGet("/pushover/settings") as Promise<PushoverSettings>,
+  updateSettings: (data: Partial<PushoverSettings>) =>
+    apiPut("/pushover/settings", data) as Promise<{
+      success: boolean;
+      error?: string;
+    }>,
+  test: () =>
+    apiPost("/pushover/test") as Promise<{ success: boolean; error?: string }>,
+  getConditions: () =>
+    apiGet("/pushover/conditions") as Promise<{
+      conditions: PushoverCondition[];
+    }>,
+  updateConditions: (conditions: PushoverCondition[]) =>
+    apiPut("/pushover/conditions", { conditions }) as Promise<{
+      success: boolean;
+      conditions: PushoverCondition[];
+      error?: string;
+    }>,
+  resetConditions: () =>
+    apiPost("/pushover/conditions/reset") as Promise<{
+      success: boolean;
+      conditions: PushoverCondition[];
+    }>,
 };

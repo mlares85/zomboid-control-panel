@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Archive, CheckCircle2, Copy, LayoutDashboard, Puzzle, Sparkles } from 'lucide-react'
+import { Archive, CheckCircle2, Copy, LayoutDashboard, Plug, Puzzle, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { serversApi, type ServerInstance } from '@/lib/api'
@@ -19,6 +19,7 @@ const NEXT_ACTIONS = [
   { to: '/server-config', icon: Sparkles, label: 'Apply a template', description: 'Tune gameplay settings in one pass.' },
   { to: '/mods', icon: Puzzle, label: 'Install mods', description: 'Browse Workshop mods for this server.' },
   { to: '/backups', icon: Archive, label: 'Set up backups', description: 'Schedule automatic world backups.' },
+  { to: '/settings?tab=bridge', icon: Plug, label: 'Set up PanelBridge', description: 'Weather, teleport, and in-world controls.' },
 ]
 
 export function CompleteStep({ serverId, platform, onGoToDashboard }: CompleteStepProps) {
@@ -66,7 +67,7 @@ export function CompleteStep({ serverId, platform, onGoToDashboard }: CompleteSt
         </div>
       )}
 
-      <div className="grid gap-2 text-left sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 text-left sm:grid-cols-4">
         {NEXT_ACTIONS.map(({ to, icon: Icon, label, description }) => (
           <Link key={to} to={to} className="rounded-lg border border-border/60 bg-background/40 p-3 transition-colors hover:border-primary/40 hover:bg-muted/20">
             <Icon className="h-4 w-4 text-primary" />
