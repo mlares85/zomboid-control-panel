@@ -50,7 +50,9 @@ The codebase uses `{success: boolean, error?: string, detail?: string}` result o
 
 bcryptjs (cost 12) + JWT access (24h) / refresh (30d, httpOnly cookie). Timing-safe dummy-hash comparison on "user not found" to prevent username enumeration. Account lockout after 10 failures (15 min). SHA-256 hashed recovery codes. `tokenGen` counter invalidates all tokens on password change. RBAC scaffolded (`requireRole()`) but currently single-role (admin).
 
-`requireRole()` is only applied to a subset of routes (backup, RCON, destructive file/chunk/mod operations, docker-managed server management). Player moderation routes (`server/routes/players.js`, `server/routes/panelBridge/players.js`) and server lifecycle routes (start/stop/restart on the active server) have no `requireRole` guard — any authenticated session can call them. This is intentional for the current single-admin model, but it's the first boundary to close when multi-user/moderator roles ship: a moderator role should plausibly get player actions but not lifecycle control (or vice versa), so those two route groups need distinct guards rather than a blanket admin check.
+Auth middleware uses an explicit `PUBLIC_AUTH_PATHS` allowlist (login, setup, status, refresh, logout, recover-with-code, recovery-status, reset endpoints) instead of a blanket `/api/auth/` prefix exemption. All other `/api/auth/` routes go through normal Bearer authentication. During setup-pending or auth-disabled, middleware sets a synthetic `{ role: "admin", synthetic: true }` user so `requireRole()` gates remain functional. `requireRole()` fails closed — returns 401 when `req.user` is missing, never passes through. `isLocalPanelRequest()` fails closed behind a reverse proxy (`trust proxy` enabled) since the socket peer is always the proxy.
+
+`requireRole()` is applied to backup (including download), RCON, destructive file/chunk/mod operations, docker-managed server management, recovery code management, and panelBridge server-info. Player moderation routes and server lifecycle routes have no `requireRole` guard — intentional for single-admin, first boundary to close for multi-user.
 
 ## Data storage
 
