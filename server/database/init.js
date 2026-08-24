@@ -1377,6 +1377,10 @@ export async function createServer(serverConfig) {
       : {}),
     dockerContainerId: serverConfig.dockerContainerId || null,
     dockerContainerName: serverConfig.dockerContainerName || null,
+    // In-container path where the mod writes status.json — the panel can't
+    // reach it via local fs, but the bridge auto-configure route can use it
+    // to know where to look via `docker exec`/archive reads.
+    dockerBridgePath: serverConfig.dockerBridgePath || null,
     adminPassword: serverConfig.adminPassword || null,
     startCommand: serverConfig.startCommand || "",
     isActive: isFirst,

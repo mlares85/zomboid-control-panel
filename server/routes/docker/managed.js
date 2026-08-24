@@ -7,7 +7,7 @@ import { createDockerVolumeManager } from "../../services/dockerVolumeManager.js
 import { createDockerContainerFactory } from "../../services/dockerContainerFactory.js";
 import { PROVIDERS } from "../../utils/serverProvider.js";
 import { ContainerSteamCmdInstaller } from "../../services/installer/ContainerSteamCmdInstaller.js";
-import { installPanelBridgeMod } from "../server/installHelpers.js";
+import { installBridgeToContainer } from "../../services/dockerBridgeInstaller.js";
 import { requireRole } from "../../services/auth.js";
 import { registerManagedHealthRoutes } from "./managedHealth.js";
 import { validateManagedServerInput, resolveHostPath } from "./managedValidation.js";
@@ -194,9 +194,13 @@ router.post("/servers", requireRole("admin"), async (req, res) => {
       dockerContainerName: result.containerName,
       installPath: basePath || "/opt/pz-server",
       // null — the data path is inside the managed container, not accessible
-      // from the panel container's filesystem. Bridge/backups need Docker-aware
+      // from the panel container's filesystem. Backups need Docker-aware
       // implementations for managed servers (future work).
       zomboidDataPath: null,
+      // In-container path where PanelBridge writes status.json (no custom
+      // -cachedir is used for managed servers, so it's the default
+      // ~/Zomboid location under the container's root user).
+      dockerBridgePath: `/root/Zomboid/Lua/panelbridge/${serverName}`,
       rconHost: result.containerName,
       rconPort,
       rconPassword,
@@ -206,9 +210,18 @@ router.post("/servers", requireRole("admin"), async (req, res) => {
       adminPassword,
     });
 
-    // Auto-install PanelBridge.lua so the server is ready for advanced features.
-    const bridgePath = basePath || server.installPath;
-    if (bridgePath) installPanelBridgeMod(bridgePath);
+    // Auto-install PanelBridge.lua so the server is ready for advanced
+    // features. The panel has no local fs access to the container's install
+    // volume (named volume, or a bind mount owned by a different path), so
+    // this uploads via Docker's archive API instead of a local fs copy.
+    const bridgeInstallResult = await installBridgeToContainer(
+      deps.dockerClient,
+      result.containerId,
+      "/opt/pz-server",
+    );
+    if (!bridgeInstallResult.success) {
+      log.warn(`PanelBridge auto-install failed for ${serverName}: ${bridgeInstallResult.error}`);
+    }
 
     // Gap 1: rollback on start failure — if startContainer fails, clean up
     // the container and DB record so nothing is orphaned.
