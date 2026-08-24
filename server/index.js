@@ -260,23 +260,16 @@ const __dirname = path.dirname(__filename);
 const app = express();
 // trust proxy is OFF by default and must be explicitly opted into via the
 // TRUST_PROXY env var (e.g. "1" for a single reverse-proxy hop like
-// nginx/caddy in front on a VPS). Leaving this unconditionally on let any
-// client that reaches the panel directly (no proxy in front — the common
-// LAN/home-server deployment) spoof X-Forwarded-For to dodge IP-keyed rate
-// limiting (login, setup, RCON limiters all key on req.ip) and to influence
-// the x-forwarded-proto secure-cookie logic.
-const trustProxyEnv = (process.env.TRUST_PROXY || "").trim().toLowerCase();
-let trustProxySetting = false;
-if (trustProxyEnv === "true") {
-  trustProxySetting = 1;
-} else if (trustProxyEnv && trustProxyEnv !== "false") {
-  const hops = parseInt(trustProxyEnv, 10);
-  trustProxySetting = Number.isFinite(hops) && hops > 0 ? hops : false;
-}
+// nginx/caddy in front on a VPS, or "10.0.0.0/8,172.16.0.0/12" for
+// subnet-based trust). Leaving this unconditionally on let any client that
+// reaches the panel directly spoof X-Forwarded-For to dodge IP-keyed rate
+// limiting and influence the secure-cookie logic.
+import { parseTrustProxySetting } from "./utils/trustProxy.js";
+const trustProxySetting = parseTrustProxySetting(process.env.TRUST_PROXY);
 app.set("trust proxy", trustProxySetting);
 if (trustProxySetting) {
   log.info(
-    `trust proxy enabled (${trustProxySetting} hop${trustProxySetting === 1 ? "" : "s"}) via TRUST_PROXY env var`,
+    `trust proxy enabled (${trustProxySetting}) via TRUST_PROXY env var`,
   );
 }
 const httpServer = createServer(app);
