@@ -1,27 +1,31 @@
 # Active Context
 
 ## Current Focus
-Cherry-picking critical security fixes and targeted bug fixes from
-upstream (fpsacha/zomboid-control-panel v1.2.1). Docker-managed backups
-and client test fixes are complete.
+All 12 upstream security fixes and 7 bug fixes integrated from
+fpsacha/zomboid-control-panel v1.2.1-v1.2.2. Docker-managed backups
+complete. Next: upstream RBAC/OIDC/i18n integration planning or
+panel-owned Docker image.
 
 ## Recent Decisions
-- Docker backups use Docker archive API (getArchive) — no exec needed.
-  Always full/tar.gz since we can't scan container contents cheaply.
-- Upstream integration via cherry-pick, not merge — 108 file conflicts
-  make a direct merge infeasible. RBAC/OIDC needs a dedicated sprint.
-- Security fixes are priority — several allow unauthenticated access or
-  privilege escalation that affect our fork.
+- Auth middleware switched from blanket `/api/auth/` exemption to an
+  explicit `PUBLIC_AUTH_PATHS` set — the blanket exemption left recovery
+  codes, /me, and /change-password unauthenticated.
+- `requireRole()` fails closed (401 on missing req.user) instead of
+  passing through. Synthetic admin user set during setup/auth-disabled.
+- Upstream cherry-picks adapted to our single-admin model rather than
+  porting the full RBAC permissions.js — direct merge not feasible
+  (663 commits, 108 file conflicts).
+- World map zoom fix adapted to our split mapProxy/ module structure
+  (upstream has monolithic mapProxy.js).
 
 ## Blockers / Open Questions
-- Some upstream security fixes target the RBAC permissions system we
-  don't have yet — those will need adaptation to our single-admin model.
-- World map tiles moved to tiles.pzmap.org upstream — our fork still
-  points to the old URL that 404s.
-- Docker-managed restore not yet implemented.
+- Full upstream integration (RBAC, OIDC, i18n) needs a dedicated sprint
+  — every route file in upstream was rewritten for capability checks.
+- Scheduler `rcon.execute` capability check (4a7dc86) skipped — requires
+  the RBAC capability system we don't have yet.
+- Docker-managed server restore not yet implemented.
 
 ## Next Steps
-1. Cherry-pick 12 critical security fixes from upstream (adapt as needed).
-2. Cherry-pick world map tile host fix and targeted bug fixes (mod OOM,
-   RCON kick reason, god mode targeting).
-3. Plan major upstream integration sprint for RBAC/OIDC/i18n.
+1. Plan upstream RBAC integration sprint (or decide to stay single-admin).
+2. Build panel-owned Docker image (libs preinstalled, faster creation).
+3. Implement Docker-managed server restore (putArchive or volume mount).

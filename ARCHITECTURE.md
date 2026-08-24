@@ -204,6 +204,14 @@ Managed routes live in `server/routes/docker/managed.js`, mounted at `/api/docke
 
 `MapVersionChecker` (server/services/mapVersionChecker.js) periodically polls `map.projectzomboid.com` for new PZ map builds. Interval is user-configurable (1h–7d, default 24h) via `GET/PUT /api/map/settings/check-interval`. Emits `map:version-changed` over Socket.IO when a new build is detected. `b42Resolution.js` supports dynamic TTL via `setResolutionTtl()` and exposes `getResolutionState()` / `invalidateResolutionCache()` for the settings route. WorldMap.tsx has a version selector dropdown in the control rail; `mapApi.versions()` fetches available builds and `mapApi.resolve(?version=X)` resolves geometry for a specific one. The `Settings > World Map` tab shows checker status, interval control, and tile cache stats.
 
+## World map tile depth discovery
+
+`discoverRenderedMaxLevel()` (mapProxy/tileCoverage.js) binary-searches the `[maxLevel-6, maxLevel]` range for the deepest zoom level that actually has tiles on the tile host. Exposed as `renderedMaxLevel` in `/api/map/resolve`. WorldMap.tsx clamps tile requests to `renderedMaxLevel` instead of the theoretical `maxLevel`, and uses `resolveFallbackTile()` (worldMapTileFallback.ts, pure function) to draw a coarser cached tile's sub-rectangle when the exact tile is missing — standard deep-zoom degrade-to-blurry behaviour. Without this, terrain goes solid black above ~137% zoom (the level 12→13 DZI step boundary). `inFlightGate` (client/src/lib/inFlightGate.ts) prevents overlapping player/overlay bridge fetches — a gate ref per polling callback, `enter()` returns false when a prior call is still in flight.
+
+## Trust proxy parsing
+
+`parseTrustProxySetting()` (server/utils/trustProxy.js) parses the `TRUST_PROXY` env var into the shape Express expects: false (disabled), a number (hop count), a string (single IP/subnet), or an array (comma-separated list). Invalid or unrecognized values fail closed (return false). Replaces the inline parsing that only supported `"true"` and integer hop counts.
+
 ## Backup destination selection
 
 Manual backups now support destination selection. `BackupPageHeader` renders a multi-select dropdown when multiple destinations are enabled (local + SFTP/Google Drive). The `useBackupsData` hook tracks `selectedDestinations` and passes them to `createBackup({ destinations })`. The scheduler (`scheduler.js`) queries all enabled destinations via `listDestinations()` instead of hardcoding `["local"]`, so scheduled backups go to SFTP/Google Drive automatically.
