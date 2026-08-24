@@ -13,6 +13,7 @@ import { EventEmitter } from 'events';
 import { logPlayerAction, recordPlayerSession } from '../database/init.js';
 import { createLogger } from '../utils/logger.js';
 import { PanelBridgeSftpTransport } from './panelBridgeSftp.js';
+import { DockerBridgeSyncTransport } from './dockerBridgeSyncTransport.js';
 import { LocalFiles } from './fileAccess/index.js';
 const log = createLogger('Bridge');
 
@@ -51,6 +52,7 @@ class PanelBridge extends EventEmitter {
     this.statusInterval = null;
     this.fileWatcher = null;
     this.sftpTransport = null;
+    this.dockerTransport = null;
     this.pendingCommands = new Map(); // id -> { resolve, reject, timeout, timestamp }
     this.processedResults = new Map(); // id -> timestamp (for deduplication)
     this.protocolVersion = 'queue-v1';
@@ -149,6 +151,35 @@ class PanelBridge extends EventEmitter {
 
   isSftpRunning() {
     return Boolean(this.sftpTransport?.running);
+  }
+
+  // Docker-managed bridge: sync IPC files via docker exec, same pattern as SFTP.
+  async configureDocker(dockerClient, containerId, serverName, cachePath) {
+    if (this.isRunning) this.stop();
+    if (this.dockerTransport) await this.dockerTransport.stop();
+    if (this.sftpTransport) await this.stopSftp();
+    this.configure(cachePath, true);
+    this.config.commandTimeoutMs = 60000;
+    const transport = new DockerBridgeSyncTransport(dockerClient);
+    try {
+      await transport.start(containerId, serverName, cachePath);
+    } catch (error) {
+      await transport.stop();
+      throw error;
+    }
+    this.dockerTransport = transport;
+    this.start();
+    return this.bridgePath;
+  }
+
+  async stopDocker() {
+    if (this.dockerTransport) await this.dockerTransport.stop();
+    this.dockerTransport = null;
+    this.config.commandTimeoutMs = 15000;
+  }
+
+  isDockerRunning() {
+    return Boolean(this.dockerTransport?.running);
   }
 
   /**
@@ -1268,7 +1299,7 @@ class PanelBridge extends EventEmitter {
       },
       statusFile: fileInfo,
       hasFileWatcher: !!this.fileWatcher
-      ,transport: this.sftpTransport?.getStatus() || { type: 'local', running: this.isRunning }
+      ,transport: this.dockerTransport?.getStatus() || this.sftpTransport?.getStatus() || { type: 'local', running: this.isRunning }
     };
   }
 
