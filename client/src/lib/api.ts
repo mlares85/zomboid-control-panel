@@ -3007,6 +3007,7 @@ export const mapApi = {
     width: number;
     height: number;
     maxLevel: number;
+    renderedMaxLevel: number;
     x0?: number;
     y0?: number;
     sqr?: number;

@@ -1,4 +1,5 @@
 import { createLogger } from "../../utils/logger.js";
+import { hasTileCoverage, discoverRenderedMaxLevel } from "./tileCoverage.js";
 
 const log = createLogger("API:MapProxy");
 
@@ -47,6 +48,11 @@ const B42_GEOMETRY_FALLBACK = {
   width: 2318656,
   height: 1019040,
   maxLevel: 22,
+  // This path never gets to run discoverRenderedMaxLevel (no live directory
+  // to probe), so fall back to the same known-safe floor hasTileCoverage
+  // uses everywhere else rather than trusting maxLevel itself — see
+  // discoverRenderedMaxLevel's comment below.
+  renderedMaxLevel: 16,
   x0: 1040384,
   y0: -139296,
   sqr: 128,
@@ -149,44 +155,11 @@ async function fetchMapGeometry(directory) {
   }
 }
 
-// A brand-new PZ build's tiles can be listed as the "default" entry in
-// build_list.json before map.projectzomboid.com has actually finished
-// rendering full world coverage for it. Probing a few inhabited-area tiles
-// lets us detect "listed but not rendered yet" and fall back to the previous
-// build instead of showing an empty map.
-//
-// The probe coordinates are derived from the build's own geometry rather than
-// hardcoded: a fixed `15/9_3.jpg`-style path is only meaningful for a
-// TileSize=1024 build and silently false-negatives on a 2048 one, which would
-// pin every install to an outdated build forever.
-const COVERAGE_PROBE_FRACTIONS = [
-  [0.51, 0.4],
-  [0.56, 0.45],
-  [0.61, 0.5],
-];
+// hasTileCoverage / discoverRenderedMaxLevel live in tileCoverage.js — see
+// that file for how a build is confirmed to have rendered tiles at all, and
+// how the deepest actually-rendered level is discovered (GH#109).
 let _b42Map = null;
 let _b42DirFetchedAt = 0;
-
-async function hasTileCoverage(directory, geometry) {
-  const level = Math.max(0, geometry.maxLevel - 6);
-  const levelScale = 2 ** (geometry.maxLevel - level);
-  const levelW = Math.ceil(geometry.width / levelScale);
-  const levelH = Math.ceil(geometry.height / levelScale);
-  for (const [fx, fy] of COVERAGE_PROBE_FRACTIONS) {
-    const col = Math.floor((levelW * fx) / geometry.tileSize);
-    const row = Math.floor((levelH * fy) / geometry.tileSize);
-    try {
-      const resp = await fetch(
-        `${PZ_MAP_ROOT}/maps/${directory}/base/layer0_files/${level}/${col}_${row}.jpg`,
-        { method: "HEAD", signal: AbortSignal.timeout(4000), headers: { "User-Agent": UA } },
-      );
-      if (resp.ok) return true;
-    } catch {
-      // Treat as not-covered and try the next probe tile.
-    }
-  }
-  return false;
-}
 
 export async function getB42Map() {
   const now = Date.now();
@@ -213,12 +186,13 @@ export async function getB42Map() {
         continue;
       }
       if (await hasTileCoverage(entry.directory, geometry)) {
+        const renderedMaxLevel = await discoverRenderedMaxLevel(entry.directory, geometry);
         if (_b42Map?.directory !== entry.directory) {
           log.info(
-            `B42 map directory resolved: ${entry.directory} (${geometry.width}x${geometry.height}, tile ${geometry.tileSize}, max level ${geometry.maxLevel})`,
+            `B42 map directory resolved: ${entry.directory} (${geometry.width}x${geometry.height}, tile ${geometry.tileSize}, max level ${geometry.maxLevel}, rendered max level ${renderedMaxLevel})`,
           );
         }
-        _b42Map = { directory: entry.directory, ...geometry };
+        _b42Map = { directory: entry.directory, ...geometry, renderedMaxLevel };
         _b42DirFetchedAt = now;
         return _b42Map;
       }
