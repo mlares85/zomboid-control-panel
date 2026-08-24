@@ -186,6 +186,9 @@ async function gracefulShutdown(signal) {
     if (containerLogStreamer) {
       containerLogStreamer.stop();
     }
+    if (alertMonitor) {
+      alertMonitor.stop();
+    }
 
     // Stop map version checker
     if (mapVersionChecker) {
@@ -250,7 +253,12 @@ import dockerRoutes from "./routes/docker.js";
 import templatesRoutes from "./routes/templates.js";
 import environmentRoutes from "./routes/environment.js";
 import discoveryRoutes from "./routes/discovery.js";
+import pushoverRoutes, { getStoredConditions } from "./routes/pushover.js";
 import panelBridge from "./services/panelBridge.js";
+import { AlertMonitor } from "./services/alertMonitor.js";
+import { PushoverService } from "./services/pushoverService.js";
+import { resolveSaveVolumePath, getDiskStatusForPath } from "./services/diskMonitor.js";
+import { resolveActiveContainerRef } from "./services/containerStatsPoller.js";
 
 dotenv.config();
 
@@ -1090,6 +1098,68 @@ const containerStatsPoller = new ContainerStatsPoller(io, dockerClient);
 containerStatsPoller.start();
 app.set("containerStatsPoller", containerStatsPoller);
 
+// Docker's RestartCount is cumulative for the container's lifetime, not
+// windowed, so crash-loop detection tracks the timestamps of observed
+// increases ourselves and flags a loop once enough land inside the window.
+const CRASH_LOOP_WINDOW_MS = 10 * 60_000;
+const CRASH_LOOP_RESTART_THRESHOLD = 3;
+const restartTimestamps = [];
+let lastKnownRestartCount = null;
+
+async function isCrashLooping(containerId) {
+  if (!containerId || !dockerClient?.available) return false;
+  const info = await dockerClient.inspectContainer(containerId);
+  const restartCount = info?.RestartCount ?? 0;
+  if (lastKnownRestartCount !== null && restartCount > lastKnownRestartCount) {
+    restartTimestamps.push(Date.now());
+  }
+  lastKnownRestartCount = restartCount;
+  const cutoff = Date.now() - CRASH_LOOP_WINDOW_MS;
+  while (restartTimestamps.length && restartTimestamps[0] < cutoff) restartTimestamps.shift();
+  return restartTimestamps.length >= CRASH_LOOP_RESTART_THRESHOLD;
+}
+
+// Composes the flat {memory,cpu,disk,server} metrics shape alertConditions.js
+// evaluates against, from the same pollers/services the rest of the panel
+// already uses (containerStatsPoller, diskMonitor, serverManager, dockerClient).
+async function collectAlertMetrics() {
+  const stats = containerStatsPoller.getLastStats();
+  const disk = await getDiskStatusForPath(await resolveSaveVolumePath());
+  const running = await serverManager.checkServerRunning();
+  const containerId = await resolveActiveContainerRef();
+  return {
+    memory: { usagePercent: stats?.memory?.usagePercent ?? 0 },
+    cpu: { usagePercent: stats?.cpu?.usagePercent ?? 0 },
+    disk: { usagePercent: disk?.usedPercent ?? 0 },
+    server: { offline: !running, crashLoop: await isCrashLooping(containerId) },
+  };
+}
+
+// Reads Pushover credentials fresh from settings on every send (rather than
+// a PushoverService captured once at boot) so PUT /api/pushover/settings
+// takes effect immediately, and respects the enabled toggle.
+async function sendPushoverNotification(payload) {
+  const enabled = await getSetting("pushoverEnabled");
+  if (enabled === false) return { success: false, error: "Pushover notifications are disabled" };
+  const userKey = await getSetting("pushoverUserKey");
+  const apiToken = await getSetting("pushoverApiToken");
+  if (!userKey || !apiToken) return { success: false, error: "Pushover is not configured" };
+  return new PushoverService({ userKey, apiToken }).sendNotification(payload);
+}
+
+// Pushover alerting: polls RAM/CPU (via containerStatsPoller's last reading),
+// disk, offline, and crash-loop state every 30s and fires a notification on
+// each edge-trigger. Credentials are re-read from settings on every send
+// (not captured once at boot) so a PUT /api/pushover/settings takes effect
+// immediately without restarting the monitor.
+const alertMonitor = new AlertMonitor({
+  pushoverService: { sendNotification: (payload) => sendPushoverNotification(payload) },
+  collectMetrics: collectAlertMetrics,
+  getConditions: getStoredConditions,
+});
+alertMonitor.start();
+app.set("alertMonitor", alertMonitor);
+
 // Stream Docker container logs to subscribers. Subscriber-driven: only
 // active when at least one client has joined the container:logs room.
 // Reattaches when the active server changes via the server-side event
@@ -1165,6 +1235,7 @@ app.use("/api/backup", backupRecordsRoutes);
 app.use("/api/map", mapProxyRoutes);
 app.use("/api/docker", dockerRoutes);
 app.use("/api/templates", templatesRoutes);
+app.use("/api/pushover", pushoverRoutes);
 
 // Health check + panel version
 // In exe builds, PANEL_VERSION is injected by esbuild at compile time.
