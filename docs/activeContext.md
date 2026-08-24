@@ -1,20 +1,25 @@
 # Active Context
 
 ## Current Focus
-Onboarding overhaul (Phase 1 + 2) and container log streaming are done.
-Next: Docker-managed server backups and pre-existing client test fixes.
+Onboarding overhaul, container log streaming, and Docker managed server
+creation are complete and deployed. Next: Docker-managed backups and
+client test fixes.
 
 ## Recent Decisions
-- Container log streaming implemented. Backend uses a persistent
-  follow=true Docker API connection with incremental frame demuxing.
-  ContainerLogStreamer is subscriber-driven (only active when clients
-  are in the container:logs room). Frontend shows a collapsible
-  terminal-style log viewer on the Dashboard for docker-managed servers.
-- Phase 2 complete: unified wizard. All install paths render inline in
-  AddServerFlow — every path reaches VerifyStep and CompleteStep.
-- ServerSetup.tsx decomposed from 2832 → 215 lines.
-- Phase 1 complete: Docker advanced options (restart policy, container
-  memory/CPU limits, timezone).
+- PZ has no `RCONEnabled` INI key — RCON is enabled implicitly when
+  `RCONPassword` is non-empty. Pre-seed a stub INI with just `RCONPort`
+  + `RCONPassword`; PZ inflates it preserving those values. No restarts
+  or background patchers needed.
+- VerifyStep must not pass server.rconPassword to the RCON connect
+  endpoint — sanitizeServerResponse masks it to `••••••••`. Call
+  rconApi.connect() with no args; the RCON service already has the real
+  config from activateServer().
+- AuthScreenLayout accepts a `wide` prop (max-w-3xl) for install flows
+  that need more room than the login-form-sized max-w-md default.
+- `/api/system/environment` bypasses auth — called right after account
+  creation before the token roundtrip has settled.
+- `improvements/structural-overhaul` branch merged into main. All new
+  work committed directly to main.
 
 ## Blockers / Open Questions
 - Backups for managed servers need Docker-aware implementation (exec or
@@ -25,3 +30,6 @@ Next: Docker-managed server backups and pre-existing client test fixes.
 ## Next Steps
 1. Backups for managed servers (Docker-aware implementation).
 2. Fix pre-existing client test failures.
+3. Consider building a panel-owned Docker image (libs preinstalled,
+   entrypoint as real file) instead of debian:bookworm-slim + first-boot
+   apt-get — faster creation, no network dependency.
