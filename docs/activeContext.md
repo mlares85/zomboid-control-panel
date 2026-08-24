@@ -1,35 +1,38 @@
 # Active Context
 
 ## Current Focus
-Onboarding overhaul, container log streaming, and Docker managed server
-creation are complete and deployed. Next: Docker-managed backups and
-client test fixes.
+Docker-managed backups and client test fixes are complete. Upstream repo
+(fpsacha/zomboid-control-panel) has diverged significantly with v1.2.0/1.2.1
+— critical security fixes need cherry-picking, and a major integration
+sprint is needed for the RBAC permissions system.
 
 ## Recent Decisions
-- PZ has no `RCONEnabled` INI key — RCON is enabled implicitly when
-  `RCONPassword` is non-empty. Pre-seed a stub INI with just `RCONPort`
-  + `RCONPassword`; PZ inflates it preserving those values. No restarts
-  or background patchers needed.
-- VerifyStep must not pass server.rconPassword to the RCON connect
-  endpoint — sanitizeServerResponse masks it to `••••••••`. Call
-  rconApi.connect() with no args; the RCON service already has the real
-  config from activateServer().
-- AuthScreenLayout accepts a `wide` prop (max-w-3xl) for install flows
-  that need more room than the login-form-sized max-w-md default.
-- `/api/system/environment` bypasses auth — called right after account
-  creation before the token roundtrip has settled.
-- `improvements/structural-overhaul` branch merged into main. All new
-  work committed directly to main.
+- Docker-managed server backups use the Docker archive API
+  (`GET /containers/{id}/archive`) to stream save files as tar, gzip on
+  the fly — no exec or tools needed inside the container. Always full
+  backups (no incremental for container-backed servers since we can't
+  cheaply scan directory contents). Format is always tar.gz.
+- `backupCreateHandler` routes docker-managed servers through
+  `createDockerBackup` instead of the filesystem-based pipeline.
+- Shared helpers (`uploadToDestinations`, `resolvePlayerCount`,
+  `resolveWorldAge`) exported from backupOrchestrator for reuse.
+- Client test fixes: tests were cherry-picked from upstream (commit
+  942a482) without updating for fork-specific component changes.
 
 ## Blockers / Open Questions
-- Backups for managed servers need Docker-aware implementation (exec or
-  volume access) since the panel can't read the container's filesystem.
-- 6 pre-existing client test failures (MountDiscoveryBanner,
-  TemplateApplyPanel) — unrelated to onboarding work.
+- Upstream has 12 critical security fixes (unauthenticated admin takeover,
+  permission bypass, privilege escalation, SSRF, etc.) that need
+  cherry-picking or integration. See upstream analysis from 2026-08-24.
+- Full upstream integration (v1.2.x) requires a major sprint — 663 commits
+  behind, 108 file conflicts, RBAC permissions system touches every route.
+- Docker-managed server restore not yet implemented (needs putArchive or
+  volume mount approach).
 
 ## Next Steps
-1. Backups for managed servers (Docker-aware implementation).
-2. Fix pre-existing client test failures.
-3. Consider building a panel-owned Docker image (libs preinstalled,
-   entrypoint as real file) instead of debian:bookworm-slim + first-boot
-   apt-get — faster creation, no network dependency.
+1. Cherry-pick critical security fixes from upstream.
+2. Cherry-pick world map tile host migration (`ebd4c82` — tiles moved to
+   `tiles.pzmap.org`, old URL 404s everything).
+3. Cherry-pick targeted bug fixes (mod conflict OOM, RCON kick reason,
+   god mode targeting wrong player).
+4. Plan major upstream integration sprint for RBAC/OIDC/i18n.
+5. Consider building a panel-owned Docker image.
