@@ -35,7 +35,7 @@ function slugTimestamp() {
 // Best-effort connected-player count via RCON. Not every caller (scheduled
 // backups, tests) has an rconService handy, and the server may be stopped,
 // so any failure just means the snapshot omits playerCount.
-async function resolvePlayerCount(rconService) {
+export async function resolvePlayerCount(rconService) {
   if (!rconService?.connected) return null;
   try {
     const result = await rconService.getPlayers();
@@ -48,7 +48,7 @@ async function resolvePlayerCount(rconService) {
 
 // Best-effort world age via the PanelBridge mod. Only available while the PZ
 // server is running with the mod loaded — otherwise this quietly omits it.
-async function resolveWorldAge() {
+export async function resolveWorldAge() {
   try {
     const result = await bridge.getGameTime();
     const hours = result?.data?.worldAgeHours;
@@ -59,7 +59,7 @@ async function resolveWorldAge() {
   }
 }
 
-async function uploadToDestinations(destPath, fileName, destinationIds, defaultLocalPath) {
+export async function uploadToDestinations(destPath, fileName, destinationIds, defaultLocalPath) {
   const names = [];
   const errors = [];
   let remotePath = null;

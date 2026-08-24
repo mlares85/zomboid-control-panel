@@ -246,6 +246,101 @@ describe('DockerClient — against a mock Docker API over a Unix socket', () => 
   });
 });
 
+describe('DockerClient — getArchive', () => {
+  let socketPath;
+  let server;
+
+  beforeEach(() => {
+    socketPath = path.join(os.tmpdir(), `docker-test-${randomUUID()}.sock`);
+  });
+
+  afterEach(async () => {
+    await new Promise((resolve) => (server ? server.close(() => resolve()) : resolve()));
+    if (fs.existsSync(socketPath)) fs.unlinkSync(socketPath);
+  });
+
+  function startMockServer(handler) {
+    return new Promise((resolve) => {
+      server = http.createServer(handler);
+      server.listen(socketPath, resolve);
+    });
+  }
+
+  it('streams a tar archive to the destination file', async () => {
+    const tarContent = Buffer.from('fake-tar-content');
+    await startMockServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/x-tar' });
+      res.end(tarContent);
+    });
+    const client = new DockerClient(socketPath);
+    const dest = path.join(os.tmpdir(), `archive-test-${randomUUID()}.tar`);
+
+    try {
+      const result = await client.getArchive('c1', '/root/Zomboid/Saves', dest);
+
+      expect(result.success).toBe(true);
+      expect(result.size).toBe(tarContent.length);
+      expect(fs.existsSync(dest)).toBe(true);
+      expect(fs.readFileSync(dest).toString()).toBe('fake-tar-content');
+    } finally {
+      if (fs.existsSync(dest)) fs.unlinkSync(dest);
+    }
+  });
+
+  it('gzips when compress:true', async () => {
+    const tarContent = Buffer.from('fake-tar-content-to-compress');
+    await startMockServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'application/x-tar' });
+      res.end(tarContent);
+    });
+    const client = new DockerClient(socketPath);
+    const dest = path.join(os.tmpdir(), `archive-test-${randomUUID()}.tar.gz`);
+
+    try {
+      const result = await client.getArchive('c1', '/data', dest, { compress: true });
+
+      expect(result.success).toBe(true);
+      expect(result.size).toBeGreaterThan(0);
+      // Gzip magic bytes: 1f 8b
+      const header = fs.readFileSync(dest).subarray(0, 2);
+      expect(header[0]).toBe(0x1f);
+      expect(header[1]).toBe(0x8b);
+    } finally {
+      if (fs.existsSync(dest)) fs.unlinkSync(dest);
+    }
+  });
+
+  it('returns failure when the container path does not exist (404)', async () => {
+    await startMockServer((req, res) => {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ message: 'no such container' }));
+    });
+    const client = new DockerClient(socketPath);
+    const dest = path.join(os.tmpdir(), `archive-test-${randomUUID()}.tar`);
+
+    const result = await client.getArchive('c1', '/no/such/path', dest);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/no such container/);
+  });
+
+  it('returns failure when the socket is unavailable', async () => {
+    const client = new DockerClient('/nonexistent/docker-test.sock');
+    const result = await client.getArchive('c1', '/data', '/tmp/nope.tar');
+
+    expect(result).toEqual({ success: false, error: 'Docker socket unavailable' });
+  });
+
+  it('returns failure when container id is missing', async () => {
+    await startMockServer((req, res) => res.end());
+    const client = new DockerClient(socketPath);
+
+    const result = await client.getArchive(null, '/data', '/tmp/nope.tar');
+
+    expect(result).toEqual({ success: false, error: 'Container id is required' });
+  });
+});
+
 describe('DockerClient — getContainerStats guard clauses', () => {
   it('returns null without a container id', async () => {
     const client = new DockerClient('/nonexistent/docker-test.sock');

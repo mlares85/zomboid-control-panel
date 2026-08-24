@@ -1,5 +1,6 @@
 import http from "http";
 import fs from "fs";
+import zlib from "zlib";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("DockerClient");
@@ -262,6 +263,67 @@ export class DockerClient {
     const result = await this._requestJson("GET", `/containers/${encodeURIComponent(id)}/stats?stream=false`);
     if (!result.success || !result.data) return null;
     return parseContainerStats(result.data);
+  }
+
+  // ── Archive operations ──
+
+  // Low-level streaming request — resolves with the response stream on
+  // success, rejects with the parsed error message on 4xx/5xx.
+  _requestStream(method, apiPath, timeoutMs = 300_000) {
+    return new Promise((resolve, reject) => {
+      const req = http.request(
+        { socketPath: this.socketPath, method, path: apiPath, timeout: timeoutMs },
+        (res) => {
+          if (res.statusCode >= 400) {
+            const chunks = [];
+            res.on("data", (chunk) => chunks.push(chunk));
+            res.on("end", () => {
+              const body = Buffer.concat(chunks).toString("utf-8");
+              let message = `Docker API error ${res.statusCode}`;
+              try { message = JSON.parse(body).message || message; } catch { /* use default */ }
+              reject(new Error(message));
+            });
+            return;
+          }
+          resolve(res);
+        },
+      );
+      req.on("timeout", () => req.destroy(new Error("Docker archive request timed out")));
+      req.on("error", reject);
+      req.end();
+    });
+  }
+
+  // Stream a path out of a container as a tar archive to a local file.
+  // Docker's archive API returns raw tar; compress:true pipes through gzip
+  // on the fly so the caller gets a .tar.gz without a second full-file pass.
+  async getArchive(containerId, containerPath, destPath, { compress = false } = {}) {
+    if (!this.available) return { success: false, error: "Docker socket unavailable" };
+    if (!containerId) return { success: false, error: "Container id is required" };
+
+    const query = `path=${encodeURIComponent(containerPath)}`;
+    const apiPath = `/containers/${encodeURIComponent(containerId)}/archive?${query}`;
+
+    try {
+      const response = await this._requestStream("GET", apiPath);
+      await new Promise((resolve, reject) => {
+        const output = fs.createWriteStream(destPath);
+        output.on("close", resolve);
+        output.on("error", reject);
+        if (compress) {
+          const gzipStream = zlib.createGzip();
+          gzipStream.on("error", reject);
+          response.pipe(gzipStream).pipe(output);
+        } else {
+          response.pipe(output);
+        }
+      });
+      const stat = await fs.promises.stat(destPath);
+      return { success: true, size: stat.size };
+    } catch (err) {
+      log.debug(`getArchive failed for ${containerId}: ${err.message}`);
+      return { success: false, error: err.message };
+    }
   }
 
   // ── Volume operations ──

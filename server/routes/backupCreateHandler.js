@@ -1,7 +1,9 @@
 import { createLogger } from "../utils/logger.js";
 import { sanitizeError } from "../utils/sanitize.js";
 import { getActiveServer } from "../database/init.js";
+import { isDockerManaged } from "../utils/serverProvider.js";
 import { createEnhancedBackup } from "../services/backupOrchestrator.js";
+import { createDockerBackup } from "../services/dockerBackup.js";
 
 const log = createLogger("API:Backup");
 
@@ -27,9 +29,23 @@ export async function handleCreateBackup(req, res) {
     const io = req.app.get("io");
     const rconService = req.app.get("rconService");
 
-    const result = usesEnhancedOptions(req.body)
-      ? await createEnhancedBackup(backupService, { ...req.body, io, rconService })
-      : await backupService.createBackup({ ...req.body, io });
+    let result;
+    if (isDockerManaged(activeServer)) {
+      const dockerClient = req.app.get("dockerClient");
+      if (!dockerClient?.available) {
+        return res.status(400).json({
+          error: "Docker socket is not available. Managed server backups require Docker access.",
+        });
+      }
+      result = await createDockerBackup(
+        { dockerClient, backupService, io, rconService },
+        { destinations: req.body?.destinations },
+      );
+    } else if (usesEnhancedOptions(req.body)) {
+      result = await createEnhancedBackup(backupService, { ...req.body, io, rconService });
+    } else {
+      result = await backupService.createBackup({ ...req.body, io });
+    }
 
     if (result.success) {
       io?.emit("backup:changed", { action: "create" });

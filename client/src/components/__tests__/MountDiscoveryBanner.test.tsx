@@ -15,11 +15,11 @@ const mount: DiscoveredMount = {
 describe('MountDiscoveryBanner', () => {
   beforeEach(() => localStorage.clear())
 
-  it('passes the discovered mount to the add action', () => {
+  it('passes the discovered mount to the connect action', () => {
     const onConnect = vi.fn()
     render(<MountDiscoveryBanner mount={mount} onConnect={onConnect} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
 
     expect(onConnect).toHaveBeenCalledWith(mount)
   })
@@ -27,9 +27,9 @@ describe('MountDiscoveryBanner', () => {
   it('remembers dismissal for the install path', () => {
     render(<MountDiscoveryBanner mount={mount} onConnect={vi.fn()} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss discovered install' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
 
-    expect(screen.queryByText('PZ install')).not.toBeInTheDocument()
+    expect(screen.queryByText('PZ server files detected at')).not.toBeInTheDocument()
     expect(localStorage.getItem(`pz-mount-discovery-dismissed-${mount.installPath}`)).toBe('true')
   })
 })
