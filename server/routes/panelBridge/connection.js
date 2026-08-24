@@ -12,6 +12,7 @@ import {
   requireBridgeRunning,
 } from "../../middleware/panelBridgeGuards.js";
 import { scanKnownBridgeLocations } from "../../services/panelBridgeScan.js";
+import { requireRole } from "../../services/auth.js";
 
 const router = express.Router();
 
@@ -121,9 +122,14 @@ router.get("/ping", requireBridgeConfigured, async (req, res) => {
   }
 });
 
-// Get server info
+// Get server info. handlers.getServerInfo (PanelBridge.lua) returns every
+// online player's exact x/y/z position and current health -- real player
+// data, not a status roster. requireRole("admin") gates it first, ahead of
+// the bridge-state checks, so a non-admin authenticated session never
+// learns bridge configuration/running state either.
 router.get(
   "/server-info",
+  requireRole("admin"),
   requireBridgeConfigured,
   requireBridgeRunning(),
   async (req, res) => {
