@@ -9,7 +9,7 @@ import {
   getActiveServer,
   getServer
 } from '../../database/init.js';
-import { isCronTooFrequent } from './cronHelpers.js';
+import { isCronTooFrequent, hasUnsupportedCronFieldCount } from './cronHelpers.js';
 
 const log = createLogger('API:Scheduler');
 const router = express.Router();
@@ -50,6 +50,13 @@ router.post('/tasks', async (req, res) => {
     // Validate cron expression before saving
     if (!cron.validate(cronExpression)) {
       return res.status(400).json({ error: 'Invalid cron expression. Use format: minute hour day month weekday (e.g., "0 */6 * * *" for every 6 hours)' });
+    }
+
+    // The panel does not support seconds-precision (6-field) schedules --
+    // see hasUnsupportedCronFieldCount()'s comment for why this must be
+    // checked before isCronTooFrequent, not folded into it.
+    if (hasUnsupportedCronFieldCount(cronExpression)) {
+      return res.status(400).json({ error: 'The panel does not support seconds-precision schedules. Use exactly 5 fields: minute hour day month weekday (e.g., "0 */6 * * *").' });
     }
 
     // Security: Reject tasks that run more frequently than every 5 minutes to prevent DoS

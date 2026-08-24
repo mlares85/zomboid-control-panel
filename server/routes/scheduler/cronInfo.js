@@ -1,6 +1,7 @@
 import express from 'express';
 import cron from 'node-cron';
 import { sanitizeError } from '../../utils/sanitize.js';
+import { hasUnsupportedCronFieldCount } from './cronHelpers.js';
 
 const router = express.Router();
 
@@ -15,6 +16,16 @@ router.post('/validate-cron', async (req, res) => {
     const isValid = cron.validate(cronExpression);
     if (!isValid) {
       return res.json({ valid: false, error: 'Invalid cron expression format' });
+    }
+
+    // Keep this preview endpoint's verdict consistent with what POST /tasks
+    // and PUT /tasks/:id will actually accept -- without this, a 6-field
+    // expression previews as valid here and then gets refused on submit.
+    if (hasUnsupportedCronFieldCount(cronExpression)) {
+      return res.json({
+        valid: false,
+        error: 'The panel does not support seconds-precision schedules. Use exactly 5 fields: minute hour day month weekday.',
+      });
     }
 
     res.json({ valid: true });
