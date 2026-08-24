@@ -61,6 +61,13 @@ export function getResetTokenPath() {
 }
 
 export function isLocalPanelRequest(req) {
+  // Behind a reverse proxy the socket peer is always the proxy itself, so
+  // we cannot distinguish a local caller from a remote one — trusting a
+  // forwarded header would let a remote caller spoof local trust. Fail
+  // closed: no request is treated as local while trust proxy is on.
+  // Upstream: 37e73c4.
+  if (req.app?.get("trust proxy")) return false;
+
   const candidateAddresses = [
     req.socket?.remoteAddress,
     req.connection?.remoteAddress,

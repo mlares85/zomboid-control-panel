@@ -173,6 +173,28 @@ describe("local password reset hardening", () => {
 
     expect(isLocalPanelRequest(localRequest)).toBe(true);
   });
+
+  // Upstream: 37e73c4 — behind a reverse proxy the socket peer is always
+  // the proxy, so we can't distinguish local from remote. Fail closed.
+  it("fails closed when trust proxy is enabled (upstream 37e73c4)", () => {
+    const localButProxied = {
+      socket: { remoteAddress: "127.0.0.1" },
+      connection: { remoteAddress: "127.0.0.1" },
+      app: { get: (key) => (key === "trust proxy" ? 1 : undefined) },
+    };
+
+    expect(isLocalPanelRequest(localButProxied)).toBe(false);
+  });
+
+  it("still accepts local requests when trust proxy is off", () => {
+    const localDirect = {
+      socket: { remoteAddress: "127.0.0.1" },
+      connection: { remoteAddress: "127.0.0.1" },
+      app: { get: () => false },
+    };
+
+    expect(isLocalPanelRequest(localDirect)).toBe(true);
+  });
 });
 
 describe("mod update auto-restart dedupe", () => {

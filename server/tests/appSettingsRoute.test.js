@@ -100,14 +100,20 @@ describe("PUT /api/config/app-settings", () => {
     );
   });
 
-  it("passes through with no req.user when auth is not configured yet", async () => {
+  // When auth is not configured, the auth middleware sets a synthetic
+  // admin user so requireRole gates still work (fail-closed, ad3f7d8).
+  it("passes through with a synthetic admin user when auth is not configured yet", async () => {
     setSetting.mockReset();
     const response = createResponse();
 
     await runRoute(
       "/app-settings",
       "put",
-      { body: { settings: { corsAllowAll: true } }, app: makeApp() },
+      {
+        body: { settings: { corsAllowAll: true } },
+        app: makeApp(),
+        user: { username: "__auth_disabled__", role: "admin", synthetic: true },
+      },
       response,
     );
 

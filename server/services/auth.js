@@ -18,6 +18,26 @@ import { getSetting, setSetting, getDb, commitNow } from "../database/init.js";
 
 const log = createLogger("Auth");
 
+// Auth paths that must work before login — login itself, account setup,
+// status check, token refresh, logout, password recovery. Everything else
+// under /api/auth/ goes through normal Bearer authentication.
+const PUBLIC_AUTH_PATHS = new Set([
+  "/api/auth/status",
+  "/api/auth/setup",
+  "/api/auth/login",
+  "/api/auth/refresh",
+  "/api/auth/logout",
+  "/api/auth/recover-with-code",
+  "/api/auth/recovery-status",
+  "/api/auth/reset-status",
+  "/api/auth/reset-token/local",
+  "/api/auth/reset-password",
+]);
+
+function isPublicAuthPath(reqPath) {
+  return PUBLIC_AUTH_PATHS.has(reqPath);
+}
+
 const BCRYPT_ROUNDS = 12;
 const ACCESS_TOKEN_EXPIRY = "24h";
 const REFRESH_TOKEN_EXPIRY = "30d";
@@ -639,8 +659,12 @@ class AuthService {
           return next();
         }
 
-        // Always allow auth routes (login, setup, status)
-        if (req.path.startsWith("/api/auth/")) {
+        // Allow ONLY the specific auth paths that must work before login.
+        // The old blanket `/api/auth/` exemption left every auth sub-route
+        // (recovery codes, change-password, /me) unauthenticated — those
+        // routes have their own getAuthenticatedUser() calls but requireRole
+        // gates were inert without req.user. Upstream: de37ad2.
+        if (isPublicAuthPath(req.path)) {
           return next();
         }
 
@@ -652,9 +676,6 @@ class AuthService {
         }
 
         // Allow map tile proxy (loaded via <img> tags, can't send auth headers).
-        // Both /tiles/ (B42 iso via map.projectzomboid.com) and /b41tiles/ (B41) and
-        // /toptiles/ (B42 top-down for ChunkCleaner) must bypass — the proxy itself
-        // only forwards to the hardcoded public domain, so there's no SSRF surface.
         if (
           req.path.startsWith("/api/map/tiles/") ||
           req.path.startsWith("/api/map/b41tiles/") ||
@@ -663,21 +684,23 @@ class AuthService {
           return next();
         }
 
-        // Allow mod thumbnail proxy (also loaded via <img> tags). Only proxies
-        // Steam Workshop preview URLs already stored in our DB — no arbitrary SSRF.
+        // Allow mod thumbnail proxy (also loaded via <img> tags).
         if (req.path.startsWith("/api/mods/thumbnail/")) {
           return next();
         }
 
-        // Skip auth if no users exist (setup needed)
+        // Setup pending — set a synthetic admin user so requireRole gates
+        // still work (fail-closed) rather than passing undefined through.
         const needsSetup = await this.needsSetup();
         if (needsSetup) {
+          req.user = { username: "__setup_pending__", role: "admin", synthetic: true };
           return next();
         }
 
-        // Skip auth if it's been explicitly disabled
+        // Auth disabled — same synthetic user.
         const authEnabled = await this.isAuthEnabled();
         if (!authEnabled) {
+          req.user = { username: "__auth_disabled__", role: "admin", synthetic: true };
           return next();
         }
 
@@ -727,10 +750,12 @@ export default authService;
  */
 export function requireRole(...roles) {
   return (req, res, next) => {
-    // No auth configured (setup pending / auth disabled) — middleware()
-    // already let the request through without setting req.user in that
-    // case, so there's nothing to check here.
-    if (!req.user) return next();
+    // Fail closed: no req.user means auth middleware didn't run or the
+    // route bypassed it without setting a synthetic user. Refusing is
+    // always safer than guessing. Upstream: ad3f7d8.
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required", code: "AUTH_REQUIRED" });
+    }
     if (roles.includes(req.user.role)) return next();
     return res.status(403).json({ error: "Insufficient permissions" });
   };

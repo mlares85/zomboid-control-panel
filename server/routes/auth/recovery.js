@@ -7,7 +7,7 @@
 
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import authService from "../../services/auth.js";
+import authService, { requireRole } from "../../services/auth.js";
 import { sanitizeError } from "../../utils/sanitize.js";
 import { log, isNonEmptyString, getAuthenticatedUser } from "./shared.js";
 
@@ -22,7 +22,11 @@ const resetLimiter = rateLimit({
   message: { error: "Too many reset attempts. Please try again later." },
 });
 
-router.get("/recovery-codes", async (req, res) => {
+// Recovery code management is admin-only — the underlying service methods
+// always target "the" admin account, so a non-admin caller could generate
+// codes for an account they don't own and use them to take it over.
+// Upstream: e1d6496.
+router.get("/recovery-codes", requireRole("admin"), async (req, res) => {
   try {
     const user = await getAuthenticatedUser(req);
     if (!user) return res.status(401).json({ error: "Not authenticated" });
@@ -32,7 +36,7 @@ router.get("/recovery-codes", async (req, res) => {
   }
 });
 
-router.post("/recovery-codes", async (req, res) => {
+router.post("/recovery-codes", requireRole("admin"), async (req, res) => {
   try {
     const user = await getAuthenticatedUser(req);
     if (!user) return res.status(401).json({ error: "Not authenticated" });
