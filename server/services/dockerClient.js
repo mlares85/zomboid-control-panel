@@ -133,11 +133,14 @@ export class DockerClient {
   // Raw HTTP request over the Docker Unix socket. Resolves to
   // { statusCode, body } where body is the raw Buffer — parsing is left to
   // callers since logs and JSON responses need different treatment.
-  _request(method, path, body, timeoutMs = REQUEST_TIMEOUT_MS) {
+  _request(method, path, body, timeoutMs = REQUEST_TIMEOUT_MS, rawBody = null) {
     return new Promise((resolve, reject) => {
-      const payload = body ? Buffer.from(JSON.stringify(body)) : null;
+      // rawBody (Buffer) bypasses JSON serialization — used by putArchive
+      // to send tar content directly.
+      const payload = rawBody || (body ? Buffer.from(JSON.stringify(body)) : null);
+      const contentType = rawBody ? "application/x-tar" : "application/json";
       const headers = payload
-        ? { "Content-Type": "application/json", "Content-Length": payload.length }
+        ? { "Content-Type": contentType, "Content-Length": payload.length }
         : {};
 
       const req = http.request(
@@ -322,6 +325,72 @@ export class DockerClient {
       return { success: true, size: stat.size };
     } catch (err) {
       log.debug(`getArchive failed for ${containerId}: ${err.message}`);
+      return { success: false, error: err.message };
+    }
+  }
+
+  // Upload a tar archive into a container at the given path. The caller
+  // must provide a Buffer of valid tar content. Docker extracts it into
+  // containerPath inside the container.
+  async putArchive(containerId, containerPath, tarBuffer) {
+    if (!this.available) return { success: false, error: "Docker socket unavailable" };
+    if (!containerId) return { success: false, error: "Container id is required" };
+
+    const query = `path=${encodeURIComponent(containerPath)}&noOverwriteDirNonDir=true`;
+    const apiPath = `/containers/${encodeURIComponent(containerId)}/archive?${query}`;
+
+    try {
+      const { statusCode, body } = await this._request("PUT", apiPath, null, 60_000, tarBuffer);
+      if (statusCode >= 400) {
+        const text = body.toString("utf-8");
+        let message = `Docker API error ${statusCode}`;
+        try { message = JSON.parse(text).message || message; } catch { /* use default */ }
+        return { success: false, error: message };
+      }
+      return { success: true };
+    } catch (err) {
+      log.debug(`putArchive failed for ${containerId}: ${err.message}`);
+      return { success: false, error: err.message };
+    }
+  }
+
+  // ── Exec operations ──
+
+  // Run a command inside a container and return its stdout/stderr.
+  // Uses the Docker exec API: create an exec instance, then start it.
+  async exec(containerId, cmd, { timeout = 30_000 } = {}) {
+    if (!this.available) return { success: false, error: "Docker socket unavailable" };
+    if (!containerId) return { success: false, error: "Container id is required" };
+
+    try {
+      // Step 1: create the exec instance
+      const createResult = await this._requestJson(
+        "POST",
+        `/containers/${encodeURIComponent(containerId)}/exec`,
+        { Cmd: Array.isArray(cmd) ? cmd : ["sh", "-c", cmd], AttachStdout: true, AttachStderr: true },
+      );
+      if (!createResult.success || !createResult.data?.Id) {
+        return { success: false, error: createResult.error || "Failed to create exec instance" };
+      }
+
+      // Step 2: start the exec and capture output
+      const execId = createResult.data.Id;
+      const { statusCode, body } = await this._request(
+        "POST", `/exec/${encodeURIComponent(execId)}/start`,
+        { Detach: false, Tty: false }, timeout,
+      );
+      if (statusCode >= 400) {
+        return { success: false, error: `Exec start failed (${statusCode})` };
+      }
+
+      // Step 3: check exit code
+      const inspectResult = await this._requestJson("GET", `/exec/${encodeURIComponent(execId)}/json`);
+      const exitCode = inspectResult.data?.ExitCode ?? -1;
+      const stdout = demuxLogFrames(body);
+
+      return { success: exitCode === 0, exitCode, stdout, error: exitCode !== 0 ? `Exit code ${exitCode}` : null };
+    } catch (err) {
+      log.debug(`exec failed for ${containerId}: ${err.message}`);
       return { success: false, error: err.message };
     }
   }
