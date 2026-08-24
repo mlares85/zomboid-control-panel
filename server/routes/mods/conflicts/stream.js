@@ -106,6 +106,7 @@ router.get("/conflicts/stream", async (req, res) => {
         totalWorkshopIds: 0,
         missingDeps: [],
         modLoadOrder: modIdsFromIni,
+        truncated: false,
         warnings: [],
         scanDurationMs: Date.now() - scanStart,
       });
@@ -120,6 +121,7 @@ router.get("/conflicts/stream", async (req, res) => {
       modsScanned,
       modsNotFound,
       modsSkippedInactive,
+      truncated,
       warnings,
     } = await buildFileIndex(
       workshopIds,
@@ -257,6 +259,7 @@ router.get("/conflicts/stream", async (req, res) => {
       steamDeps,
       idCollisions,
       modLoadOrder: modIdsFromIni,
+      truncated,
       warnings,
       scanDurationMs: Date.now() - scanStart,
     };

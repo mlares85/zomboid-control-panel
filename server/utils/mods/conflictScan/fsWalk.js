@@ -6,6 +6,19 @@ const log = createLogger("API:Mods");
 
 const WALK_MAX_DEPTH = 20;
 const WALK_MAX_FILES = 50_000;
+
+// How many directory entries to process between yields to the event loop.
+// Measured (mods-conflict-scan-unmeasured-at-scale): a single mod sitting at
+// WALK_MAX_FILES blocked the event loop for ~690ms in one synchronous
+// burst, because the old sync walkDir() only ever yielded between MODS
+// (buildFileIndex's own loop), never within one mod's walk. Yielding every
+// WALK_YIELD_EVERY entries bounds a single burst to a few tens of ms
+// regardless of how large one mod's media tree is.
+export const WALK_YIELD_EVERY = 1000;
+
+// Yield to event loop (allows SSE writes, incoming requests, etc.)
+export const yieldTick = () => new Promise((resolve) => setImmediate(resolve));
+
 const WALK_SKIP_DIRS = new Set([
   ".git",
   ".svn",
@@ -31,16 +44,22 @@ export function isInsideRoot(target, root) {
 // Recursively collect all files under a directory, returning relative paths.
 // Guarded with depth and file-count limits to prevent runaway traversal.
 // Returns { files: string[], truncated: boolean }
-export function walkDir(dir, prefix = "", _depth = 0, _ctx = null) {
+export async function walkDir(dir, prefix = "", _depth = 0, _ctx = null) {
   // The budget is shared across the whole recursion; a per-call limit let a
-  // deep tree return many times the intended maximum.
-  const ctx = _ctx || { left: WALK_MAX_FILES, root: safeRealpath(dir) || dir };
+  // deep tree return many times the intended maximum. sinceYield is shared
+  // the same way, so the yield cadence is measured across the whole mod's
+  // walk, not reset every time recursion descends into a new subdirectory.
+  const ctx = _ctx || {
+    left: WALK_MAX_FILES,
+    root: safeRealpath(dir) || dir,
+    sinceYield: 0,
+  };
   const results = [];
   let truncated = false;
   if (_depth > WALK_MAX_DEPTH) return { files: results, truncated };
   let entries;
   try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
+    entries = await fs.promises.readdir(dir, { withFileTypes: true });
   } catch (e) {
     log.debug(`walkDir: could not read ${dir}: ${e.message}`);
     return { files: results, truncated };
@@ -49,6 +68,10 @@ export function walkDir(dir, prefix = "", _depth = 0, _ctx = null) {
     if (ctx.left <= 0) {
       truncated = true;
       break;
+    }
+    if (++ctx.sinceYield >= WALK_YIELD_EVERY) {
+      ctx.sinceYield = 0;
+      await yieldTick();
     }
     const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
     const fullPath = path.join(dir, entry.name);
@@ -60,7 +83,7 @@ export function walkDir(dir, prefix = "", _depth = 0, _ctx = null) {
       const real = safeRealpath(fullPath);
       if (!real || !isInsideRoot(real, ctx.root)) continue;
       try {
-        isDirectory = fs.statSync(real).isDirectory();
+        isDirectory = (await fs.promises.stat(real)).isDirectory();
       } catch (e) {
         log.debug(`walkDir: could not stat link ${fullPath}: ${e.message}`);
         continue;
@@ -69,7 +92,7 @@ export function walkDir(dir, prefix = "", _depth = 0, _ctx = null) {
     if (isDirectory) {
       // Skip version-control and metadata directories — never game content
       if (WALK_SKIP_DIRS.has(entry.name.toLowerCase())) continue;
-      const sub = walkDir(fullPath, rel, _depth + 1, ctx);
+      const sub = await walkDir(fullPath, rel, _depth + 1, ctx);
       results.push(...sub.files);
       if (sub.truncated) truncated = true;
     } else {

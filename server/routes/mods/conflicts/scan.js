@@ -90,6 +90,7 @@ router.get("/conflicts", async (req, res) => {
         modsScanned: 0,
         missingDeps: [],
         modLoadOrder: modIdsFromIni,
+        truncated: false,
         warnings: [],
         scanDurationMs: Date.now() - scanStart,
       });
@@ -100,6 +101,7 @@ router.get("/conflicts", async (req, res) => {
       modsScanned,
       modsNotFound,
       modsSkippedInactive,
+      truncated,
       warnings,
     } = await buildFileIndex(workshopIds, serverPath, null, modIdsFromIni);
     const {
@@ -153,6 +155,7 @@ router.get("/conflicts", async (req, res) => {
       steamDeps,
       idCollisions,
       modLoadOrder: modIdsFromIni,
+      truncated,
       warnings,
       scanDurationMs: Date.now() - scanStart,
     };
