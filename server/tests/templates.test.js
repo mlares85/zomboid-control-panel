@@ -101,6 +101,21 @@ describe("validateTemplate", () => {
     expect(valid).toBe(false);
     expect(errors.join(" ")).toMatch(/RCONPassword/);
   });
+
+  // Privilege-escalation regression: a template used to be able to supply
+  // its OWN iniExclusions and have that REPLACE the default exclusion set,
+  // so `"iniExclusions": []` disabled the leaked-key check entirely and
+  // validated clean with RCONPassword sitting in serverIni.
+  it("rejects a template that supplies its own empty iniExclusions to try to disable the check", () => {
+    const template = {
+      ...createTemplate({ name: "Privesc attempt" }),
+      iniExclusions: [],
+      serverIni: { RCONPassword: "leak" },
+    };
+    const { valid, errors } = validateTemplate(template);
+    expect(valid).toBe(false);
+    expect(errors.join(" ")).toMatch(/RCONPassword/);
+  });
 });
 
 describe("diffTemplate", () => {
@@ -136,6 +151,16 @@ describe("diffTemplate", () => {
     const template = createTemplate({ name: "X", serverIni: { PauseEmpty: true } });
     const diff = diffTemplate(template, { serverIni: {} });
     expect(diff.serverIni).toEqual([{ key: "PauseEmpty", from: undefined, to: true }]);
+  });
+
+  it("never surfaces excluded ini keys even when the template supplies its own empty iniExclusions", () => {
+    const template = {
+      ...createTemplate({ name: "X" }),
+      iniExclusions: [],
+      serverIni: { RCONPassword: "leak" },
+    };
+    const diff = diffTemplate(template, { serverIni: {} });
+    expect(diff.serverIni).toEqual([]);
   });
 });
 
@@ -356,6 +381,35 @@ describe("previewTemplate / applyTemplate", () => {
 
     const ini = fs.readFileSync(path.join(dir, "TestServer.ini"), "utf-8");
     expect(ini).not.toContain("RCONPassword");
+    expect(ini).toContain("PauseEmpty=true");
+  });
+
+  // Privilege-escalation regression: the apply-time write path had its own
+  // independent read of iniExclusions -- proving validateTemplate rejects
+  // this does NOT prove applyTemplate's write path defends independently,
+  // since both sites made the same "trust template.iniExclusions" mistake
+  // on their own. The fixture must already contain RCONPassword before
+  // applying -- prepareIniChange/applyIniChanges only ever updates a key
+  // already present in the file, so a fixture without a pre-existing
+  // RCONPassword line would pass this assertion even with the exclusion
+  // filter completely broken, proving nothing.
+  it("applyTemplate never writes an excluded ini key even when the stored template supplies its own empty iniExclusions", async () => {
+    fs.writeFileSync(
+      path.join(dir, "TestServer.ini"),
+      "PauseEmpty=false\nPVP=true\nRCONPassword=original-secret\n",
+    );
+    userTemplates.push({
+      ...createTemplate({ name: "Privesc via stored template" }),
+      meta: { ...createTemplate({ name: "Privesc via stored template" }).meta, id: "privesc" },
+      iniExclusions: [],
+      serverIni: { RCONPassword: "leak", PauseEmpty: true },
+    });
+
+    await templateService.applyTemplate("privesc", "server-1");
+
+    const ini = fs.readFileSync(path.join(dir, "TestServer.ini"), "utf-8");
+    expect(ini).toContain("RCONPassword=original-secret");
+    expect(ini).not.toContain("leak");
     expect(ini).toContain("PauseEmpty=true");
   });
 

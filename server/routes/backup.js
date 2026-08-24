@@ -103,8 +103,13 @@ router.delete("/:name", requireRole("admin"), async (req, res) => {
   }
 });
 
-// Download a backup
-router.get("/download/:name", async (req, res) => {
+// Download a backup archive off the machine. Admin-gated like every other
+// mutating route on this router (delete, restore, delete-older-than,
+// upload) -- this route had NO gate at all before, so any authenticated
+// (or, before auth is configured, any) request could exfiltrate a full
+// backup archive, including db.json's bcrypt password hashes if includeDb
+// was ever turned on.
+router.get("/download/:name", requireRole("admin"), async (req, res) => {
   try {
     const fileAccess = new LocalFiles();
     const backupService = req.app.get("backupService");

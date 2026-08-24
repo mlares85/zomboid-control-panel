@@ -1,4 +1,5 @@
 // Validation helpers for app-settings and RCON option writes.
+import fs from "fs";
 
 export const VALID_SETTINGS_KEYS = [
   "rconHost",
@@ -80,6 +81,59 @@ export function isValidOptionName(name) {
 export function isValidOptionValue(value) {
   const strVal = String(value);
   return OPTION_VALUE_REGEX.test(strVal);
+}
+
+// httpsCertPath/httpsKeyPath used to be accepted as any string and only
+// ever checked at panel BOOT (utils/certs.js), where a bad value (directory
+// instead of a file, unreadable) crashed the whole process. Rejecting a bad
+// value here, at save time, is what actually prevents an operator from
+// saving one in the first place — a value that goes bad AFTER being saved
+// (moved/deleted/permissions changed later) is a separate case handled by
+// certs.js's own defensive fallback at boot.
+export function validateHttpsFilePath(key, value) {
+  if (value === "") return null; // empty clears the custom cert
+  if (typeof value !== "string") return `${key} must be a string`;
+
+  let stat;
+  try {
+    stat = fs.statSync(value);
+  } catch {
+    return `${key} does not point to a file that exists: ${value}`;
+  }
+  if (!stat.isFile()) {
+    return `${key} must be a file, not a directory: ${value}`;
+  }
+  try {
+    fs.accessSync(value, fs.constants.R_OK);
+  } catch {
+    return `${key} exists but is not readable by the panel: ${value}`;
+  }
+  return null;
+}
+
+// A bad httpsPort (out of range, or colliding with the panel's own HTTP
+// port) is the other half of the same lockout: HTTPS setup at boot has no
+// way to recover from either without filesystem access to edit db.json.
+export function validateHttpsPort(value, panelPort) {
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    return "httpsPort must be a whole number from 1 to 65535";
+  }
+  if (panelPort && port === Number(panelPort)) {
+    return `httpsPort cannot be the same as the panel's HTTP port (${panelPort})`;
+  }
+  return null;
+}
+
+// Same missing-range-check shape as httpsPort, but the worst case if it
+// slips through is a too-fast/too-slow reconnect timer, not a lockout —
+// worth closing anyway since it's one check alongside the others.
+export function validateReconnectInterval(value) {
+  const interval = Number(value);
+  if (!Number.isInteger(interval) || interval < 1 || interval > 60) {
+    return "reconnectInterval must be a whole number from 1 to 60";
+  }
+  return null;
 }
 
 export function validateCorsAllowedOrigins(value) {

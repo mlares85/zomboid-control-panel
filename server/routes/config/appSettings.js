@@ -1,14 +1,20 @@
 import express from "express";
 import net from "net";
 import { createLogger } from "../../utils/logger.js";
-import { getAllSettings, setSetting } from "../../database/init.js";
+import { getAllSettings, getSetting, setSetting } from "../../database/init.js";
 import { sanitizeError } from "../../utils/sanitize.js";
 import {
   MOD_CHECK_INTERVAL_MINUTES_MAX,
   MOD_CHECK_INTERVAL_MINUTES_MIN,
   minutesToCheckIntervalMs,
 } from "../../services/modChecker.js";
-import { VALID_SETTINGS_KEYS, validateCorsAllowedOrigins } from "./validators.js";
+import {
+  VALID_SETTINGS_KEYS,
+  validateCorsAllowedOrigins,
+  validateHttpsFilePath,
+  validateHttpsPort,
+  validateReconnectInterval,
+} from "./validators.js";
 import { SENSITIVE_FIELD_RE, isMaskedSecret, maskSensitiveSettings } from "./secrets.js";
 import { requireRole } from "../../services/auth.js";
 
@@ -27,8 +33,9 @@ router.get("/app-settings", async (req, res) => {
 });
 
 // Validate a single [key, value] entry against its field-specific rules.
-// Returns an error message string, or null if valid.
-function validateSettingEntry(key, value) {
+// Returns an error message string, or null if valid. Async because the
+// httpsPort collision check needs to read the panel's own HTTP port.
+async function validateSettingEntry(key, value) {
   if (key === "corsAllowedOrigins") {
     return validateCorsAllowedOrigins(value);
   }
@@ -37,6 +44,15 @@ function validateSettingEntry(key, value) {
   }
   if (key === "lanIpAddress" && value !== "" && net.isIP(value) !== 4) {
     return "lanIpAddress must be an IPv4 address or empty";
+  }
+  if (key === "httpsCertPath" || key === "httpsKeyPath") {
+    return validateHttpsFilePath(key, value);
+  }
+  if (key === "httpsPort") {
+    return validateHttpsPort(value, await getSetting("panelPort"));
+  }
+  if (key === "reconnectInterval") {
+    return validateReconnectInterval(value);
   }
   const booleanKeys = [
     "corsAllowAll",
@@ -153,7 +169,7 @@ router.put("/app-settings", requireRole("admin"), async (req, res) => {
         continue;
       }
 
-      const validationError = validateSettingEntry(key, value);
+      const validationError = await validateSettingEntry(key, value);
       if (validationError) {
         return res.status(400).json({ error: validationError });
       }

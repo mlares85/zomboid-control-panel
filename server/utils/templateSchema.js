@@ -21,7 +21,13 @@ export const SANDBOX_SECTIONS = [
 
 // Keys that must never appear in a template's serverIni — identity,
 // networking and secrets are per-server/per-deployment, not part of a
-// "ruleset". Enforced by validateTemplate regardless of what a caller passes.
+// "ruleset". This is a FLOOR, not a default a caller can replace: see
+// resolveIniExclusions() below, the only correct way to read a template's
+// exclusion set. Reading template.iniExclusions directly let a template
+// carrying `"iniExclusions": []` disable this protection entirely — the
+// leaked-key check ran against the attacker's own empty list, letting a
+// templates-only role rewrite RCONPassword, the public port and the server
+// name.
 export const DEFAULT_INI_EXCLUSIONS = [
   "RCONPassword",
   "Password",
@@ -32,6 +38,21 @@ export const DEFAULT_INI_EXCLUSIONS = [
   "RCONPort",
   "server_browser_announced_ip",
 ];
+
+// The only correct way to resolve a template's ini exclusion set: always
+// the union of DEFAULT_INI_EXCLUSIONS with whatever additional keys the
+// template supplies. A template may only ADD to the excluded set, never
+// remove from it — template.iniExclusions is attacker-controlled input (it
+// travels with the template through create/import/apply), so treating it as
+// THE exclusion list rather than an addition to a mandatory floor is exactly
+// the privilege-escalation bug this function closes. Used by
+// validateTemplate and diffTemplate here, and by templateService.js's
+// applyIniChanges (the actual .ini write path) so all three sites read the
+// same predicate and can't drift apart from each other again.
+export function resolveIniExclusions(template) {
+  const extra = Array.isArray(template?.iniExclusions) ? template.iniExclusions : [];
+  return [...new Set([...DEFAULT_INI_EXCLUSIONS, ...extra])];
+}
 
 export function createTemplate({
   name,
@@ -121,9 +142,7 @@ export function validateTemplate(template) {
     }
   }
 
-  const exclusions = Array.isArray(template.iniExclusions)
-    ? template.iniExclusions
-    : DEFAULT_INI_EXCLUSIONS;
+  const exclusions = resolveIniExclusions(template);
   if (isPlainObject(template.serverIni)) {
     const leaked = Object.keys(template.serverIni).filter((key) =>
       exclusions.includes(key),
@@ -174,9 +193,7 @@ function valuesEqual(a, b) {
  * of the sparse override set, not a full config comparison.
  */
 export function diffTemplate(template, currentConfig = {}) {
-  const exclusions = Array.isArray(template?.iniExclusions)
-    ? template.iniExclusions
-    : DEFAULT_INI_EXCLUSIONS;
+  const exclusions = resolveIniExclusions(template);
 
   const serverIni = [];
   for (const [key, to] of Object.entries(template?.serverIni || {})) {
