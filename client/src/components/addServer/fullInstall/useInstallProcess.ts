@@ -19,6 +19,7 @@ export interface InstallFormSnapshot {
   serverPort: number;
   minMemory: number;
   maxMemory: number;
+  adminPassword: string;
   useNoSteam: boolean;
   useDebug: boolean;
 }
@@ -146,6 +147,7 @@ export function useInstallProcess(
           serverPort: data.serverPort || s.serverPort,
           minMemory: (data.minMemory || s.minMemory) * 1024,
           maxMemory: (data.maxMemory || s.maxMemory) * 1024,
+          adminPassword: s.adminPassword || "",
           useNoSteam: s.useNoSteam,
           useDebug: s.useDebug,
         });

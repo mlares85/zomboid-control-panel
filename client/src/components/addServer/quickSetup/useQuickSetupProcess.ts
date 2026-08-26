@@ -71,6 +71,7 @@ export function useQuickSetupProcess(onServerCreated: (serverId: string | number
         serverPort: data.serverPort || fallback.serverPort,
         minMemory: (data.minMemory || fallback.minMemory) * 1024,
         maxMemory: (data.maxMemory || fallback.maxMemory) * 1024,
+        adminPassword: fallback.adminPassword,
         useNoSteam: fallback.useNoSteam,
         useDebug: fallback.useDebug,
       });

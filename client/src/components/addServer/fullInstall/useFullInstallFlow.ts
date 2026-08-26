@@ -34,6 +34,7 @@ export function useFullInstallFlow({ onServerCreated, initialBranch, initialInst
       serverPort: performance.serverPort,
       minMemory: performance.minMemory,
       maxMemory: performance.maxMemory,
+      adminPassword: performance.adminPassword,
       useNoSteam: performance.useNoSteam,
       useDebug: performance.useDebug,
     },
