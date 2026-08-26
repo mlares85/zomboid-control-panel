@@ -1,32 +1,31 @@
 # Active Context
 
 ## Current Focus
-Windows fresh install UX has been heavily tested and fixed this session.
-Next priority is multi-server simultaneous support (running multiple PZ
-servers at once with independent dashboards/RCON connections).
+Windows fresh install UX heavily tested and fixed. World map is broken
+because the tile host migrated from map.projectzomboid.com to pzmap.org
+/ tiles.pzmap.org — needs a full upstream sync of mapProxy.
 
 ## Recent Decisions
-- PZ Build 42 dropped ProjectZomboid64.exe — server launches via
-  StartServer64.bat + Java. All signature checks updated.
-- Admin password was only in startup scripts, not the server DB record —
-  lifecycle.js regeneration dropped it. Now persisted via serversApi.create().
-- SteamCMD stdout buffering on Windows fixed by splitting on bare \r,
-  plus a 5-second folder size poller as a progress fallback.
-- Windows auto-start uses Task Scheduler (schtasks CLI) — no NSSM or
-  third-party tools. Toggle in Settings > General.
-- Steam library folders on other drives discovered via libraryfolders.vdf
-  parsing. Multi-install picker shown when >1 found.
+- Admin password and RCON password now persisted to server DB record so
+  lifecycle.js script regeneration doesn't drop them.
 - VerifyStep auto-starts native PZ servers before RCON check.
-- Startup scripts are platform-specific (.bat-only on Windows).
+- Windows auto-start uses Task Scheduler (schtasks CLI).
+- PZ Build 42 signatures updated (StartServer64.bat, projectzomboid.jar).
+- SteamCMD progress: bare \r split + folder size poller fallback.
+- Disk space preflight raised to 8 GB for Build 42.
 
 ## Blockers / Open Questions
-- Multi-server simultaneous running needs a connection pool (RCON per
-  server) and dashboard that shows all servers. Currently single-active.
-- Windows Firewall rules (try netsh + fallback) not yet implemented.
-- Docker bridge still needs live end-to-end testing on Unraid.
+- World map tiles 404: map.projectzomboid.com is dead, tiles at
+  tiles.pzmap.org (no /maps prefix), build list at pzmap.org/api/builds.
+  Upstream rewrote the entire mapProxy to a single file with curl-based
+  metadata fetching (Cloudflare blocks Node fetch for descriptors). Need
+  to port upstream's mapProxy.js — too interconnected for a quick URL swap.
+  Also add a configurable tile host URL in Settings > World Map.
+- Multi-server simultaneous running needs connection pool + dashboard.
+- Windows Firewall rules not yet implemented.
 
 ## Next Steps
-1. Multi-server simultaneous support — connection pool, independent
-   RCON per server, dashboard showing all servers with live status.
-2. Windows Firewall rule auto-creation during setup.
-3. End-to-end test Docker bridge on Unraid.
+1. Port upstream's mapProxy.js rewrite (pzmap.org migration + Cloudflare
+   curl workaround) — world map is completely broken without this.
+2. Multi-server simultaneous support — connection pool, per-server RCON.
+3. Add configurable map tile host URL in Settings.
