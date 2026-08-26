@@ -221,7 +221,15 @@ export class NativeSteamCmdInstaller extends Installer {
         const output = streaming.getOutput();
 
         if (success) {
+          // Verify the server files actually exist on disk — SteamCMD
+          // can exit 0 without writing anything in edge cases.
+          const verified = verifyInstall(installPath, this._isWindows);
           steamCmd.activeOps.delete(normalizedPath);
+          if (!verified.ok) {
+            emit("complete", { success: false, message: verified.reason });
+            resolve({ success: false, error: verified.reason });
+            return;
+          }
           emit("complete", {
             success: true,
             message: `${capitalize(operation)} completed successfully`,
@@ -309,6 +317,38 @@ function detectFailureReason(output, operation, code) {
   }
 
   return `Server ${operation} failed with exit code ${code}`;
+}
+
+/** Verify the PZ server files actually landed on disk after SteamCMD. */
+function verifyInstall(installPath, isWindows) {
+  // PZ server must have at least one of these to be launchable
+  const signatures = isWindows
+    ? ["ProjectZomboid64.exe", "start-server.bat"]
+    : ["ProjectZomboid64", "start-server.sh"];
+
+  const found = signatures.some((f) =>
+    fs.existsSync(path.join(installPath, f)),
+  );
+
+  if (!found) {
+    return {
+      ok: false,
+      reason: `SteamCMD exited successfully but the server files were not found at ${installPath}. ` +
+        "The download may have been incomplete. Try running the install again — SteamCMD will resume where it left off.",
+    };
+  }
+
+  // jre64 is required — PZ bundles its own JVM
+  const hasJre = fs.existsSync(path.join(installPath, "jre64"));
+  if (!hasJre) {
+    return {
+      ok: false,
+      reason: `Server files exist but the bundled Java runtime (jre64/) is missing at ${installPath}. ` +
+        "The download was likely incomplete. Try running the install again.",
+    };
+  }
+
+  return { ok: true };
 }
 
 function capitalize(s) {
