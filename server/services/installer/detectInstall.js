@@ -20,6 +20,7 @@ const log = createLogger("DetectInstall");
 const isWindows = process.platform === "win32";
 
 const WINDOWS_STEAMCMD_PATHS = [
+  path.join(os.homedir(), "Documents", "SteamCMD"),
   "C:\\steamcmd",
   "C:\\SteamCMD",
   path.join(process.env.USERPROFILE || "C:\\Users\\Default", "steamcmd"),

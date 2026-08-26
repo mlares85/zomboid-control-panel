@@ -110,6 +110,16 @@ export function useSteamCmdStep() {
           setHasSteamCmd(true);
         } else if (detect.suggestedPath) {
           setSteamCmdPath(detect.suggestedPath);
+          // Check if SteamCMD already exists at the suggested path
+          // (e.g. user downloaded it in a previous attempt)
+          try {
+            const check = await serverApi.checkSteamCmd(detect.suggestedPath);
+            if (check.exists) {
+              setHasSteamCmd(true);
+            }
+          } catch {
+            // Non-critical — field stays pre-filled, user can still click install
+          }
         }
       } catch {
         // Non-critical — field stays empty

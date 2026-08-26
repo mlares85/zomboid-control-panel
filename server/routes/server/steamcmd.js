@@ -6,6 +6,7 @@ import { spawn, exec } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import { createLogger } from "../../utils/logger.js";
 import { getSetting } from "../../database/init.js";
 import { isWindows } from "./shared.js";
@@ -174,12 +175,23 @@ export async function ensureSteamCmdLinux(installPath, io) {
 
 export async function findSteamCmdPath() {
   const configuredPath = await getSetting("steamcmdPath");
-  const candidates = [
-    configuredPath,
-    process.env.STEAMCMD_PATH,
+  const windowsPaths = isWindows ? [
+    path.join(os.homedir(), "Documents", "SteamCMD"),
+    "C:\\steamcmd",
+    "C:\\SteamCMD",
+    path.join(process.env.USERPROFILE || "C:\\Users\\Default", "steamcmd"),
+    "C:\\Program Files\\SteamCMD",
+  ] : [];
+  const linuxPaths = isWindows ? [] : [
     "/home/steam/steamcmd",
     "/home/steam/Steam/steamcmd",
     "/opt/steamcmd",
+  ];
+  const candidates = [
+    configuredPath,
+    process.env.STEAMCMD_PATH,
+    ...windowsPaths,
+    ...linuxPaths,
   ].filter(Boolean);
 
   for (const candidate of candidates) {
