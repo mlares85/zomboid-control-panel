@@ -1,35 +1,37 @@
 # Active Context
 
 ## Current Focus
-PanelBridge for Docker-managed servers, Pushover notifications, and
-upstream security hardening are all shipped and deployed to Unraid.
-The DockerBridgeTransport exec-based IPC and install-docker route are
-wired but need end-to-end testing on the live server.
+Windows fresh install UX testing uncovered multiple issues. Several are
+fixed; the panel still does not auto-start the PZ server after install,
+so the VerifyStep's RCON check hangs waiting for a server that isn't running.
 
 ## Recent Decisions
-- Docker bridge uses exec-based sync (3s polling) to a local cache dir,
-  same pattern as SFTP transport — main PanelBridge reads the cache as
-  usual, no changes to its polling loop.
-- PanelBridge.lua installed into managed containers via putArchive (tar
-  upload to Docker API) rather than shared volumes — no compose changes
-  needed, works with any container setup.
-- Pushover is independent of Discord — no shared notification abstraction
-  until a third channel is added. Alert conditions are pure evaluators
-  with edge-triggered monitoring (30s poll, cooldown per condition).
-- Auth middleware blanket `/api/auth/` exemption replaced with explicit
-  PUBLIC_AUTH_PATHS set. requireRole fails closed (401 on missing user).
+- Dynamic imports (`await import(...)`) break `pkg` binaries — esbuild
+  skips them, so the module is missing at runtime. All converted to static.
+- SteamCMD exit code 7 accepted as success (CWorkThreadPool race) but
+  code 8 reverted — too ambiguous, may indicate real failure.
+- SteamCMD default paths moved from C:\ root to Documents/ (SteamCMD
+  and pz-server) so non-admin users can write there without UAC issues.
+- Startup scripts are now platform-specific: .bat-only on Windows,
+  .sh-only on Linux — no cross-platform scripts that confuse users.
+- Admin password promoted from hidden Advanced Options to the main RCON
+  card with yellow highlight — it's required and users were getting
+  blocked at the review step without knowing why.
 
 ## Blockers / Open Questions
-- Docker bridge needs live end-to-end testing — the PZ server must have
-  run at least once to create the panelbridge directory structure inside
-  the container before the exec transport can read status.json.
-- Upstream RBAC/OIDC/i18n integration still needs a dedicated sprint
-  (663 commits, 108 file conflicts).
-- PanelBridge Lua enhancements (sandbox vars, weather, zombie density)
-  deferred until bridge is confirmed working for all providers.
+- Panel does not auto-start the PZ server after install — VerifyStep
+  waits for RCON, user has to manually start the server first. Need to
+  either auto-start or show clear instructions.
+- Windows Firewall rules could be auto-created with `netsh` when running
+  as admin, or shown as copy-paste commands. Decided on approach 1 (try
+  + fallback) but not yet implemented.
+- Docker bridge still needs live end-to-end testing on Unraid.
+- SteamCMD 0x202 "update required" can still fail if disk is truly full
+  even after 3 retries — the preflight check should catch most cases.
 
 ## Next Steps
-1. End-to-end test Docker bridge on Unraid — verify bridge connects and
-   world map shows player positions for the docker-managed server.
-2. Plan upstream RBAC integration sprint or decide to stay single-admin.
-3. Consider building a panel-owned Docker image (preinstalled libs).
+1. Auto-start server after install or add clear "Start your server" step
+   before VerifyStep's RCON check — this is the biggest UX gap.
+2. Implement Windows Firewall rule creation (try netsh + fallback to
+   copy-paste commands).
+3. End-to-end test Docker bridge on Unraid.
