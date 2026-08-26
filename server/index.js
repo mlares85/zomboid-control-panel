@@ -44,7 +44,6 @@ import { UpdateChecker } from "./services/updateChecker.js";
 import { PanelUpdateChecker } from "./services/panelUpdateChecker.js";
 import { ContainerStatsPoller } from "./services/containerStatsPoller.js";
 import { ContainerLogStreamer } from "./services/containerLogStreamer.js";
-import { MapVersionChecker } from "./services/mapVersionChecker.js";
 import { LogTailer } from "./services/logTailer.js";
 import authService from "./services/auth.js";
 import { requireRole } from "./services/auth.js";
@@ -189,11 +188,6 @@ async function gracefulShutdown(signal) {
     }
     if (alertMonitor) {
       alertMonitor.stop();
-    }
-
-    // Stop map version checker
-    if (mapVersionChecker) {
-      mapVersionChecker.stop();
     }
 
     // Stop PanelBridge
@@ -1196,14 +1190,6 @@ app.set("panelUpdateChecker", panelUpdateChecker);
 
 // Map version checker — periodically checks map.projectzomboid.com for new
 // PZ map builds and emits socket events when one is detected. The check
-// interval is user-configurable (default 24h).
-import { getB42Map, getMapVersions } from "./routes/mapProxy/b42Resolution.js";
-const mapVersionChecker = new MapVersionChecker(io, {
-  resolveLatest: getB42Map,
-  getVersions: getMapVersions,
-});
-app.set("mapVersionChecker", mapVersionChecker);
-
 // Auth routes (must be before other API routes)
 app.use("/api/auth", authRoutes);
 
@@ -2634,9 +2620,6 @@ async function start() {
 
     // Start panel self-update checker
     panelUpdateChecker.start(_pkgVersion);
-
-    // Start map version checker — periodic checks for new PZ map builds
-    mapVersionChecker.start();
 
     // Read panel port from DB (saved via Settings UI), fallback to env or 3001
     const savedPort = await getSetting("panelPort");
