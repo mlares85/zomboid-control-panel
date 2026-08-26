@@ -176,8 +176,9 @@ export class NativeSteamCmdInstaller extends Installer {
     return { success: true };
   }
 
-  async _runSteamCmd({ steamcmdExe, steamcmdPath, installPath, branch, operation, normalizedPath, emit }) {
+  async _runSteamCmd({ steamcmdExe, steamcmdPath, installPath, branch, operation, normalizedPath, emit, attempt = 1 }) {
     const { steamCmd } = this._deps;
+    const MAX_RETRIES = 3;
 
     const betaArgs = steamCmd.getBetaArgs(branch);
     const loginArgs = await steamCmd.getLoginArgs();
@@ -196,10 +197,12 @@ export class NativeSteamCmdInstaller extends Installer {
     const opRef = steamCmd.activeOps.get(normalizedPath);
     if (opRef) opRef.pid = child.pid;
 
-    emit("start", {
-      type: operation,
-      message: `${capitalize(operation)} started...`,
-    });
+    if (attempt === 1) {
+      emit("start", {
+        type: operation,
+        message: `${capitalize(operation)} started...`,
+      });
+    }
 
     return new Promise((resolve) => {
       // attachStreaming expects an io-like object with .emit(eventName, data)
@@ -208,28 +211,46 @@ export class NativeSteamCmdInstaller extends Installer {
         logFlush: operation === "install",
       });
 
-      child.on("close", (code) => {
+      child.on("close", async (code) => {
         streaming.flush();
-        steamCmd.activeOps.delete(normalizedPath);
 
         // SteamCMD exit codes: 0 = success, 7 = success (common on
-        // Windows — "CWorkThreadPool" cleanup race), 8 = success on
-        // Windows with a transient thread-pool warning. All three leave
-        // a valid install on disk.
-        const success = code === 0 || code === 7 || (code === 8 && this._isWindows);
+        // Windows — "CWorkThreadPool" cleanup race that fires after the
+        // download/update has already completed successfully).
+        const success = code === 0 || code === 7;
         const output = streaming.getOutput();
 
         if (success) {
+          steamCmd.activeOps.delete(normalizedPath);
           emit("complete", {
             success: true,
             message: `${capitalize(operation)} completed successfully`,
           });
           resolve({ success: true });
-        } else {
-          const detail = detectFailureReason(output, operation, code);
-          emit("complete", { success: false, message: detail });
-          resolve({ success: false, error: detail });
+          return;
         }
+
+        // Auto-retry on incomplete downloads (0x202 / 0x602) — SteamCMD
+        // resumes where it left off, so retrying usually finishes the job.
+        const isIncomplete = /state is 0x[26]02/i.test(output);
+        if (isIncomplete && attempt < MAX_RETRIES) {
+          emit("log", {
+            type: "stdout",
+            text: `Download incomplete — retrying (attempt ${attempt + 1}/${MAX_RETRIES})...`,
+          });
+          log.warn(`SteamCMD download incomplete, retrying (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          const retryResult = await this._runSteamCmd({
+            steamcmdExe, steamcmdPath, installPath, branch,
+            operation, normalizedPath, emit, attempt: attempt + 1,
+          });
+          resolve(retryResult);
+          return;
+        }
+
+        steamCmd.activeOps.delete(normalizedPath);
+        const detail = detectFailureReason(output, operation, code);
+        emit("complete", { success: false, message: detail });
+        resolve({ success: false, error: detail });
       });
 
       child.on("error", (err) => {
@@ -273,6 +294,18 @@ function detectFailureReason(output, operation, code) {
     return "SteamCMD could not access a Project Zomboid depot manifest. " +
       "Your installed server files were not changed. Retry later; if it " +
       "persists, update using a Steam account that owns Project Zomboid.";
+  }
+
+  // 0x202 = "update required" — download was incomplete or interrupted.
+  // 0x602 = same but with the "access denied" flag (partial + auth issue).
+  const incompleteDownload =
+    /state is 0x202/i.test(output) ||
+    /state is 0x602/i.test(output);
+
+  if (incompleteDownload) {
+    return `Server ${operation} did not finish — SteamCMD's download was ` +
+      "interrupted or incomplete. This usually resolves by retrying. " +
+      "Check that you have at least 3 GB of free disk space.";
   }
 
   return `Server ${operation} failed with exit code ${code}`;

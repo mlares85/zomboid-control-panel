@@ -116,8 +116,8 @@ export async function completeSuccessfulInstall(ctx) {
       serverName,
       scripts,
     );
-    log.info(`Created custom startup batch: ${batchPath}`);
-    log.info(`Created custom startup script: ${shellPath}`);
+    if (batchPath) log.info(`Created custom startup batch: ${batchPath}`);
+    if (shellPath) log.info(`Created custom startup script: ${shellPath}`);
 
     const scriptName =
       process.platform === "win32"

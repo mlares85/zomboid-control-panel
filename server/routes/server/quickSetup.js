@@ -167,8 +167,8 @@ export function registerQuickSetupRoutes(router) {
         serverName,
         scripts,
       );
-      log.info(`Created custom startup batch: ${batchPath}`);
-      log.info(`Created custom startup script: ${shellPath}`);
+      if (batchPath) log.info(`Created custom startup batch: ${batchPath}`);
+      if (shellPath) log.info(`Created custom startup script: ${shellPath}`);
 
       const startupScript =
         process.platform === "win32"

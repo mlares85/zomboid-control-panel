@@ -202,14 +202,20 @@ export LD_LIBRARY_PATH="\${INSTDIR}/natives/:\${INSTDIR}/natives/linux64/:\${INS
 // before (the log/emit text differs slightly per call site, so that stays
 // with the caller).
 export function writeStartupScriptFiles(installPath, serverName, scripts) {
-  const batchPath = path.join(installPath, `StartServer_${serverName}.bat`);
-  writeFileAtomic(batchPath, scripts.bat, "utf8");
+  const isWindows = process.platform === "win32";
+
+  // Only write the script for the current platform — a .sh on Windows
+  // (or .bat on Linux) just confuses users who don't need it.
+  if (isWindows) {
+    const batchPath = path.join(installPath, `StartServer_${serverName}.bat`);
+    writeFileAtomic(batchPath, scripts.bat, "utf8");
+    return { batchPath, shellPath: null };
+  }
 
   const shellPath = path.join(installPath, `start-server_${serverName}.sh`);
   writeFileAtomic(shellPath, scripts.sh.replace(/\r\n/g, "\n"), {
     encoding: "utf8",
     mode: 0o750,
   });
-
-  return { batchPath, shellPath };
+  return { batchPath: null, shellPath };
 }
