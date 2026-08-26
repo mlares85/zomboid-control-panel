@@ -184,11 +184,16 @@ export function attachSteamCmdLineStreaming(child, io, eventName, { logFlush = f
   let stdoutBuffer = "";
   let stderrBuffer = "";
 
+  // SteamCMD on Windows uses bare \r (carriage return) for download progress
+  // lines to overwrite the same console line. Split on \r, \n, or \r\n so
+  // progress updates are emitted in real time instead of buffering until exit.
+  const LINE_SPLIT = /\r\n|\r|\n/;
+
   child.stdout.on("data", (data) => {
     const text = data.toString();
     output += text;
     stdoutBuffer += text;
-    const lines = stdoutBuffer.split(/\r?\n/);
+    const lines = stdoutBuffer.split(LINE_SPLIT);
     stdoutBuffer = lines.pop() || "";
     for (const line of lines) {
       if (line.trim()) {
@@ -202,7 +207,7 @@ export function attachSteamCmdLineStreaming(child, io, eventName, { logFlush = f
     const text = data.toString();
     output += text;
     stderrBuffer += text;
-    const lines = stderrBuffer.split(/\r?\n/);
+    const lines = stderrBuffer.split(LINE_SPLIT);
     stderrBuffer = lines.pop() || "";
     for (const line of lines) {
       if (line.trim()) {
