@@ -1,31 +1,35 @@
 # Active Context
 
 ## Current Focus
-All 12 upstream security fixes and 7 bug fixes integrated from
-fpsacha/zomboid-control-panel v1.2.1-v1.2.2. Docker-managed backups
-complete. Next: upstream RBAC/OIDC/i18n integration planning or
-panel-owned Docker image.
+PanelBridge for Docker-managed servers, Pushover notifications, and
+upstream security hardening are all shipped and deployed to Unraid.
+The DockerBridgeTransport exec-based IPC and install-docker route are
+wired but need end-to-end testing on the live server.
 
 ## Recent Decisions
-- Auth middleware switched from blanket `/api/auth/` exemption to an
-  explicit `PUBLIC_AUTH_PATHS` set — the blanket exemption left recovery
-  codes, /me, and /change-password unauthenticated.
-- `requireRole()` fails closed (401 on missing req.user) instead of
-  passing through. Synthetic admin user set during setup/auth-disabled.
-- Upstream cherry-picks adapted to our single-admin model rather than
-  porting the full RBAC permissions.js — direct merge not feasible
-  (663 commits, 108 file conflicts).
-- World map zoom fix adapted to our split mapProxy/ module structure
-  (upstream has monolithic mapProxy.js).
+- Docker bridge uses exec-based sync (3s polling) to a local cache dir,
+  same pattern as SFTP transport — main PanelBridge reads the cache as
+  usual, no changes to its polling loop.
+- PanelBridge.lua installed into managed containers via putArchive (tar
+  upload to Docker API) rather than shared volumes — no compose changes
+  needed, works with any container setup.
+- Pushover is independent of Discord — no shared notification abstraction
+  until a third channel is added. Alert conditions are pure evaluators
+  with edge-triggered monitoring (30s poll, cooldown per condition).
+- Auth middleware blanket `/api/auth/` exemption replaced with explicit
+  PUBLIC_AUTH_PATHS set. requireRole fails closed (401 on missing user).
 
 ## Blockers / Open Questions
-- Full upstream integration (RBAC, OIDC, i18n) needs a dedicated sprint
-  — every route file in upstream was rewritten for capability checks.
-- Scheduler `rcon.execute` capability check (4a7dc86) skipped — requires
-  the RBAC capability system we don't have yet.
-- Docker-managed server restore not yet implemented.
+- Docker bridge needs live end-to-end testing — the PZ server must have
+  run at least once to create the panelbridge directory structure inside
+  the container before the exec transport can read status.json.
+- Upstream RBAC/OIDC/i18n integration still needs a dedicated sprint
+  (663 commits, 108 file conflicts).
+- PanelBridge Lua enhancements (sandbox vars, weather, zombie density)
+  deferred until bridge is confirmed working for all providers.
 
 ## Next Steps
-1. Plan upstream RBAC integration sprint (or decide to stay single-admin).
-2. Build panel-owned Docker image (libs preinstalled, faster creation).
-3. Implement Docker-managed server restore (putArchive or volume mount).
+1. End-to-end test Docker bridge on Unraid — verify bridge connects and
+   world map shows player positions for the docker-managed server.
+2. Plan upstream RBAC integration sprint or decide to stay single-admin.
+3. Consider building a panel-owned Docker image (preinstalled libs).

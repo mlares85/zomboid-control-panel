@@ -18,11 +18,11 @@ Large route files are split into `routes/{name}/` directories. Each sub-file exp
 
 ## PanelBridge file-based IPC
 
-The panel communicates with the in-game PanelBridge Lua mod via filesystem queues, not sockets. Commands written as `inbox/cmd-{seq}.json`, results read from `outbox/res-{seq}.json[.txt]`. The `.txt` suffix is a Build 42 constraint (Lua can only create `.txt` files). Status polled every 1s (Node) / written every 3s (Lua) with `fs.watch` fast path. SFTP transport available for remote servers.
+The panel communicates with the in-game PanelBridge Lua mod via filesystem queues, not sockets. Commands written as `inbox/cmd-{seq}.json`, results read from `outbox/res-{seq}.json[.txt]`. The `.txt` suffix is a Build 42 constraint (Lua can only create `.txt` files). Status polled every 1s (Node) / written every 3s (Lua) with `fs.watch` fast path. Three transport layers match the three provider groups: local `fs` for native/docker-local, `DockerBridgeSyncTransport` for docker-managed (syncs via `DockerClient.exec()`), and `PanelBridgeSftpTransport` for remote-sftp. `PanelBridge.configureDocker(dockerClient, containerId, serverName, cachePath)` mirrors `configureSftp()` — sets up a 3s polling loop that syncs IPC files between a local cache and the container via exec, while the main bridge polling operates on the cache as usual.
 
 ## PanelBridge auto-install
 
-When the panel has local file access to the PZ server (provider `native` or `docker-local`), it automatically copies `PanelBridge.lua` from its own `pz-mod/` directory into the server's `media/lua/server/` on server activation. No SFTP or manual copy needed for local mounts.
+When the panel has local file access to the PZ server (provider `native` or `docker-local`), it automatically copies `PanelBridge.lua` from its own `pz-mod/` directory into the server's `media/lua/server/` on server activation. For docker-managed servers, `installBridgeToContainer()` (dockerBridgeInstaller.js) creates a tar containing the mod and uploads it via `DockerClient.putArchive()`. For remote-sftp servers, `installBridgeViaSftp()` (panelBridgeSftpInstaller.js) uploads via `ssh2-sftp-client`. Both are exposed as `POST /api/panel-bridge/install-docker` and `POST /api/panel-bridge/install-sftp`. The onboarding VerifyStep is provider-aware: native/docker-local auto-installs, docker-managed triggers putArchive install, remote-sftp shows an SFTP credentials form.
 
 ## Template system
 
@@ -61,6 +61,10 @@ Single `db.json` via lowdb — debounced 500ms writes, atomic (temp + rename), c
 ## Disk space monitoring
 
 `diskMonitor.js` polls free space on the save volume every 60 seconds. Warning at 90%, critical at 95%. Combined with circuit-breaker status in `/api/system/storage-health`. Frontend renders a persistent banner for critical states (full disk during save = world corruption).
+
+## Pushover notifications
+
+`PushoverService` (pushoverService.js) sends push notifications via the Pushover API using Node's built-in `https` module. `AlertConditions` (alertConditions.js) is a pure evaluator: each condition specifies a dotted metric path (`memory.usagePercent`, `cpu.usagePercent`, `disk.usagePercent`, `server.crashLoop`, `server.offline`), an operator/threshold, severity, and cooldown. `AlertMonitor` (alertMonitor.js) polls every 30s, edge-triggered (alerts on state transitions only), with per-condition cooldown. `DEFAULT_CONDITIONS` covers RAM >90/95%, CPU >90%, disk >90/95%, server offline, crash loop (3+ restarts in 10 minutes). Routes at `/api/pushover/*` (settings, test, conditions CRUD, reset to defaults). Settings page at Settings > Notifications tab.
 
 ## Socket.IO events
 
