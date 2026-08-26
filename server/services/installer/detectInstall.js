@@ -39,6 +39,8 @@ const WINDOWS_PZ_PATHS = [
   "C:\\zomboid-server",
   "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Project Zomboid Dedicated Server",
   path.join(process.env.USERPROFILE || "C:\\Users\\Default", "pz-server"),
+  // Steam library folders on other drives are discovered dynamically
+  // by discoverSteamLibraryPaths() below
 ];
 
 const LINUX_PZ_PATHS = [
@@ -102,7 +104,7 @@ export function detectSteamCmd() {
 export function detectPzInstalls() {
   const candidates = [
     process.env.PZ_SERVER_PATH,
-    ...(isWindows ? WINDOWS_PZ_PATHS : LINUX_PZ_PATHS),
+    ...(isWindows ? getWindowsPzPaths() : LINUX_PZ_PATHS),
   ].filter(Boolean);
 
   const results = [];
@@ -172,6 +174,47 @@ export function detectSetupEnvironment() {
 }
 
 // ── Internal ────────────────────────────────────────────────────────────
+
+/**
+ * Parse Steam's libraryfolders.vdf to discover Steam library paths on all
+ * drives. VDF is a simple key-value format; we only need the "path" values.
+ * Returns paths like ["C:\\Program Files (x86)\\Steam", "E:\\SteamLibrary"].
+ */
+function discoverSteamLibraryPaths() {
+  if (!isWindows) return [];
+  const vdfCandidates = [
+    "C:\\Program Files (x86)\\Steam\\steamapps\\libraryfolders.vdf",
+    "C:\\Program Files\\Steam\\steamapps\\libraryfolders.vdf",
+  ];
+  for (const vdfPath of vdfCandidates) {
+    try {
+      if (!fs.existsSync(vdfPath)) continue;
+      const content = fs.readFileSync(vdfPath, "utf8");
+      // Match "path"  "C:\\SteamLibrary" lines (VDF uses escaped backslashes)
+      const paths = [];
+      for (const match of content.matchAll(/"path"\s+"([^"]+)"/gi)) {
+        paths.push(match[1].replace(/\\\\/g, "\\"));
+      }
+      if (paths.length > 0) {
+        log.info(`Steam library folders: ${paths.join(", ")}`);
+        return paths;
+      }
+    } catch {
+      // VDF unreadable — skip
+    }
+  }
+  return [];
+}
+
+/** Build PZ server candidate paths including all Steam library folders. */
+function getWindowsPzPaths() {
+  const base = [...WINDOWS_PZ_PATHS];
+  for (const libPath of discoverSteamLibraryPaths()) {
+    const pzPath = path.join(libPath, "steamapps", "common", "Project Zomboid Dedicated Server");
+    if (!base.includes(pzPath)) base.push(pzPath);
+  }
+  return base;
+}
 
 function safeExists(filePath) {
   try { return fs.existsSync(filePath); } catch { return false; }
