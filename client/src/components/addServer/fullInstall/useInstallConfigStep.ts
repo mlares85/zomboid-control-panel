@@ -16,6 +16,7 @@ export function useInstallConfigStep(
   initialInstallPath?: string,
 ) {
   const [installPath, setInstallPath] = useState(initialInstallPath || "");
+  const [detectedInstalls, setDetectedInstalls] = useState<Array<{ path: string; signatures: string[] }>>([]);
   const [serverName, setServerName] = useState("myserver");
   const [branch, setBranch] = useState(initialBranch || "public");
   const [availableBranches, setAvailableBranches] =
@@ -45,11 +46,14 @@ export function useInstallConfigStep(
         reportClientError("Failed to load settings.", error);
       }
 
-      // No saved path and none passed via props — use server's suggestion
+      // No saved path and none passed via props — try detecting existing installs
       if (!hasPath && !initialInstallPath) {
         try {
           const detect = await serverApi.detectSetup();
-          if (detect.suggestedInstallPath) {
+          if (detect.existingInstalls?.length > 0) {
+            setDetectedInstalls(detect.existingInstalls);
+            setInstallPath(detect.existingInstalls[0].path);
+          } else if (detect.suggestedInstallPath) {
             setInstallPath(detect.suggestedInstallPath);
           }
         } catch {
@@ -95,5 +99,6 @@ export function useInstallConfigStep(
     setUseCustomDataPath,
     zomboidDataPath,
     setZomboidDataPath,
+    detectedInstalls,
   };
 }

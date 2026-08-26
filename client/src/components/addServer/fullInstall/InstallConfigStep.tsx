@@ -27,6 +27,11 @@ import { FieldHelp } from "@/components/FieldHelp";
 import type { SteamBranch } from "@/lib/api";
 import { LINUX_SERVICE_INSTALL_PATH } from "./helpers";
 
+interface DetectedInstall {
+  path: string;
+  signatures: string[];
+}
+
 interface InstallConfigStepProps {
   installPath: string;
   onInstallPathChange: (path: string) => void;
@@ -36,6 +41,7 @@ interface InstallConfigStepProps {
   onBranchChange: (branch: string) => void;
   availableBranches: SteamBranch[];
   loadingBranches: boolean;
+  detectedInstalls?: DetectedInstall[];
   dataPath: {
     enabled: boolean;
     onEnabledChange: (enabled: boolean) => void;
@@ -59,6 +65,7 @@ export function InstallConfigStep({
   onBranchChange,
   availableBranches,
   loadingBranches,
+  detectedInstalls,
   dataPath,
   onBrowseFolder,
 }: InstallConfigStepProps) {
@@ -72,6 +79,30 @@ export function InstallConfigStep({
       </div>
 
       <div className="grid gap-6">
+        {/* Detected installs picker */}
+        {detectedInstalls && detectedInstalls.length > 1 && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+            <p className="text-sm font-medium text-foreground">We found {detectedInstalls.length} existing PZ server installations:</p>
+            <div className="grid gap-1.5">
+              {detectedInstalls.map((install) => (
+                <button
+                  key={install.path}
+                  type="button"
+                  onClick={() => onInstallPathChange(install.path)}
+                  className={`flex items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                    installPath === install.path
+                      ? 'border-primary bg-primary/10 text-foreground'
+                      : 'border-border/60 bg-background/40 text-muted-foreground hover:border-primary/40'
+                  }`}
+                >
+                  <FolderOpen className="h-3.5 w-3.5 shrink-0" />
+                  <span className="font-mono text-xs truncate">{install.path}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Installation Path */}
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">

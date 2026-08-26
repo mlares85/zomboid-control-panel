@@ -68,6 +68,7 @@ export function FullInstallFlow({ onServerCreated, onBack, initialBranch, initia
             onBranchChange={config.setBranch}
             availableBranches={config.availableBranches}
             loadingBranches={config.loadingBranches}
+            detectedInstalls={config.detectedInstalls}
             dataPath={{
               enabled: config.useCustomDataPath,
               onEnabledChange: config.setUseCustomDataPath,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { configApi, debugApi } from "@/lib/api";
+import { configApi, debugApi, serverApi } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { reportClientError } from "@/lib/client-errors";
 import { copyText } from "@/lib/utils";
@@ -16,6 +16,7 @@ type SystemRam = {
 // memory allocation, and advanced runtime options.
 export function useQuickConfigStep({ initialInstallPath }: { initialInstallPath?: string } = {}) {
   const [installPath, setInstallPath] = useState(initialInstallPath || "");
+  const [detectedInstalls, setDetectedInstalls] = useState<Array<{ path: string; signatures: string[] }>>([]);
   const [serverName, setServerName] = useState("myserver");
   const [rconPassword, setRconPassword] = useState("");
   const [rconPort, setRconPort] = useState(27015);
@@ -60,13 +61,18 @@ export function useQuickConfigStep({ initialInstallPath }: { initialInstallPath?
     detectRam();
   }, []);
 
-  // Load previously saved install path / server name / data path / memory / port
+  // Load previously saved install path / server name / data path / memory / port,
+  // then fall back to auto-detected PZ installs for fresh setups
   useEffect(() => {
     const loadSettings = async () => {
+      let hasPath = false;
       try {
         const data = await configApi.getAppSettings();
         const settings = data.settings || {};
-        if (settings.serverPath) setInstallPath(settings.serverPath);
+        if (settings.serverPath) {
+          setInstallPath(settings.serverPath);
+          hasPath = true;
+        }
         if (settings.serverName) setServerName(settings.serverName);
         if (settings.zomboidDataPath) {
           setZomboidDataPath(settings.zomboidDataPath);
@@ -84,9 +90,25 @@ export function useQuickConfigStep({ initialInstallPath }: { initialInstallPath?
       } catch (error) {
         reportClientError("Failed to load settings.", error);
       }
+
+      // No saved path and none from props — try detecting existing installs
+      if (!hasPath && !initialInstallPath) {
+        try {
+          const detect = await serverApi.detectSetup();
+          // Pre-fill with the first detected install; expose all for a picker
+          if (detect.existingInstalls?.length > 0) {
+            setDetectedInstalls(detect.existingInstalls);
+            setInstallPath(detect.existingInstalls[0].path);
+          } else if (detect.suggestedInstallPath) {
+            setInstallPath(detect.suggestedInstallPath);
+          }
+        } catch {
+          // Non-critical — field stays empty
+        }
+      }
     };
     loadSettings();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- initialInstallPath stable from props
 
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -146,5 +168,6 @@ export function useQuickConfigStep({ initialInstallPath }: { initialInstallPath?
     zomboidDataPath,
     setZomboidDataPath,
     missingAdminPassword,
+    detectedInstalls,
   };
 }
