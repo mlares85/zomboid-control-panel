@@ -212,7 +212,11 @@ export class NativeSteamCmdInstaller extends Installer {
         streaming.flush();
         steamCmd.activeOps.delete(normalizedPath);
 
-        const success = code === 0;
+        // SteamCMD exit codes: 0 = success, 7 = success (common on
+        // Windows — "CWorkThreadPool" cleanup race), 8 = success on
+        // Windows with a transient thread-pool warning. All three leave
+        // a valid install on disk.
+        const success = code === 0 || code === 7 || (code === 8 && this._isWindows);
         const output = streaming.getOutput();
 
         if (success) {

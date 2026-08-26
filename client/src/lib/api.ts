@@ -553,7 +553,17 @@ export const serverApi = {
       found: boolean;
       path?: string;
       executable?: string;
+      suggestedPath?: string;
       message: string;
+    }>,
+
+  // Auto-detect SteamCMD, existing installs, and suggested paths
+  detectSetup: () =>
+    apiGet("/server/setup/detect") as Promise<{
+      steamCmd: { found: boolean; path?: string };
+      existingInstalls: Array<{ path: string; signatures: string[] }>;
+      suggestedInstallPath: string;
+      platform: string;
     }>,
 
   // Quick setup (create server config without SteamCMD)

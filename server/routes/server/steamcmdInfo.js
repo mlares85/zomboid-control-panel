@@ -7,6 +7,7 @@ import { createLogger } from "../../utils/logger.js";
 import { getSetting, setSetting } from "../../database/init.js";
 import { sanitizeError } from "../../utils/sanitize.js";
 import { isValidPath } from "./shared.js";
+import os from "os";
 import {
   getSteamCmdExe,
   findSteamCmdPath,
@@ -32,7 +33,10 @@ function registerDetectRoute(router) {
     try {
       const steamcmdPath = await findSteamCmdPath();
       if (!steamcmdPath) {
-        return res.json({ found: false, message: "SteamCMD was not found automatically" });
+        const suggestedPath = isWindows
+          ? path.join(os.homedir(), "Documents", "SteamCMD")
+          : path.join(os.homedir(), "steamcmd");
+        return res.json({ found: false, suggestedPath, message: "SteamCMD was not found automatically" });
       }
 
       const configuredPath = await getSetting("steamcmdPath");

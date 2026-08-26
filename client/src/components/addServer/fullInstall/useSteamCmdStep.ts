@@ -76,6 +76,10 @@ export function useSteamCmdStep() {
         setHasSteamCmd(true);
         toast({ title: "SteamCMD Found", description: data.message });
       } else {
+        // Pre-fill with server's suggested path so the user sees where it'll go
+        if (data.suggestedPath && !steamCmdPath) {
+          setSteamCmdPath(data.suggestedPath);
+        }
         toast({ title: "SteamCMD Not Found", description: data.message });
       }
     } catch (error) {
@@ -83,7 +87,7 @@ export function useSteamCmdStep() {
     }
   };
 
-  // Load any previously saved SteamCMD path on mount
+  // Load any previously saved SteamCMD path on mount, then auto-detect
   useEffect(() => {
     const loadSavedPath = async () => {
       try {
@@ -92,9 +96,23 @@ export function useSteamCmdStep() {
         if (settings.steamcmdPath) {
           setSteamCmdPath(settings.steamcmdPath);
           setHasSteamCmd(true);
+          return; // Already configured — skip detect
         }
       } catch (error) {
         reportClientError("Failed to load settings.", error);
+      }
+
+      // No saved path — try auto-detect and pre-fill suggested path
+      try {
+        const detect = await serverApi.detectSteamCmd();
+        if (detect.found && detect.path) {
+          setSteamCmdPath(detect.path);
+          setHasSteamCmd(true);
+        } else if (detect.suggestedPath) {
+          setSteamCmdPath(detect.suggestedPath);
+        }
+      } catch {
+        // Non-critical — field stays empty
       }
     };
     loadSavedPath();

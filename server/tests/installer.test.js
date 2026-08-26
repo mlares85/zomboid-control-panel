@@ -256,7 +256,7 @@ describe("NativeSteamCmdInstaller", () => {
       expect(events.some(e => e.event === "complete")).toBe(true);
     });
 
-    it("returns {success: false} on non-zero exit — never throws", async () => {
+    it("treats SteamCMD exit code 7 as success (Windows thread-pool race)", async () => {
       spawnMock = vi.fn(() => fakeSpawn(7));
       const deps = makeFakeDeps();
       const installer = new NativeSteamCmdInstaller(deps);
@@ -267,8 +267,22 @@ describe("NativeSteamCmdInstaller", () => {
         onProgress: vi.fn(),
       });
 
+      expect(result.success).toBe(true);
+    });
+
+    it("returns {success: false} on non-zero exit — never throws", async () => {
+      spawnMock = vi.fn(() => fakeSpawn(1));
+      const deps = makeFakeDeps();
+      const installer = new NativeSteamCmdInstaller(deps);
+
+      const result = await installer.install({
+        steamcmdPath: "/opt/steamcmd",
+        installPath: "/opt/pz-server",
+        onProgress: vi.fn(),
+      });
+
       expect(result.success).toBe(false);
-      expect(result.error).toMatch(/exit code 7/);
+      expect(result.error).toMatch(/exit code 1/);
     });
 
     it("handles spawn error — never throws", async () => {

@@ -90,6 +90,10 @@ export function FullInstallFlow({ onServerCreated, onBack, initialBranch, initia
               copied: performance.copiedPassword,
               onCopy: performance.handleCopyPassword,
               onRegenerate: performance.handleRegeneratePassword,
+              adminPassword: performance.adminPassword,
+              onAdminPasswordChange: performance.setAdminPassword,
+              adminPasswordVisible: performance.showAdminPassword,
+              onToggleAdminPasswordVisible: () => performance.setShowAdminPassword((v) => !v),
             }}
             memory={{
               min: performance.minMemory,

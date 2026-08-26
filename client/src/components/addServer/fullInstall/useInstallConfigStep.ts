@@ -24,13 +24,18 @@ export function useInstallConfigStep(
   const [useCustomDataPath, setUseCustomDataPath] = useState(false);
   const [zomboidDataPath, setZomboidDataPath] = useState("");
 
-  // Load previously saved install path / server name / data path
+  // Load previously saved install path / server name / data path,
+  // then fall back to the server's suggested install path for fresh installs
   useEffect(() => {
     const loadSettings = async () => {
+      let hasPath = false;
       try {
         const data = await configApi.getAppSettings();
         const settings = data.settings || {};
-        if (settings.serverPath) setInstallPath(settings.serverPath);
+        if (settings.serverPath) {
+          setInstallPath(settings.serverPath);
+          hasPath = true;
+        }
         if (settings.serverName) setServerName(settings.serverName);
         if (settings.zomboidDataPath) {
           setZomboidDataPath(settings.zomboidDataPath);
@@ -39,9 +44,21 @@ export function useInstallConfigStep(
       } catch (error) {
         reportClientError("Failed to load settings.", error);
       }
+
+      // No saved path and none passed via props — use server's suggestion
+      if (!hasPath && !initialInstallPath) {
+        try {
+          const detect = await serverApi.detectSetup();
+          if (detect.suggestedInstallPath) {
+            setInstallPath(detect.suggestedInstallPath);
+          }
+        } catch {
+          // Non-critical — field stays empty
+        }
+      }
     };
     loadSettings();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- initialInstallPath is stable from props
 
   // Fetch available Steam branches once SteamCMD is detected
   useEffect(() => {

@@ -11,6 +11,7 @@
  *   Docker:  /pz-server, /serverdata/serverfiles, ...
  */
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { createLogger } from "../../utils/logger.js";
 
@@ -129,8 +130,9 @@ export function detectPzInstalls() {
  * @returns {string}
  */
 export function suggestInstallPath() {
+  const documentsPath = path.join(os.homedir(), "Documents", "pz-server");
   const candidates = isWindows
-    ? ["C:\\pz-server", path.join(process.env.USERPROFILE || "C:\\Users\\Default", "pz-server")]
+    ? [documentsPath, "C:\\pz-server"]
     : ["/opt/pz-server", "/home/steam/pz-server", "/srv/pz-server"];
 
   for (const dir of candidates) {
@@ -138,7 +140,7 @@ export function suggestInstallPath() {
     if (safeWritable(parent)) return dir;
   }
 
-  return isWindows ? "C:\\pz-server" : "/opt/pz-server";
+  return isWindows ? documentsPath : "/opt/pz-server";
 }
 
 /**

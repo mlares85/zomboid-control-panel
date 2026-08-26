@@ -18,7 +18,7 @@ export function registerSteamcmdDownloadRoute(router) {
     try {
       log.info(`POST /steamcmd/download (platform=${process.platform})`);
       const defaultPath = isWindows
-        ? "C:\\SteamCMD"
+        ? path.join(os.homedir(), "Documents", "SteamCMD")
         : [
             "/usr/games",
             "/usr/bin",

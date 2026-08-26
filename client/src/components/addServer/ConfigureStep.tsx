@@ -78,10 +78,10 @@ function useAutoDetect(selection: WizardSelection, setForm: (fn: (f: FormState) 
   return detecting
 }
 
-const MODE_CARDS: Array<{ mode: NewServerMode; icon: typeof Download; title: string; description: string }> = [
-  { mode: 'full', icon: Download, title: 'Fresh Install', description: 'Download server files via SteamCMD' },
-  { mode: 'quick', icon: FolderOpen, title: 'Existing Files', description: 'Point at PZ server files you already have' },
-  { mode: 'docker', icon: Container, title: 'Docker', description: 'Run PZ inside a managed container' },
+const MODE_CARDS: Array<{ mode: NewServerMode; icon: typeof Download; title: string; description: string; badge?: string }> = [
+  { mode: 'full', icon: Download, title: 'Fresh Install', description: 'Download server files via SteamCMD', badge: 'Suggested' },
+  { mode: 'quick', icon: FolderOpen, title: 'Existing Files', description: 'Point at PZ server files you already have', badge: 'Suggested' },
+  { mode: 'docker', icon: Container, title: 'Docker', description: 'Run PZ inside a managed container', badge: 'Advanced' },
 ]
 
 function NewServerModePicker({ onSelect, onBack }: { onSelect: (m: NewServerMode) => void; onBack: () => void }) {
@@ -92,7 +92,7 @@ function NewServerModePicker({ onSelect, onBack }: { onSelect: (m: NewServerMode
         <p className="mt-1 text-sm text-muted-foreground">Choose an install method for your new server.</p>
       </div>
       <div className="grid gap-2">
-        {MODE_CARDS.map(({ mode, icon: Icon, title, description }) => (
+        {MODE_CARDS.map(({ mode, icon: Icon, title, description, badge }) => (
           <button
             key={mode}
             type="button"
@@ -102,8 +102,19 @@ function NewServerModePicker({ onSelect, onBack }: { onSelect: (m: NewServerMode
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/30 text-muted-foreground">
               <Icon className="h-4 w-4" />
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">{title}</p>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-foreground">{title}</p>
+                {badge && (
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium leading-tight ${
+                    badge === 'Advanced'
+                      ? 'bg-orange-500/15 text-orange-500'
+                      : 'bg-primary/15 text-primary'
+                  }`}>
+                    {badge}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">{description}</p>
             </div>
           </button>
