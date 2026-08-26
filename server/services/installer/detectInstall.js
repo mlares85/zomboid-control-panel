@@ -54,10 +54,12 @@ const LINUX_PZ_PATHS = [
 ];
 
 const PZ_SERVER_SIGNATURES = [
-  "ProjectZomboid64",
-  "ProjectZomboid64.exe",
-  "start-server.sh",
-  "start-server.bat",
+  "StartServer64.bat",       // Build 42 Windows
+  "ProjectZomboid64.exe",    // Build 41 Windows
+  "ProjectZomboid64",        // Build 41 Linux
+  "start-server.sh",         // Build 41 Linux
+  "start-server.bat",        // Build 41 Windows
+  "projectzomboid.jar",      // Build 42 (both platforms)
 ];
 
 /**

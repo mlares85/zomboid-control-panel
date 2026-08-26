@@ -229,7 +229,7 @@ export class NativeSteamCmdInstaller extends Installer {
         if (success) {
           // Verify the server files actually exist on disk — SteamCMD
           // can exit 0 without writing anything in edge cases.
-          const verified = verifyInstall(installPath, this._isWindows);
+          const verified = verifyInstall(installPath);
           steamCmd.activeOps.delete(normalizedPath);
           if (!verified.ok) {
             emit("complete", { success: false, message: verified.reason });
@@ -384,11 +384,17 @@ async function getFolderSizeShallow(dir) {
 }
 
 /** Verify the PZ server files actually landed on disk after SteamCMD. */
-function verifyInstall(installPath, isWindows) {
-  // PZ server must have at least one of these to be launchable
-  const signatures = isWindows
-    ? ["ProjectZomboid64.exe", "start-server.bat"]
-    : ["ProjectZomboid64", "start-server.sh"];
+function verifyInstall(installPath) {
+  // Build 42 uses StartServer64.bat + projectzomboid.jar (no .exe).
+  // Build 41 used ProjectZomboid64.exe / start-server.bat / start-server.sh.
+  const signatures = [
+    "StartServer64.bat",
+    "projectzomboid.jar",
+    "ProjectZomboid64.exe",
+    "ProjectZomboid64",
+    "start-server.bat",
+    "start-server.sh",
+  ];
 
   const found = signatures.some((f) =>
     fs.existsSync(path.join(installPath, f)),
