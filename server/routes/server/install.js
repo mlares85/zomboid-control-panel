@@ -73,14 +73,15 @@ function registerInstallRoute(router) {
       const dataPathError = checkWritableOrError(serverConfigPath, "Zomboid data folder", zomboidPath);
       if (dataPathError) return res.status(400).json({ error: dataPathError });
 
-      // Preflight: PZ server needs ~3 GB. Block early instead of letting
-      // SteamCMD fail midway through a multi-GB download.
-      const MIN_DISK_BYTES = 3.5 * 1024 * 1024 * 1024; // 3.5 GB buffer
+      // Preflight: PZ Build 42 server is ~7 GB. Require 8 GB so there's
+      // room for saves/config alongside the install. Block early instead of
+      // letting SteamCMD fail midway through a multi-GB download.
+      const MIN_DISK_BYTES = 8 * 1024 * 1024 * 1024; // 8 GB
       const disk = await statDisk(installPath);
       if (disk && disk.freeBytes < MIN_DISK_BYTES) {
         const freeGB = (disk.freeBytes / (1024 * 1024 * 1024)).toFixed(1);
         return res.status(400).json({
-          error: `Not enough disk space. The PZ server needs at least 3.5 GB ` +
+          error: `Not enough disk space. The PZ server needs at least 8 GB ` +
             `but only ${freeGB} GB is free on the install drive. ` +
             `Free up space or choose a different install folder.`,
         });
