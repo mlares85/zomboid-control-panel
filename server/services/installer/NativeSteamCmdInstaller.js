@@ -211,7 +211,13 @@ export class NativeSteamCmdInstaller extends Installer {
         logFlush: operation === "install",
       });
 
+      // Poll the install folder size every 5s as a progress fallback —
+      // SteamCMD on Windows buffers stdout and may not emit download
+      // percentages in real time.
+      const sizePoller = startSizePoller(installPath, emit);
+
       child.on("close", async (code) => {
+        sizePoller.stop();
         streaming.flush();
 
         // SteamCMD exit codes: 0 = success, 7 = success (common on
@@ -262,6 +268,7 @@ export class NativeSteamCmdInstaller extends Installer {
       });
 
       child.on("error", (err) => {
+        sizePoller.stop();
         steamCmd.activeOps.delete(normalizedPath);
         const msg = `Failed to run SteamCMD: ${err.message}`;
         emit("complete", { success: false, message: msg });
@@ -317,6 +324,63 @@ function detectFailureReason(output, operation, code) {
   }
 
   return `Server ${operation} failed with exit code ${code}`;
+}
+
+// PZ Build 42 dedicated server is ~7 GB.
+const ESTIMATED_PZ_SIZE_BYTES = 7 * 1024 * 1024 * 1024;
+const SIZE_POLL_INTERVAL_MS = 5000;
+
+/** Poll the install folder size every few seconds and emit progress. */
+function startSizePoller(installPath, emit) {
+  let stopped = false;
+  let lastSize = 0;
+
+  const poll = async () => {
+    if (stopped) return;
+    try {
+      const size = await getFolderSizeShallow(installPath);
+      if (size > lastSize) {
+        lastSize = size;
+        const sizeMB = Math.round(size / (1024 * 1024));
+        const pct = Math.min(99, Math.round((size / ESTIMATED_PZ_SIZE_BYTES) * 100));
+        emit("log", {
+          type: "stdout",
+          text: `Downloading... ${sizeMB} MB downloaded (~${pct}%)`,
+        });
+      }
+    } catch {
+      // Folder may not exist yet — ignore
+    }
+    if (!stopped) timer = setTimeout(poll, SIZE_POLL_INTERVAL_MS);
+  };
+
+  let timer = setTimeout(poll, SIZE_POLL_INTERVAL_MS);
+  return { stop: () => { stopped = true; clearTimeout(timer); } };
+}
+
+/** Quick folder size: sum file sizes one level deep in key subdirectories. */
+async function getFolderSizeShallow(dir) {
+  let total = 0;
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isFile()) {
+        try { total += fs.statSync(full).size; } catch { /* skip */ }
+      } else if (entry.isDirectory()) {
+        // One level deep into key large directories
+        try {
+          const sub = fs.readdirSync(full, { withFileTypes: true });
+          for (const s of sub) {
+            if (s.isFile()) {
+              try { total += fs.statSync(path.join(full, s.name)).size; } catch { /* skip */ }
+            }
+          }
+        } catch { /* skip unreadable dirs */ }
+      }
+    }
+  } catch { /* dir doesn't exist yet */ }
+  return total;
 }
 
 /** Verify the PZ server files actually landed on disk after SteamCMD. */
