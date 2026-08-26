@@ -38,6 +38,25 @@ export async function checkFiles(server: ServerInstance): Promise<Partial<CheckI
   }
 }
 
+/** Start the PZ server process via the panel's /start endpoint. */
+export async function startPzServer(): Promise<Partial<CheckItem>> {
+  try {
+    // Check if already running first
+    const status = await serverApi.getStatus()
+    if (status?.isRunning) {
+      return { status: 'ok', detail: 'Server is already running' }
+    }
+
+    await serverApi.start()
+    // Give the process a moment to spawn before RCON polling starts
+    await new Promise<void>((r) => setTimeout(r, 3000))
+    return { status: 'ok', detail: 'Server process started — waiting for RCON' }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Could not start server'
+    return { status: 'fail', detail: msg }
+  }
+}
+
 export async function checkRcon(server: ServerInstance): Promise<Partial<CheckItem>> {
   try {
     // Don't pass credentials — the RCON service already has the config
@@ -118,12 +137,14 @@ export function updateCheck(checks: CheckItem[], id: string, patch: Partial<Chec
   return checks.map((c) => (c.id === id ? { ...c, ...patch } : c))
 }
 
-export function buildInitialChecks(isDocker: boolean): CheckItem[] {
+export function buildInitialChecks(isDocker: boolean, isRemote: boolean): CheckItem[] {
   const checks: CheckItem[] = [
     { id: 'files', label: 'Server files accessible', status: 'pending' },
   ]
   if (isDocker) {
     checks.push({ id: 'boot', label: 'Container starting', status: 'pending' })
+  } else if (!isRemote) {
+    checks.push({ id: 'start', label: 'Starting server', status: 'pending' })
   }
   checks.push(
     { id: 'rcon', label: 'RCON reachable', status: 'pending' },

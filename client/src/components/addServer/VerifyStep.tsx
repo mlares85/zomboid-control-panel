@@ -13,6 +13,7 @@ import {
   checkBridgeStatus,
   checkFiles,
   checkRcon,
+  startPzServer,
   updateCheck,
   waitForContainerBoot,
   type CheckItem,
@@ -45,13 +46,29 @@ export function VerifyStep({ serverId, onVerified }: VerifyStepProps) {
 
     setProvider(server.provider)
     const isDocker = server.provider === 'docker-managed'
-    const initial = buildInitialChecks(isDocker)
+    const isRemote = !!server.isRemote
+    const initial = buildInitialChecks(isDocker, isRemote)
     setChecks(initial.map((c) => ({ ...c, status: 'running' })))
 
     // Files check
     const filesResult = await checkFiles(server)
     if (cancelledRef.current) return
     setChecks((prev) => updateCheck(prev, 'files', filesResult))
+
+    // Auto-start native/local servers so RCON can connect
+    if (!isDocker && !isRemote) {
+      setChecks((prev) => updateCheck(prev, 'start', { status: 'waiting', detail: 'Starting PZ server process…' }))
+      const startResult = await startPzServer()
+      if (cancelledRef.current) return
+      setChecks((prev) => updateCheck(prev, 'start', startResult))
+      if (startResult.status === 'fail') {
+        // Don't abort — let RCON check fail too with a clear message
+        setChecks((prev) => updateCheck(prev, 'rcon', { status: 'fail', detail: 'Server failed to start' }))
+        setChecks((prev) => updateCheck(prev, 'bridge', { status: 'pending' }))
+        setRunning(false)
+        return
+      }
+    }
 
     // Docker boot check — wait for the container entrypoint to finish
     if (isDocker && server.dockerContainerId) {
