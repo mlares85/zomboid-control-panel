@@ -9,6 +9,7 @@ import { createLogger } from "../../utils/logger.js";
 import { sanitizeError } from "../../utils/sanitize.js";
 import { isValidPath } from "./shared.js";
 import { getSteamCmdExe, isWindows } from "./steamcmd.js";
+import unzipper from "unzipper";
 
 const log = createLogger("API:Server");
 
@@ -58,7 +59,6 @@ export function registerSteamcmdDownloadRoute(router) {
 
 async function downloadForWindows(installPath, io) {
   // Windows: Download and extract zip
-  const unzipper = await import("unzipper");
   const steamcmdUrl =
     "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip";
   const zipPath = path.join(installPath, "steamcmd.zip");
@@ -91,7 +91,7 @@ async function downloadForWindows(installPath, io) {
 
       await fs
         .createReadStream(zipFile)
-        .pipe(unzipper.default.Extract({ path: installPath }))
+        .pipe(unzipper.Extract({ path: installPath }))
         .promise();
 
       fs.unlinkSync(zipFile);

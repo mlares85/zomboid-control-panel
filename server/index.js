@@ -59,6 +59,7 @@ import {
 } from "./utils/embeddedLua.js";
 import { isServerObservedRunning } from "./utils/serverStatus.js";
 import { validateStartupConfig } from "./utils/startupValidation.js";
+import { DockerClient } from "./services/dockerClient.js";
 
 // === Supervisor bootstrap ===
 // If the .exe was double-clicked directly (no PANEL_SUPERVISOR_V env var) and
@@ -692,7 +693,6 @@ const serverManager = new ServerManager();
 // reading undefined and reporting "unavailable" regardless of real state.
 let dockerClient = null;
 try {
-  const { DockerClient } = await import("./services/dockerClient.js");
   dockerClient = new DockerClient();
   if (dockerClient.available) {
     serverManager.setDockerClient(dockerClient);
