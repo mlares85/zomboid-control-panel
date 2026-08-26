@@ -453,7 +453,7 @@ Recommended safe-upgrade commands:
     );
   }
 
-  if (fs.existsSync("./zomboid-panel.service")) {
+  if (targets.includes("linux") && fs.existsSync("./zomboid-panel.service")) {
     fs.copyFileSync(
       "./zomboid-panel.service",
       "./release/zomboid-panel.service",
@@ -623,7 +623,9 @@ goto :eof
   >>"%LOG_FILE%" echo [!NOW!] %~1
 goto :eof
 `;
-  fs.writeFileSync("./release/Start.bat", startBat);
+  if (targets.includes("win")) {
+    fs.writeFileSync("./release/Start.bat", startBat);
+  }
 
   const startSh = `#!/bin/bash
 # Zomboid Control Panel — Linux launcher
@@ -660,9 +662,11 @@ fi
 
 ./ZomboidControlPanel
 `;
-  fs.writeFileSync("./release/start.sh", startSh.replace(/\r\n/g, "\n"), {
-    mode: 0o755,
-  });
+  if (targets.includes("linux")) {
+    fs.writeFileSync("./release/start.sh", startSh.replace(/\r\n/g, "\n"), {
+      mode: 0o755,
+    });
+  }
 
   const checksumLines = [];
   const manifestArtifacts = [];
@@ -700,8 +704,8 @@ fi
   for (const artifact of builtArtifacts) {
     console.log(`  - ${artifact.fileName} (${artifact.platform})`);
   }
-  console.log("  - Start.bat");
-  console.log("  - start.sh");
+  if (targets.includes("win")) console.log("  - Start.bat");
+  if (targets.includes("linux")) console.log("  - start.sh");
   console.log("  - checksums.txt");
   console.log("  - release-manifest.json");
   console.log("  - client/dist/");
