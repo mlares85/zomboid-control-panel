@@ -1,4 +1,5 @@
-import { AlertTriangle, Loader2, Palette, RotateCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { AlertTriangle, Loader2, Monitor, Palette, RotateCw } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -18,8 +19,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useTheme, type ThemeName } from "@/contexts/ThemeContext";
+import { useToast } from "@/components/ui/use-toast";
 import { FieldHelp } from "@/components/FieldHelp";
+import { configApi } from "@/lib/api";
 import { AppSettings } from "@/lib/settingsTypes";
 
 function ThemeSelect() {
@@ -34,6 +38,86 @@ function ThemeSelect() {
         <SelectItem value="light">Light</SelectItem>
       </SelectContent>
     </Select>
+  );
+}
+
+function AutoStartToggle() {
+  const [supported, setSupported] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    configApi
+      .getAutoStartStatus()
+      .then((status) => {
+        setSupported(status.supported);
+        setEnabled(status.enabled);
+      })
+      .catch(() => setSupported(false))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading || !supported) return null;
+
+  const handleToggle = async (value: boolean) => {
+    setToggling(true);
+    try {
+      const result = await configApi.setAutoStart(value);
+      setEnabled(result.enabled);
+      toast({
+        title: value ? "Auto-start enabled" : "Auto-start disabled",
+        description: value
+          ? "The panel will start automatically when you log in to Windows."
+          : "The panel will no longer start automatically.",
+      });
+    } catch (err) {
+      toast({
+        title: "Failed to update auto-start",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border/70 bg-background/40 p-4 space-y-4">
+      <div className="space-y-1">
+        <p className="text-sm font-medium flex items-center gap-2">
+          <Monitor className="w-4 h-4 text-primary" />
+          Startup
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Control whether the panel launches automatically.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/25 p-3">
+        <div>
+          <div className="flex items-center gap-1.5">
+            <Label className="text-sm font-medium">Start with Windows</Label>
+            <FieldHelp
+              description="Creates a Windows Task Scheduler entry that launches the panel when you log in."
+              context="The panel runs as a normal (non-elevated) process. A console window will appear on login — close it to stop the panel."
+              recommendation="safe-default"
+              articleId="welcome-tour"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Launch the panel automatically when you log in.
+          </p>
+        </div>
+        <Switch
+          checked={enabled}
+          onCheckedChange={handleToggle}
+          disabled={toggling}
+          aria-label="Start panel with Windows"
+        />
+      </div>
+    </div>
   );
 }
 
@@ -130,6 +214,8 @@ export function GeneralSettings({
             </p>
           )}
         </div>
+
+        <AutoStartToggle />
 
         <div className="rounded-xl border border-border/70 bg-background/40 p-4 space-y-4">
           <div className="space-y-1">

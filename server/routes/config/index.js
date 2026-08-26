@@ -5,6 +5,7 @@ import appSettingsRoutes from "./appSettings.js";
 import corsDebugRoutes from "./corsDebug.js";
 import pathsRoutes from "./paths.js";
 import rconConfigRoutes from "./rconConfig.js";
+import autoStartRoutes from "./autoStart.js";
 
 const router = express.Router();
 
@@ -14,6 +15,7 @@ router.use(appSettingsRoutes);
 router.use(corsDebugRoutes);
 router.use(pathsRoutes);
 router.use(rconConfigRoutes);
+router.use(autoStartRoutes);
 
 export default router;
 export { isMaskedSecret } from "./secrets.js";

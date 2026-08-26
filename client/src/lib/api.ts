@@ -1372,6 +1372,18 @@ export const configApi = {
   getAppSettings: () => apiGet("/config/app-settings"),
   updateAppSettings: (settings: Record<string, unknown>) =>
     apiPut("/config/app-settings", { settings }),
+
+  // Windows auto-start (Task Scheduler)
+  getAutoStartStatus: () =>
+    apiGet("/config/auto-start") as Promise<{
+      enabled: boolean;
+      supported: boolean;
+    }>,
+  setAutoStart: (enabled: boolean) =>
+    apiPost("/config/auto-start", { enabled }) as Promise<{
+      success: boolean;
+      enabled: boolean;
+    }>,
   getCorsDiagnostics: () =>
     apiGet("/config/cors-debug") as Promise<{
       diagnostics: {
