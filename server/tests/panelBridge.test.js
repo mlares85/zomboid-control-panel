@@ -286,7 +286,9 @@ describe('PanelBridge player healing compatibility', () => {
     expect(killStart).toBeGreaterThanOrEqual(0);
     expect(godModeStart).toBeGreaterThan(killStart);
     expect(killHandler).toContain('PanelBridge.invoke(player, "Kill", nil)');
-    expect(killHandler).toContain('return isDead, {');
+    // v1.7.48: returns (true, data) on success, (false, data, err) on failure
+    expect(killHandler).toContain('return true, {');
+    expect(killHandler).toContain('return false, {');
     expect(killHandler).not.toContain('setOverallBodyHealth');
     expect(killHandler).not.toContain('DoDeath');
   });

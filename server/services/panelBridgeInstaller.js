@@ -84,12 +84,26 @@ export async function checkBridgeInstalled(server, { fileAccess } = {}) {
   const sourcePath = await resolveSourcePath({ fileAccess: fa });
   const targetPath = resolveTargetPath(server);
   const installed = Boolean(targetPath && await fa.exists(targetPath));
-  const sourceVersion = sourcePath ? await readVersion(sourcePath, fa) : null;
   const targetVersion = installed ? await readVersion(targetPath, fa) : null;
-  const needsUpdate = Boolean(
-    installed && sourceVersion && targetVersion &&
-    compareModVersions(sourceVersion, targetVersion) > 0,
-  );
+
+  // Content comparison: catches fixes where the VERSION string wasn't bumped.
+  // Falls back to version comparison if content can't be read.
+  let needsUpdate = false;
+  if (installed && sourcePath) {
+    const [sourceRead, targetRead] = await Promise.all([
+      fa.readFile(sourcePath, 'utf8'),
+      fa.readFile(targetPath, 'utf8'),
+    ]);
+    if (sourceRead.success && targetRead.success) {
+      needsUpdate = sourceRead.data !== targetRead.data;
+    } else {
+      const sourceVersion = await readVersion(sourcePath, fa);
+      needsUpdate = Boolean(
+        sourceVersion && targetVersion &&
+        compareModVersions(sourceVersion, targetVersion) > 0,
+      );
+    }
+  }
 
   return { installed, version: targetVersion, needsUpdate, sourcePath, targetPath };
 }
