@@ -228,6 +228,26 @@ The entrypoint installs 32-bit compat libs, extracts SQLite native libs, configu
 
 Playwright's `webServer` command runs `e2e/ensure-ports-free.sh` before `npm run dev` to kill stale processes on 3001/5173. Vite uses `strictPort: true` to fail fast instead of silently shifting ports. `DATA_DIR` env var (read by `server/utils/paths.js`) isolates the test database from production; set `E2E_DATA_DIR` to enable. `reuseExistingServer` is disabled when `E2E_DATA_DIR` is set so the test server uses the isolated DB. The `dashboard` fixture detects login failures via form-scoped alert locators to avoid strict mode violations from unrelated destructive elements on the dashboard.
 
+## Socket.IO safe emit
+
+`server/utils/safeEmit.js` exports `safeIo(io)` — a Proxy wrapper that try-catches every `.emit()` and `.to().emit()` call so a synchronous throw (disconnected socket, circular JSON) can't crash the Node process. All Socket.IO emit sites in `index.js` use `safeSocketIo` instead of raw `io`, and services receive the wrapped instance.
+
+## INI line ending preservation
+
+`server/utils/iniLineEndings.js` detects whether an INI file uses CRLF or LF on read, and restores the original line ending on write. Windows PZ servers produce CRLF files; writing back LF could break PZ's config parser. Used in `lifecycleHelpers.js`, `config.js`, and `serverConfigIo.js`.
+
+## Mods INI whitespace tolerance
+
+`server/utils/mods/iniFile.js` exports `parseIniList(value)` — trims, splits on `;`, trims each entry, drops empties. Replaced ~40 broken `.split(";").filter(Boolean)` call sites across 21 files that failed on `Mods=mod1 ; mod2` (entries had embedded spaces).
+
+## TanStack Query (React Query)
+
+Introduced for polling bridge data on the dashboard. `client/src/lib/queryClient.ts` holds the shared `QueryClient`, wrapped in `QueryClientProvider` in `App.tsx`. Used by `useWorldStats`, `usePlayerVitals`, and `useWeatherConditions` hooks. Existing pages remain on manual fetch; new polling/detail features should follow the Query pattern.
+
+## Internationalization (i18n)
+
+`i18next` + `react-i18next` with `import.meta.glob` auto-discovery of `client/src/locales/*/*.json` files. `i18n/languages.ts` is the single registry for supported languages (en, fr, zh-CN, es, de, ht). `LanguageSwitcher` component in the sidebar footer persists choice to localStorage. `parseMissingKeyHandler` shows raw keys for not-yet-wired strings — the app stays functional during incremental extraction. 21 English namespace files cover all pages. Adding a language is one folder of JSON files + one row in `languages.ts`.
+
 ## Dashboard server cards
 
 `components/dashboard/ServerCards.tsx` renders one compact `ServerCard` per configured server above the main dashboard. Non-active servers now show both a host process signal and an RCON connectivity signal (from `GET /servers/rcon-status`). The active server gets full 3-signal status (host/RCON/bridge) from `GET /servers/active/status`. Cards are clickable without nesting `<button>`s inside `<button>`s: a full-size `<button>` sits absolutely positioned behind a `pointer-events-none` content wrapper, and only the real action buttons opt back in with `pointer-events-auto` — clicks on empty card space fall through to the cover button (switches server), clicks on an action button are captured by that button first.
