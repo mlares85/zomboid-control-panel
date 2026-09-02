@@ -19,6 +19,79 @@ export function normalizeRconHost(host) {
   return host.trim() || "127.0.0.1";
 }
 
+// Response texts PZ's RCON sends back for a command it accepted but refused
+// to run. banuser / unbanuser / adduser / removeuserfromwhitelist delegate
+// their entire result string to zombie/network/BanSystem and
+// zombie/network/ServerWorldDatabase — their own command classes carry no
+// rejection text at all, so without recognizing these specific strings a
+// rejected ban/whitelist change came back indistinguishable from a real
+// success. Deliberately a denylist of known rejection shapes, not a success
+// allowlist: every pattern is anchored (full-string, or bounded by fixed
+// text around an interpolated player name) so a player naming themselves
+// text that happens to contain a rejection fragment can't turn their own
+// successful ban/unban into a false failure.
+export const KNOWN_RCON_REJECTIONS = [
+  {
+    pattern: /^\s*Unknown command\b/i,
+    describe: (text) =>
+      `${text}. This command is not available on this server build.`,
+  },
+  {
+    // BanSystem (BanUser): target holds a protected/admin capability.
+    pattern: /^\s*This user can't be banned\.\s*$/i,
+    describe: () => "This user can't be banned (protected account).",
+  },
+  {
+    // BanSystem (BanUserByIP, -ip flag): target's IP is a Steam Relay
+    // shared address, so there's no real IP to ban.
+    pattern:
+      /^Cannot ban IP .+ \(Steam Relay shared address\)\. Use bansteamid or banuser instead\.\s*$/i,
+    describe: (text) => text,
+  },
+  {
+    // BanSystem (BanUserByIP): same Steam-Relay case, real IP unavailable.
+    pattern:
+      /^Cannot ban IP for player '.+' \(Steam Relay, real IP unavailable\)\. Use bansteamid or banuser without -ip\.\s*$/i,
+    describe: (text) => text,
+  },
+  {
+    // ServerWorldDatabase (addUser): target username is already whitelisted.
+    pattern: /^\s*A user with this name already exists\.?\s*$/i,
+    describe: () => "A user with this name already exists.",
+  },
+  {
+    // ServerWorldDatabase: target isn't whitelisted at all. Kept distinct
+    // from setaccesslevel's differently-worded "...nor the server, use
+    // /adduser first" — that's a different class's literal text.
+    pattern: /^User ".*" is not in the whitelist, use \/adduser first\s*$/i,
+    describe: (text) => `${text}.`,
+  },
+  {
+    // ServerWorldDatabase: target username not found.
+    pattern: /^User .+ not found\s*$/i,
+    describe: () => "User not found.",
+  },
+  {
+    // BanSystem (BanUser): capability backstop, redundant with whatever the
+    // RCON account's role already gates.
+    pattern: /^\s*You don't have capability to ban\/unban users\.\s*$/i,
+    describe: () => "You don't have capability to ban/unban users.",
+  },
+];
+
+// Classifies a raw RCON response string against KNOWN_RCON_REJECTIONS.
+// Returns null when the response doesn't match any known rejection shape
+// (treated as success by callers), or { matched, message } when it does.
+export function classifyRconResponse(response) {
+  if (typeof response !== "string") return null;
+  const trimmed = response.trim();
+  const rejection = KNOWN_RCON_REJECTIONS.find(({ pattern }) =>
+    pattern.test(response),
+  );
+  if (!rejection) return null;
+  return { matched: trimmed, message: rejection.describe(trimmed) };
+}
+
 // Raw TCP reachability probe used by testRconConnection() below — separate
 // from RconService.checkPortOpen() because that method has a fixed 2s
 // timeout tuned for the background auto-reconnect loop, while a
@@ -824,16 +897,18 @@ export class RconService extends EventEmitter {
 
       log.debug(`response: ${response}`);
 
-      // The server answers an unrecognised command with a normal RCON reply, so
-      // without this check a command removed by a game update looks like it
-      // succeeded. Build 42 dropped several Build 41 commands this way.
-      if (typeof response === "string" && /^\s*Unknown command\b/i.test(response)) {
-        const unknown = response.trim();
-        log.warn(`Server rejected command as unknown: ${command}`);
+      // The server answers a rejected command with a normal RCON reply, so
+      // without this check a removed/refused command looks like it
+      // succeeded — including banuser/adduser/unbanuser/
+      // removeuserfromwhitelist, whose rejection text comes from PZ's
+      // BanSystem/ServerWorldDatabase classes (see KNOWN_RCON_REJECTIONS).
+      const rejection = classifyRconResponse(response);
+      if (rejection) {
+        log.warn(`Server rejected command: ${command} (${rejection.matched})`);
         return {
           success: false,
-          error: `${unknown}. This command is not available on this server build.`,
-          response: unknown,
+          error: rejection.message,
+          response: rejection.matched,
         };
       }
 
