@@ -1,0 +1,97 @@
+{
+  "page": {
+    "title": "Simulation Templates",
+    "description": "Apply a curated ruleset to your server, or save your own configuration to reuse later."
+  },
+  "actions": {
+    "import": "Import",
+    "saveCurrentConfig": "Save Current Config"
+  },
+  "empty": {
+    "loading": "Loading templates...",
+    "couldNotLoad": {
+      "title": "Couldn't load templates",
+      "retry": "Retry"
+    },
+    "noTemplates": {
+      "title": "No templates yet",
+      "description": "Save your current server configuration as a template, or import one from a file."
+    }
+  },
+  "card": {
+    "builtIn": "Built-in",
+    "custom": "Custom",
+    "settingsOverridden": "setting",
+    "settingsOverriddenPlural": "settings",
+    "mods": "mod",
+    "modsPlural": "mods",
+    "preview": "Preview",
+    "exportTooltip": "Export template",
+    "deleteTooltip": "Delete template"
+  },
+  "createDialog": {
+    "title": "Save Current Config as Template",
+    "description": "Captures this server's current server.ini and sandbox settings.",
+    "nameLabel": "Name",
+    "namePlaceholder": "My Ruleset",
+    "descriptionLabel": "Description",
+    "tagsLabel": "Tags (comma separated)",
+    "tagsPlaceholder": "hardcore, pvp",
+    "willSaveMessage": "Will save {{sandboxCount}} sandbox setting(s) and {{iniCount}} server.ini key(s). Identity and connection settings (name, ports, passwords) are never included.",
+    "couldNotSaveError": "Couldn't save template",
+    "cancel": "Cancel",
+    "save": "Save Template"
+  },
+  "importDialog": {
+    "title": "Import Template",
+    "description": "Paste a .pztemplate.json file's contents, or pick a file below.",
+    "chooseFile": "Choose File",
+    "templateJsonLabel": "Template JSON",
+    "templateJsonPlaceholder": "Paste template JSON here",
+    "importFailed": "Import Failed",
+    "cancel": "Cancel",
+    "import": "Import"
+  },
+  "previewDialog": {
+    "noActiveServer": "No Active Server",
+    "noActiveServerDesc": "Set up a server before previewing or applying templates.",
+    "remoteServer": "Remote Server",
+    "remoteServerDesc": "Applying templates to remote servers isn't supported yet.",
+    "previewFailed": "Preview Failed"
+  },
+  "diffList": {
+    "sandboxChanges": "Sandbox Changes",
+    "sandboxNoChanges": "No sandbox setting changes.",
+    "serverIniChanges": "Server INI Changes",
+    "iniNoChanges": "No server.ini changes.",
+    "mods": "Mods",
+    "modsEmpty": "This template doesn't reference any mods.",
+    "modsAutoInstall": "Referenced mods aren't installed automatically — add them from the Mod Manager."
+  },
+  "applyPanel": {
+    "success": "Template Applied",
+    "successMessage": "{{iniCount}} INI key(s) updated. {{sandboxCount}} sandbox setting(s) updated. {{backupCount}} backup file(s) created. Changes will take effect the next time the server restarts.",
+    "running": "Server is running",
+    "runningDesc": "Files will be updated now, but the running server won't pick up the changes until it's restarted.",
+    "applyChanges": "Apply sandbox changes",
+    "applyServerIni": "Apply server.ini changes",
+    "applyFailed": "Apply Failed",
+    "cancel": "Cancel",
+    "apply": "Apply Template"
+  },
+  "toasts": {
+    "exportFailed": "Export Failed",
+    "exportFailedDesc": "Failed to export template",
+    "deleteConfirm": "Delete Template",
+    "deleteConfirmDesc": "Delete \"{{name}}\"? This can't be undone.",
+    "deleted": "Template Deleted",
+    "deleteFailed": "Delete Failed",
+    "deleteFailedDesc": "Failed to delete template",
+    "created": "Template Saved",
+    "createdDesc": "\"{{name}}\" is ready to reuse.",
+    "imported": "Template Imported",
+    "importedDesc": "\"{{name}}\" was added to your templates.",
+    "applied": "Template Applied",
+    "appliedDesc": "\"{{name}}\" was applied."
+  }
+}

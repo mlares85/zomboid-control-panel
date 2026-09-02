@@ -1,0 +1,76 @@
+{
+  "title": "World Map",
+  "description": "Live player positions, vehicles, and interactive map controls",
+  "bridgeStatus": "Bridge Status",
+  "bridgeConnected": "Connected",
+  "bridgeDisconnected": "Disconnected",
+  "bridgeConnecting": "Connecting…",
+  "loading": "Loading…",
+  "noActiveServer": "No active server",
+  "zoom": "Zoom",
+  "pan": "Pan",
+  "fitToView": "Fit to view",
+  "togglePlayers": "Toggle players",
+  "toggleVehicles": "Toggle vehicles",
+  "toggleSafehouses": "Toggle safehouses",
+  "mapVersion": "Map Version",
+  "mapAuto": "Auto (latest)",
+  "buildLabel": "Build",
+  "airdropPresets": {
+    "military": {
+      "label": "Military",
+      "desc": "Rifles, ammo, armor, comms"
+    },
+    "medical": {
+      "label": "Medical",
+      "desc": "Bandages, antibiotics, first aid"
+    },
+    "food": {
+      "label": "Food",
+      "desc": "Canned food, water, MREs"
+    },
+    "building": {
+      "label": "Building",
+      "desc": "Planks, nails, tools, rope"
+    },
+    "weapons": {
+      "label": "Weapons",
+      "desc": "Shotguns, melee weapons, holsters"
+    },
+    "tools": {
+      "label": "Tools",
+      "desc": "Axes, wrenches, blowtorch, tape"
+    }
+  },
+  "landmarks": {
+    "muldraugh": "Muldraugh",
+    "westPoint": "West Point",
+    "rosewood": "Rosewood",
+    "riverside": "Riverside",
+    "louisville": "Louisville",
+    "marchRidge": "March Ridge",
+    "valleyStation": "Valley Station",
+    "fallasLake": "Fallas Lake",
+    "ekron": "Ekron",
+    "brandenburg": "Brandenburg",
+    "irvington": "Irvington",
+    "echoCreek": "Echo Creek",
+    "louisvilleAirport": "Louisville Airport"
+  },
+  "floorLabel": {
+    "ground": "Ground",
+    "basement": "B{level}",
+    "floor": "Floor {level}"
+  },
+  "vehicleLabel": "Vehicle",
+  "safehouse": "Safehouse",
+  "playerColors": {
+    "alive": "Alive",
+    "dead": "Dead",
+    "infected": "Infected",
+    "admin": "Admin"
+  },
+  "versionChanged": "New map version available",
+  "versionChangedDesc": "Map updated from {previous} to {current}",
+  "worldMapTabName": "World Map"
+}

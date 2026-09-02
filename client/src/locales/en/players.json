@@ -1,0 +1,168 @@
+{
+  "page": {
+    "title": "Players",
+    "description": "Manage connected players and their permissions"
+  },
+  "stats": {
+    "online": "Online",
+    "peak_today": "Peak Today",
+    "roster": "Roster",
+    "seen": "seen",
+    "players": "players",
+    "player": "player",
+    "banned_steamids": "Banned SteamIDs",
+    "manage": "manage"
+  },
+  "roster": {
+    "live": "live",
+    "history": "history",
+    "bans": "bans",
+    "online": "Online",
+    "roster": "Roster",
+    "banned": "Banned"
+  },
+  "search": {
+    "players_online": "Search players...",
+    "roster": "Search roster...",
+    "bans": "Search bans...",
+    "description": "Filters the list below by name (or by Steam ID / reason on the Banned tab).",
+    "context": "Matches anywhere in the name as you type — it doesn't change who's actually online, just what's shown."
+  },
+  "roster_empty": {
+    "no_players": "No players online",
+    "desc": "Players appear here when they connect.",
+    "see_roster": "See {{count}} previously seen {{player_word}}"
+  },
+  "roster_offline": {
+    "no_matches": "No matches",
+    "roster_empty": "Roster is empty",
+    "try_search": "Try a different search term.",
+    "offline_desc": "Players you've seen before will appear here once they disconnect."
+  },
+  "roster_banned": {
+    "no_matches": "No matches",
+    "no_bans": "No SteamID bans",
+    "try_search": "Try a different search term.",
+    "bans_empty": "Banned SteamIDs will appear here."
+  },
+  "manual_target": {
+    "label": "Manual target",
+    "description": "Type an exact username to target it for actions below, bypassing the roster list.",
+    "context": "Useful for offline or unlisted players — moderation actions like ban/kick still need the player's exact in-game name."
+  },
+  "dossier": {
+    "label": "dossier",
+    "target_acquired": "target.acquired",
+    "standby": "standby",
+    "online": "online",
+    "offline": "offline",
+    "connected": "connected",
+    "last_seen": "last seen",
+    "played": "played",
+    "sessions": "sessions",
+    "no_history": "No history recorded yet"
+  },
+  "tabs": {
+    "moderation": "Moderation",
+    "spawn": "Spawn",
+    "powers": "Powers",
+    "notes_log": "Notes & Log"
+  },
+  "actions": {
+    "kick": "Kick",
+    "kick_desc": "Boot player with reason",
+    "ban": "Ban",
+    "ban_desc": "Permanent · two-step",
+    "access_level": "Access Level",
+    "access_desc": "Admin · Mod · User",
+    "teleport": "Teleport",
+    "teleport_desc": "B42 MP · may not sync",
+    "refresh": "Refresh"
+  },
+  "dialogs": {
+    "kick_player": "Kick Player",
+    "kick_player_confirm": "Kick {{player}} from the server",
+    "kick_reason": "Reason (optional)",
+    "kick_reason_hint": "Shown to the player in their disconnect message.",
+    "kick_reason_context": "A kick just disconnects the player — they can rejoin immediately. Use Ban if you need to keep them out.",
+    "kick_button": "Kick Player",
+    "ban_player": "Ban Player",
+    "ban_player_confirm": "Ban {{player}} from the server",
+    "ban_reason": "Reason (optional)",
+    "ban_reason_placeholder": "Enter reason...",
+    "ban_ip": "Also ban IP address",
+    "ban_continue": "Continue to Ban",
+    "ban_confirm_title": "Are you absolutely sure?",
+    "ban_confirm_desc": "This will permanently ban <strong>{{player}}</strong> from the server{{with_ip}}{{with_reason}}",
+    "ban_cancel": "Cancel",
+    "ban_confirm_button": "Yes, Ban Player",
+    "set_access_level": "Set Access Level",
+    "set_access_confirm": "Change access level for {{player}}",
+    "access_level_label": "Access Level",
+    "access_level_select": "Select level...",
+    "set_button": "Set Level",
+    "teleport_player_title": "Teleport Player",
+    "teleport_player_desc": "Teleport {{player}} to coordinates",
+    "teleport_target": "Target Player",
+    "quick_locations": "Quick Locations",
+    "teleport_x": "X",
+    "teleport_y": "Y",
+    "teleport_z": "Z"
+  },
+  "access_levels": {
+    "admin": "Admin",
+    "moderator": "Moderator",
+    "overseer": "Overseer",
+    "gm": "GM",
+    "observer": "Observer",
+    "user": "User (demote — try this first)",
+    "none": "None (official demote value)"
+  },
+  "teleport_presets": [
+    { "name": "Muldraugh" },
+    { "name": "West Point" },
+    { "name": "Riverside" },
+    { "name": "Rosewood" },
+    { "name": "Louisville" },
+    { "name": "March Ridge" },
+    { "name": "Ekron" },
+    { "name": "Military Base" }
+  ],
+  "toasts": {
+    "success": "Success",
+    "completed": "{{action}} completed",
+    "error": "Error",
+    "failed": "Action failed",
+    "note_saved": "Note Saved",
+    "note_saved_desc": "Note for {{player}} has been saved",
+    "note_deleted": "Note Deleted",
+    "note_deleted_desc": "Note for {{player}} has been deleted",
+    "item_given": "Item given",
+    "item_failed": "Give item failed",
+    "item_failed_desc": "Could not deliver the item",
+    "vehicle_spawned": "Vehicle spawned",
+    "vehicle_failed": "Vehicle spawn failed",
+    "vehicle_failed_desc": "Could not spawn the vehicle"
+  },
+  "errors": {
+    "username_password_required": "Username and password are required",
+    "password_too_short": "Password must be at least 4 characters",
+    "partially_unavailable": "Players page is partially unavailable",
+    "retry": "Retry"
+  },
+  "dropdown_more": {
+    "god_mode_enable": "Enable God Mode",
+    "god_mode_disable": "Disable God Mode",
+    "invisible_enable": "Enable Invisible",
+    "invisible_disable": "Disable Invisible",
+    "noclip_enable": "Enable Noclip",
+    "noclip_disable": "Disable Noclip",
+    "add_whitelist": "Add to Whitelist",
+    "remove_whitelist": "Remove from Whitelist",
+    "import_export": "Import/Export Character"
+  },
+  "empty_roster": {
+    "no_target": "no target selected",
+    "pick_player": "Pick a player from the roster to view their dossier, or type a username under <span class=\"font-mono text-foreground/80\">› Manual target</span>."
+  }
+}

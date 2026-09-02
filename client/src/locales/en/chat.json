@@ -1,0 +1,61 @@
+{
+  "page": {
+    "title": "In-Game Chat",
+    "description": "Broadcast messages to all connected players and see their chat in real time."
+  },
+  "chat": {
+    "stream": "chat stream",
+    "msg": "msg",
+    "msgs": "msgs",
+    "status_live": "LIVE",
+    "status_offline": "OFFLINE",
+    "no_messages": "No chat messages yet",
+    "no_messages_desc": "Player messages and your broadcasts will appear here in real time."
+  },
+  "players_sidebar": {
+    "players": "players",
+    "online": "online",
+    "no_players": "no players connected"
+  },
+  "quick_broadcasts": {
+    "broadcasts": "quick broadcasts",
+    "edit": "edit",
+    "done": "done",
+    "no_presets": "// no presets — click edit to add",
+    "add_preset": "add a new quick message…"
+  },
+  "channels": {
+    "server": "Server broadcast",
+    "admin": "Admin chat",
+    "general": "General chat"
+  },
+  "channel_help": {
+    "description": "Delivery channel for this message.",
+    "context": "Server broadcast uses RCON servermsg and reaches every connected player. Admin chat is visible only to admins in-game. General chat posts as a custom author into the public chat stream via the Panel Bridge mod."
+  },
+  "input": {
+    "admin_placeholder": "admins only — press enter to send…",
+    "general_placeholder": "post as Admin — press enter to send…",
+    "server_placeholder": "broadcast to all players — press enter to send…",
+    "aria_label": "Chat message"
+  },
+  "status": {
+    "admins_only": "admins only — hidden from regular players",
+    "no_players": "no players online — server log only",
+    "broadcasting": "broadcasting to {{count}} {{player_word}}"
+  },
+  "button": {
+    "send": "send",
+    "refresh": "Refresh"
+  },
+  "toasts": {
+    "admin_sent": "Admin Message Sent",
+    "admin_sent_desc": "Visible only to admins in-game.",
+    "general_posted": "Posted to Chat",
+    "general_posted_desc": "Posted into the public chat stream.",
+    "broadcast_sent": "Broadcast Sent",
+    "broadcast_sent_desc": "Message delivered to all connected players.",
+    "error": "Error",
+    "error_desc": "Failed to send message"
+  }
+}

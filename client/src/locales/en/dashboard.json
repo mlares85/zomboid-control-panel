@@ -1,0 +1,271 @@
+{
+  "loading": {
+    "establishingLink": "Establishing link…"
+  },
+  "viewToggle": {
+    "allServers": "All servers",
+    "cardsView": "Cards view",
+    "classicView": "Classic view"
+  },
+  "statusHeader": {
+    "serverStatus": "Server status",
+    "noActiveServer": "No active server",
+    "everythingNominal": "Everything nominal",
+    "remote": "remote",
+    "copyToClipboard": {
+      "title": "Copied",
+      "description": "{{label}} copied to clipboard",
+      "failed": "Failed to copy",
+      "failedDescription": "Could not copy to clipboard"
+    },
+    "addressBar": {
+      "lan": "LAN",
+      "lanHint": "Connect from your home network",
+      "wan": "WAN",
+      "wanHint": "Share this address with internet players",
+      "panel": "Panel",
+      "panelHint": "Open or copy the control panel address",
+      "join": "Join",
+      "joinHint": "Connect with Steam",
+      "joinAriaLabel": "Join with Steam at {{address}}"
+    },
+    "copyAriaLabel": "Copy {{tag}} address: {{address}}",
+    "controls": {
+      "startServer": "Start server",
+      "startServerTitle": "Add or select a server first",
+      "startServerTitleRemote": "Not available for remote (RCON-only) servers",
+      "stopServer": "Stop server",
+      "stopServerDescription": "Are you sure you want to stop the server? All connected players will be disconnected.",
+      "forceStopServer": "Force stop server",
+      "forceStopServerDescription": "This will immediately kill the game process without saving.{{playerCount}} player(s) will be disconnected!",
+      "forceStopServerTitle": "Immediately stops the game without saving",
+      "restartServer": "Restart server",
+      "restartServerDescription": "This will send a 5-minute warning to all players, then restart the server.",
+      "saveWorld": "Save world",
+      "moreActions": "More server actions",
+      "createBackup": "Create backup",
+      "refreshStatus": "Refresh status",
+      "bridgeSettings": "Bridge settings",
+      "connectRcon": "Connect RCON",
+      "restartNow": "Restart now",
+      "restartNowDescription": "This will immediately restart the server without warning.{{playerCount}} player(s) will be disconnected!",
+      "wipeServer": "Wipe server"
+    }
+  },
+  "serverCard": {
+    "onlinePlayers": "{{count}} online",
+    "selected": "Selected",
+    "openServer": "Open {{name}}",
+    "isActiveServer": "{{name}} is the active server",
+    "switchToServer": "Switch to {{name}}",
+    "switchToServerSuccess": "Switched to {{name}}",
+    "error": "Error",
+    "failedToSelectServer": "Failed to select server.",
+    "failedToRunAction": "Failed to {{action}} server.",
+    "actions": {
+      "start": "Start",
+      "stop": "Stop",
+      "restart": "Restart",
+      "backup": "Backup",
+      "console": "Console"
+    },
+    "success": {
+      "starting": "Server starting",
+      "stopping": "Server stopping",
+      "restarting": "Restart triggered",
+      "backup": "Backup started"
+    }
+  },
+  "banners": {
+    "panel": {
+      "applyFailed": "Apply failed",
+      "updateStaged": "Update staged",
+      "updateAvailable": "Panel update",
+      "applyFailedMessage": "Last apply attempt failed — see Settings for diagnostics.",
+      "stagedMessage": "Downloaded and ready. Restart the panel to apply.",
+      "availableMessage": "A new panel version is available.",
+      "dismissLabel": "Dismiss update notification",
+      "dismissTitle": "Dismiss until next version",
+      "applyUpdate": "Apply update",
+      "viewUpdate": "View update"
+    },
+    "error": {
+      "connectionError": "Connection error",
+      "description": "{{error}}. Some features may be unavailable.",
+      "retry": "Retry"
+    },
+    "notConfigured": {
+      "title": "Not configured",
+      "description": "Open Server Setup to add or configure a server.",
+      "action": "open setup →"
+    }
+  },
+  "verdict": {
+    "serverVerdict": "Server verdict",
+    "freshness": {
+      "noUpdate": "no update yet",
+      "updatedNow": "updated just now",
+      "updatedSeconds": "updated {{count}}s ago",
+      "updatedMinutes": "updated {{count}}m ago",
+      "updatedHours": "updated {{count}}h ago",
+      "linkStale": "link may be stale, {{label}}"
+    },
+    "playersMore": "and {{count}} more"
+  },
+  "liveActivityFeed": {
+    "title": "Live activity",
+    "eventsCount": "{{count}} events",
+    "idle": "idle",
+    "offline": "offline",
+    "listeningDescription": "Listening for player joins, departures, deaths, and moderation events.",
+    "startServerDescription": "Start the server to begin tracking player activity.",
+    "configureServerDescription": "Configure a server to start tracking activity.",
+    "noLogsYet": "No logs yet"
+  },
+  "telemetrySection": {
+    "title": "Server telemetry",
+    "timespan": {
+      "sampling": "sampling",
+      "standby": "standby",
+      "live": "live",
+      "lastSeconds": "last {{count}}s · live",
+      "lastMinutes": "last {{count}} min · live"
+    },
+    "chartDescription": "Telemetry will appear within the next sample cycle.",
+    "startServerDescription": "Start the server to track CPU, RAM, and player metrics."
+  },
+  "workSidebar": {
+    "maintenance": "Maintenance",
+    "refreshStatus": "Refresh status",
+    "createBackup": "Create backup",
+    "wipeServer": "Wipe server",
+    "wipeTitle": "Stop the server before wiping",
+    "wipeHint": "Delete map / players / world state",
+    "autoStart": "Auto-start on launch",
+    "bridgeOffline": "Bridge offline",
+    "bridgeMessage": "Advanced world controls require PanelBridge.",
+    "configureBridge": "Configure bridge",
+    "connectionStatus": {
+      "host": "Host",
+      "process": "Process",
+      "rcon": "RCON",
+      "bridge": "Bridge",
+      "connected": "connected",
+      "pending": "pending",
+      "offline": "offline"
+    }
+  },
+  "containerLogs": {
+    "title": "Container logs",
+    "noLogs": "No logs yet",
+    "clearLogs": "Clear logs",
+    "clear": "Clear",
+    "resume": "Resume"
+  },
+  "confirmDialog": {
+    "cancel": "Cancel"
+  },
+  "wipeDialog": {
+    "title": "Wipe server",
+    "description": "Select what data to delete from {{server}}. The server must be stopped.",
+    "categories": {
+      "map": "Map & terrain",
+      "mapDescription": "Chunks, terrain, buildings, zombie population, iso regions.",
+      "players": "Players & vehicles",
+      "playersDescription": "Player saves, inventories, positions, vehicle data.",
+      "world": "World state",
+      "worldDescription": "World dictionary, metadata, erosion, game object states, radio.",
+      "accounts": "Accounts & bans",
+      "accountsDescription": "User accounts, passwords, roles, whitelist and ban lists. Everyone re-registers on next join."
+    },
+    "warning": "Selecting map, players and world empties the save folder completely, including anything mods left behind. Server .ini and sandbox settings are stored separately and will not be affected.",
+    "preview": {
+      "noFiles": "No files found for the selected targets.",
+      "willDelete": "This will permanently delete:",
+      "labels": {
+        "map": "map/terrain",
+        "players": "player/vehicle",
+        "world": "world state",
+        "leftovers": "other leftover",
+        "accounts": "account database"
+      },
+      "files": "{{count}} {{label}} files ({{size}} MB)",
+      "noFilesFound": "No {{label}} files found",
+      "total": "Total: {{count}} files ({{size}} MB)"
+    },
+    "actions": {
+      "preview": "Preview",
+      "wipeNow": "Wipe now"
+    },
+    "toast": {
+      "previewFailed": "Preview failed",
+      "scanError": "Could not scan save directory",
+      "wiped": "Server wiped",
+      "wipedDescription": "Deleted: {{targets}}",
+      "wipeFailed": "Wipe failed",
+      "unknownError": "Unknown error"
+    }
+  },
+  "quickStartGuide": {
+    "dismissLabel": "Dismiss quick start guide",
+    "badge": "First server",
+    "heading": "Get one server up, RCON working, then layer on the rest.",
+    "steps": {
+      "step1": "1",
+      "step1Title": "Bring in a server",
+      "step1Description": "Add an existing install, connect remote RCON, or create a new server.",
+      "step2": "2",
+      "step2Title": "Verify connectivity",
+      "step2Description": "Confirm paths, RCON credentials, and active server.",
+      "step3": "3",
+      "step3Title": "Reach live control",
+      "step3Description": "When status, players, and chat update, live control is ready."
+    },
+    "buttons": {
+      "installNew": "Install new server",
+      "addExisting": "Add existing server",
+      "addRemote": "Add remote server"
+    }
+  },
+  "actions": {
+    "success": {
+      "start": "Server starting",
+      "startDescription": "Watch the dashboard for live status.",
+      "stop": "Server stopped",
+      "stopDescription": "Session closed cleanly.",
+      "forceStop": "Server force stopped",
+      "forceStopDescription": "The game process was terminated without RCON.",
+      "restart": "Restart scheduled",
+      "restartDescription": "The server will restart shortly.",
+      "restartNow": "Restart triggered",
+      "restartNowDescription": "Hard restart command sent.",
+      "save": "World saved",
+      "saveDescription": "Current state written to disk.",
+      "backup": "Backup started",
+      "backupDescription": "Packaging a fresh recovery point.",
+      "rcon": "RCON connected",
+      "rconDescription": "Remote command control ready.",
+      "default": "Action complete",
+      "defaultDescription": "{{action}} completed successfully."
+    },
+    "time": {
+      "justNow": "just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago",
+      "anyMoment": "any moment",
+      "inMinutes": "in {{count}}m",
+      "inHours": "in {{count}}h",
+      "inHoursMinutes": "in {{hours}}h {{minutes}}m",
+      "inDays": "in {{count}}d"
+    },
+    "events": {
+      "joined": "joined",
+      "left": "left",
+      "died": "died",
+      "killed": "killed",
+      "banned": "banned",
+      "kicked": "kicked"
+    }
+  }
+}

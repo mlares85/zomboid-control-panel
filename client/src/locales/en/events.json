@@ -1,0 +1,148 @@
+{
+  "page": {
+    "title": "Events",
+    "description": "Control weather, time, spawn zombies, teleport players, and trigger sounds."
+  },
+  "success": {
+    "rain_started": {
+      "title": "Rain Started",
+      "description": "Rain is now active on the server."
+    },
+    "rain_stopped": {
+      "title": "Rain Stopped",
+      "description": "Rainfall has been cleared."
+    },
+    "storm_triggered": {
+      "title": "Storm Triggered",
+      "description": "A storm event is now active."
+    },
+    "tropical_storm_triggered": {
+      "title": "Tropical Storm Triggered",
+      "description": "High-intensity weather is now active."
+    },
+    "blizzard_triggered": {
+      "title": "Blizzard Triggered",
+      "description": "A blizzard event is now active."
+    },
+    "weather_cleared": {
+      "title": "Weather Cleared",
+      "description": "All forced weather conditions removed."
+    },
+    "snowfall_enabled": {
+      "title": "Snowfall Enabled",
+      "description": "Snow precipitation is now active."
+    },
+    "snowfall_disabled": {
+      "title": "Snowfall Disabled",
+      "description": "Snow precipitation turned off."
+    },
+    "climate_reset": {
+      "title": "Climate Reset",
+      "description": "All climate overrides cleared."
+    },
+    "fog_updated": {
+      "title": "Fog Updated",
+      "description": "Fog density applied to the server."
+    },
+    "wind_updated": {
+      "title": "Wind Updated",
+      "description": "Wind intensity applied to the server."
+    },
+    "temperature_updated": {
+      "title": "Temperature Updated",
+      "description": "Temperature applied to the server."
+    },
+    "cloud_cover_updated": {
+      "title": "Cloud Cover Updated",
+      "description": "Cloud intensity applied to the server."
+    },
+    "humidity_updated": {
+      "title": "Humidity Updated",
+      "description": "Humidity level applied to the server."
+    },
+    "precipitation_updated": {
+      "title": "Precipitation Updated",
+      "description": "Precipitation intensity applied to the server."
+    },
+    "time_updated": {
+      "title": "Time Updated",
+      "description": "In-game date and time adjusted."
+    },
+    "utilities_restored": {
+      "title": "Utilities Restored",
+      "description": "Power and water are back online."
+    },
+    "utilities_shut_down": {
+      "title": "Utilities Shut Down",
+      "description": "Power and water have been cut."
+    },
+    "power_restored": {
+      "title": "Power Restored",
+      "description": "Electrical service is back online."
+    },
+    "water_restored": {
+      "title": "Water Restored",
+      "description": "Water service is back online."
+    },
+    "helicopter_triggered": {
+      "title": "Helicopter Triggered",
+      "description": "A helicopter event is now active."
+    },
+    "gunshot_triggered": {
+      "title": "Gunshot Triggered",
+      "description": "A gunshot sound has been created."
+    },
+    "alarm_triggered": {
+      "title": "Alarm Triggered",
+      "description": "An alarm has been triggered."
+    },
+    "noise_created": {
+      "title": "Noise Created",
+      "description": "A custom sound lure has been placed."
+    },
+    "lightning_triggered": {
+      "title": "Lightning Triggered",
+      "description": "A lightning strike has been called."
+    },
+    "thunder_triggered": {
+      "title": "Thunder Triggered",
+      "description": "A thunder event is now active."
+    },
+    "horde_spawned": {
+      "title": "Horde Spawned",
+      "description": "A zombie group has been created."
+    },
+    "rear_horde_spawned": {
+      "title": "Rear Horde Spawned",
+      "description": "A zombie group spawned behind the target."
+    },
+    "zombies_cleared": {
+      "title": "Zombies Cleared",
+      "description": "All zombies removed from loaded cells."
+    },
+    "time_speed_updated": {
+      "title": "Time Speed Updated",
+      "description": "The time multiplier has been changed."
+    },
+    "teleport_complete": {
+      "title": "Teleport Complete",
+      "description": "The target has been moved."
+    },
+    "vehicle_spawned": {
+      "title": "Vehicle Spawned",
+      "description": "Vehicle delivered to the target player."
+    },
+    "announcement_sent": {
+      "title": "Announcement Sent",
+      "description": "Message broadcast to all players."
+    },
+    "climate_applied": {
+      "title": "Climate Applied",
+      "description": "All climate parameters updated."
+    },
+    "action_complete": {
+      "title": "Action Complete",
+      "description": "{{action}} completed successfully."
+    }
+  }
+}

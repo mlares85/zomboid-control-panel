@@ -1,0 +1,338 @@
+{
+  "page": {
+    "title": "World Backups",
+    "description": "Create, restore, and manage your server world backups"
+  },
+  "common": {
+    "actions": {
+      "retry": "Retry",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "download": "Download",
+      "restore": "Restore",
+      "verify": "Verify",
+      "preview": "Preview",
+      "save": "Save Settings",
+      "connect": "Connect",
+      "settings": "Settings",
+      "refresh": "Refresh"
+    },
+    "labels": {
+      "never": "Never",
+      "on": "On",
+      "off": "Off",
+      "unknown": "Unknown"
+    },
+    "status": {
+      "loading": "Loading...",
+      "creating": "Creating...",
+      "saving": "Saving..."
+    }
+  },
+  "alerts": {
+    "remoteDisabled": {
+      "title": "Backups disabled for remote servers",
+      "description": "The active server is configured as remote, so the panel can't reach its filesystem. Create, upload, and restore are unavailable until you switch to a local server."
+    },
+    "dataUnavailable": "Backup data unavailable",
+    "savesFolderNotFound": "Saves folder not found",
+    "noLocalFile": "This backup has no local file on record — restore/download are unavailable."
+  },
+  "errors": {
+    "general": "An error occurred",
+    "verificationFailed": "Verification Failed",
+    "checksumOrIntegrity": "Checksum or archive integrity check failed.",
+    "connectionFailed": "Connection Failed",
+    "couldNotGetAuthLink": "Could Not Get Authorization Link",
+    "failedBuildAuthUrl": "Failed to build the auth URL",
+    "failedConnectGoogleDrive": "Failed to connect Google Drive",
+    "couldNotAddDestination": "Could Not Add Destination",
+    "serverRejectedDestination": "The server rejected this destination.",
+    "couldNotUpdateDestination": "Could Not Update Destination",
+    "couldNotRemoveDestination": "Could Not Remove Destination",
+    "failedUpdateDestination": "Failed to update destination",
+    "failedDeleteDestination": "Failed to delete destination",
+    "failedDeleteBackup": "Failed to delete backup",
+    "compactionFailed": "Compaction Failed",
+    "failedCompactSave": "Failed to compact save data",
+    "failedPreviewCompaction": "Failed to preview compaction",
+    "noActiveSave": "No active save is configured, so there is nothing to preview.",
+    "restoreFailed": "Restore Failed",
+    "failedRestoreBackup": "Failed to restore backup",
+    "testFailed": "Test failed",
+    "formatComparison": "Comparison unavailable"
+  },
+  "backup": {
+    "title": "Backup Settings",
+    "frequency": "Backup Frequency",
+    "frequencyDescription": "How often the panel automatically creates a backup of your world save.",
+    "frequencyContext": "More frequent backups mean less data loss if the server crashes or a save gets corrupted, but each run uses CPU and disk I/O while it copies the world.",
+    "maxBackups": "Maximum Backups to Keep",
+    "maxBackupsDescription": "Number of automatic backups kept before the oldest one is deleted.",
+    "maxBackupsContext": "Set this based on available disk space and world save size — once you're over the limit, the oldest backup is removed each time a new one is created.",
+    "scheduleDescription": "How often to automatically create backups",
+    "keepDescription": "Oldest backups will be auto-deleted when limit is reached",
+    "saves": "Saves: {{path}}",
+    "schedules": {
+      "15min": "Every 15 minutes",
+      "30min": "Every 30 minutes",
+      "1hour": "Every hour",
+      "2hours": "Every 2 hours",
+      "4hours": "Every 4 hours",
+      "6hours": "Every 6 hours",
+      "8hours": "Every 8 hours",
+      "12hours": "Every 12 hours",
+      "midnight": "Daily at midnight",
+      "6am": "Daily at 6 AM",
+      "noon": "Daily at noon",
+      "6pm": "Daily at 6 PM"
+    }
+  },
+  "backupHeader": {
+    "format": "Backup format",
+    "formatDescription": "Compression format used for manually created backups.",
+    "formatContext": ".zip is the most compatible everywhere. .tar.gz and .tar.zst produce smaller files but need standard Linux tools (tar) to extract.",
+    "formats": {
+      "zip": ".zip",
+      "targz": ".tar.gz",
+      "tarzst": ".tar.zst"
+    },
+    "destination": "Choose where to save the backup",
+    "destinationMultiple": "{{count}} destinations",
+    "destinationLabel": "Local",
+    "createBackup": "Create Backup",
+    "creating": "Creating...",
+    "uploadBackup": "Upload .zip",
+    "uploading": "Uploading {{percent}}%",
+    "uploadHint": "Upload an existing world_backup_*.zip from another machine",
+    "selectDestination": "Select at least one destination",
+    "remoteDisabled": "Backups are not available for remote servers",
+    "destinationMenuHeader": "save backup to"
+  },
+  "statusCards": {
+    "totalBackups": "Total Backups",
+    "totalSize": "Total Size",
+    "lastBackup": "Last Backup",
+    "autoBackup": "Auto-Backup",
+    "autoBackupDescription": "Enables the scheduled backup job configured in Backup Settings.",
+    "autoBackupContext": "When off, backups only happen when you click Create Backup manually — turn this on if you want protection without remembering to do it yourself.",
+    "noSchedule": "No scheduled backups",
+    "schedule": "Runs {{schedule}} · keep {{count}}"
+  },
+  "progress": {
+    "creatingBackup": "Creating backup..."
+  },
+  "advanced": {
+    "formats": "Formats",
+    "destinations": "Destinations",
+    "compaction": "Compaction",
+    "noDestinations": "No destinations configured",
+    "noDestinationsDescription": "Backups only go to the local backups folder until you add another destination.",
+    "addDestination": "Add Destination"
+  },
+  "destination": {
+    "title": "Add Backup Destination",
+    "description": "Configure where backups get copied after they're created.",
+    "type": "Type",
+    "name": "Name",
+    "namePlaceholder": "e.g. NAS backups",
+    "path": "Path",
+    "pathPlaceholder": "/mnt/backups",
+    "host": "Host",
+    "port": "Port",
+    "portPlaceholder": "{{port}}",
+    "username": "Username",
+    "password": "Password",
+    "share": "Share",
+    "remotePath": "Remote Path",
+    "sshKeyPath": "SSH Key Path",
+    "folderId": "Folder ID (optional)",
+    "folderIdPlaceholder": "Leave blank to upload to Drive root",
+    "googleDriveInfo": "Add the destination, then use the \"Connect\" flow on its card below to link a Google account via OAuth.",
+    "notImplementedWarning": "{{type}} support is coming soon. You can save this configuration now — it will activate once support ships, but Test/Save-to-destination won't work yet.",
+    "added": "Destination Added",
+    "addedMessage": "{{name}} was added.",
+    "deleted": "Destination Removed",
+    "deletedMessage": "{{name}} was removed.",
+    "deleteConfirm": "Delete {{name}}? Backups already copied there are not removed.",
+    "notImplemented": "Not yet implemented",
+    "testConnection": "Test connection",
+    "test": "Test",
+    "hideSettings": "Hide",
+    "showSettings": "Show",
+    "connectionSettings": " connection settings",
+    "errors": {
+      "nameRequired": "Name is required",
+      "pathRequired": "Path is required",
+      "hostRequired": "Host is required",
+      "shareRequired": "Share is required"
+    }
+  },
+  "googleDrive": {
+    "oauth": "Google Drive OAuth",
+    "connected": "Connected",
+    "notConnected": "Not Connected",
+    "clientId": "OAuth Client ID",
+    "clientSecret": "OAuth Client Secret",
+    "clientSecretPlaceholder": "Client secret from Google Cloud Console",
+    "redirectUri": "Redirect URI",
+    "redirectUriHint": "Must match a redirect URI registered for this Client ID in Google Cloud Console.",
+    "authCode": "Authorization Code",
+    "authCodePlaceholder": "Paste the code Google gave you",
+    "getAuthLink": "Get Authorization Link",
+    "connect": "Connect",
+    "clientIdRequired": "Client ID Required",
+    "clientIdDescription": "Enter the OAuth Client ID from Google Cloud Console.",
+    "missingInfo": "Missing Information",
+    "missingInfoDescription": "Enter the Client Secret and paste the authorization code Google gave you.",
+    "connectedSuccess": "Google Drive Connected",
+    "linkedMessage": "{{name}} is now linked.",
+    "connectionFailed": "Google rejected the authorization code."
+  },
+  "compaction": {
+    "title": "Save Compaction",
+    "description": "Removes stale save chunk data older than a cutoff to reclaim disk space.",
+    "staleDays": "Stale after (days)",
+    "totalSize": "Total Size",
+    "staleSize": "Stale Size",
+    "staleChunks": "{{stale}} of {{total}} chunks",
+    "estimatedSavings": "Estimated Savings",
+    "preview": "Preview",
+    "compactNow": "Compact Now",
+    "compacting": "Compacting...",
+    "compacted": "Save Compacted",
+    "freedMessage": "Freed {{size}} across {{count}} file(s).",
+    "backupCreated": " A safety backup was created first.",
+    "deletedMessage": "Deleted {{count}} file(s), freed {{size}}.{{backup}}",
+    "confirm": "Compact Save Data",
+    "confirmDescription": "This permanently deletes stale chunk data older than {{days}} day{{plural}} ({{size}} across {{chunks}} chunks). A safety backup will be created first, but this action cannot be undone otherwise."
+  },
+  "formatComparison": {
+    "title": "Format Comparison",
+    "description": "Compresses a real sample of your save with each format and compares size vs. speed.",
+    "run": "Run Comparison",
+    "rerun": "Re-run Comparison",
+    "comparing": "Comparing…",
+    "sampleSize": "Sample size: {{size}}",
+    "smallest": "Smallest",
+    "notAvailable": "Not available",
+    "unavailableHint": "Format unavailable on this server",
+    "noData": "Run a comparison to see size and speed for each available format.",
+    "formats": "{{count}} format{{plural}} available: {{formats}}. Run a comparison to see real numbers for your save.",
+    "unavailableDescription": "No save is configured to sample from yet.",
+    "tryAgain": "Try Again"
+  },
+  "history": {
+    "title": "Backup History",
+    "description": "New-format backups tracked with checksums, destinations, and a server config snapshot.",
+    "allServers": "All Servers",
+    "filterByServer": "Filter by server",
+    "noRecords": "No metadata-tracked backups yet",
+    "noRecordsDescription": "Backups created with the enhanced format (checksums, verification, destinations) will show up here.",
+    "table": {
+      "server": "Server",
+      "timestamp": "Timestamp",
+      "type": "Type",
+      "format": "Format",
+      "size": "Size",
+      "ratio": "Ratio",
+      "checksum": "Checksum",
+      "verified": "Verified"
+    },
+    "verifiedNot": "Not verified",
+    "verifiedYes": "Verified",
+    "verifiedNo": "Failed",
+    "backupRestored": "Backup Restored",
+    "restoredMessage": "Rolled back to {{name}}"
+  },
+  "detail": {
+    "title": "Backup Details",
+    "loading": "Loading backup record...",
+    "loadFailed": "Could not load this backup record.",
+    "labels": {
+      "server": "Server",
+      "provider": "Provider",
+      "template": "Template Used",
+      "templateNone": "None recorded",
+      "players": "Players at Backup Time",
+      "worldAge": "World Age",
+      "saveSize": "Save Size"
+    },
+    "sandbox": "Sandbox Settings",
+    "sandboxEmpty": "Not captured with this backup.",
+    "ini": "Server INI",
+    "mods": "Mods ({{count}})",
+    "modsEmpty": "No mods tracked at backup time.",
+    "download": "Download",
+    "restore": "Restore"
+  },
+  "fileList": {
+    "title": "Backup Files",
+    "noBackups": "No safety net",
+    "noBackupsDescription": "Create a backup before changing saves, mods, or server settings — one bad update away from lost progress.",
+    "selectAll": "Select all · {{count}} backup{{plural}}",
+    "allSelected": "All {{count}} selected · click to clear",
+    "partialSelected": "{{selected}} of {{total}} selected",
+    "latest": "Latest",
+    "deleteCount": "Delete ({{count}})",
+    "selectBackup": "Select backup {{name}}",
+    "restore": "Restore {{name}}",
+    "download": "Download {{name}}",
+    "downloadBackup": "Download backup",
+    "delete": "Delete {{name}}",
+    "deleteBackup": "Delete backup"
+  },
+  "dialogs": {
+    "restore": {
+      "title": "Restore Backup",
+      "description": "Restore {{backupName}}. This will replace the current world data.",
+      "bullets": {
+        "server": "Stop the server first.",
+        "backup": "The panel will create a safety backup before restoring.",
+        "undo": "This action cannot be undone."
+      },
+      "confirm": "Restore this backup"
+    },
+    "delete": {
+      "title": "Delete Backup",
+      "titleMultiple": "Delete Backups",
+      "single": "Delete {{name}}? This permanently removes the backup file.",
+      "multiple": "Delete {{count}} backups? This permanently removes those files.",
+      "confirm": "Delete backup",
+      "confirmMultiple": "Delete backups"
+    },
+    "deleteOlder": {
+      "title": "Delete Old Backups",
+      "description": "Delete every backup older than the number of days you choose here.",
+      "label": "Delete backups older than",
+      "daysSuffix": "days",
+      "warning": "This permanently deletes backups created more than {{days}} days ago.",
+      "confirm": "Delete older backups"
+    }
+  },
+  "types": {
+    "destination": {
+      "local": "Local",
+      "sftp": "SFTP",
+      "googleDrive": "Google Drive",
+      "smb": "SMB",
+      "ftp": "FTP",
+      "rsync": "Rsync"
+    },
+    "schedule": {
+      "noSchedule": "No schedule",
+      "15min": "every 15 minutes",
+      "30min": "every 30 minutes",
+      "1hour": "every hour",
+      "2hours": "every 2 hours",
+      "4hours": "every 4 hours",
+      "6hours": "every 6 hours",
+      "8hours": "every 8 hours",
+      "12hours": "every 12 hours",
+      "midnight": "daily at midnight",
+      "6am": "daily at 6 AM",
+      "noon": "daily at noon",
+      "6pm": "daily at 6 PM"
+    }
+  }
+}

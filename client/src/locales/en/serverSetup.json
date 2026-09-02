@@ -1,0 +1,300 @@
+{
+  "progressBar": {
+    "ariaLabel": "Add server progress",
+    "labels": ["Environment", "Server", "Verify", "Online"]
+  },
+  "addServerFlow": {
+    "dialogTitle": "Add Server",
+    "badge": "First-Run Setup",
+    "title": "Bring in your server",
+    "description": "A couple of automated checks, then you're managing a live Project Zomboid server."
+  },
+  "environmentStep": {
+    "heading": "Scanning your environment",
+    "description": "Looking for a Project Zomboid server, Docker, and existing panel state.",
+    "labels": {
+      "platform": "Platform",
+      "dockerSocket": "Docker socket",
+      "foundSaveData": "Found PZ save data",
+      "foundServerFiles": "Found PZ server files",
+      "serverFiles": "Server files",
+      "existingServers": "Existing servers in panel"
+    },
+    "details": {
+      "mounted": "mounted",
+      "notMounted": "not mounted",
+      "notApplicable": "n/a",
+      "noneFound": "none found automatically"
+    },
+    "continueButton": "Continue without auto-detection"
+  },
+  "serverTypeStep": {
+    "heading": "What do you want to do?",
+    "description": "Choose how to bring a server into the panel.",
+    "windowsFirewallTip": "Tip: Allow PZ through Windows Firewall for players to connect — UDP 16261 (game) + TCP 27015 (RCON).",
+    "detectedCard": {
+      "titlePrefix": "Connect to the server we found",
+      "detailTemplate": "{{type}} found at {{path}}. We can connect to it in one click."
+    },
+    "newServerCard": {
+      "darwin": {
+        "title": "Create Docker Server",
+        "description": "Install a fresh PZ dedicated server in a Linux container."
+      },
+      "win32": {
+        "title": "Install PZ Server",
+        "description": "SteamCMD will download the dedicated server for you."
+      },
+      "default": {
+        "title": "Create a new server",
+        "description": "Install a fresh Project Zomboid dedicated server on this machine."
+      }
+    },
+    "existingCard": {
+      "title": "Connect to an existing server",
+      "description": "Point the panel at a server already running, locally or remotely."
+    },
+    "skipCard": {
+      "title": "Skip for now",
+      "description": "Go to the dashboard. A setup checklist will keep track of what's left."
+    }
+  },
+  "configureStep": {
+    "modeCards": [
+      {
+        "mode": "full",
+        "title": "Fresh Install",
+        "description": "Download server files via SteamCMD",
+        "badge": "Suggested"
+      },
+      {
+        "mode": "quick",
+        "title": "Existing Files",
+        "description": "Point at PZ server files you already have",
+        "badge": "Suggested"
+      },
+      {
+        "mode": "docker",
+        "title": "Docker",
+        "description": "Run PZ inside a managed container",
+        "badge": "Advanced"
+      }
+    ],
+    "modePickerHeading": "How do you want to set up?",
+    "modePickerDescription": "Choose an install method for your new server.",
+    "backButton": "Back",
+    "detectedHeading": "Confirm the detected server",
+    "existingHeading": "Connect a server",
+    "readingConfig": "Reading its configuration…",
+    "fillRcon": "Fill in RCON access so the panel can control it.",
+    "remoteCheckbox": "This server runs on another machine (RCON only)",
+    "displayNameLabel": "Display Name",
+    "displayNamePlaceholder": "My PZ Server",
+    "rconHostLabel": "RCON Host *",
+    "rconPortLabel": "RCON Port",
+    "rconPasswordLabel": "RCON Password *",
+    "rconPasswordPlaceholder": "RCON password",
+    "addServerButton": "Add server & continue",
+    "addingButton": "Adding…",
+    "errorTitle": "Could not add server"
+  },
+  "verifyStep": {
+    "heading": "Verifying the connection",
+    "description": "Nothing here is a dead end — every failure has a fix.",
+    "checkLabels": {
+      "serverRecord": "Server record",
+      "files": "Files",
+      "start": "Starting",
+      "boot": "Container boot",
+      "rcon": "RCON reachable",
+      "bridge": "PanelBridge"
+    },
+    "checkDetails": {
+      "couldNotLoadServer": "Could not load server record",
+      "startingServer": "Starting PZ server process…",
+      "serverFailedToStart": "Server failed to start",
+      "waitingForContainer": "Waiting for container to start…",
+      "processLaunched": "PZ server process launched",
+      "containerRunning": "Container running (boot check timed out — continuing)",
+      "connecting": "Connecting…",
+      "waitingForRcon": "Waiting for RCON to become available…",
+      "rconAttempt": "RCON reachable (attempt {{attempt}}/{{max}})",
+      "rconDidNotRespond": "Server did not respond after {{max}} attempts — it may still be starting. Try Retry.",
+      "enterSftpCredentials": "Enter SFTP credentials below to install the PanelBridge mod",
+      "installingBridge": "Installing PanelBridge mod into container…",
+      "sftpInstallFailed": "SFTP install failed",
+      "verifyingMod": "Verifying mod connection…"
+    },
+    "retryButton": "Retry",
+    "checkingButton": "Checking…",
+    "continueButton": "Continue",
+    "fixThisLink": "Fix this",
+    "continueMessage": "You can continue once every check passes, or use \"Fix this\" to resolve an item first."
+  },
+  "completeStep": {
+    "heading": "Server online",
+    "description": "{{serverName}} is connected and verified.",
+    "activeStatus": "Active",
+    "copyConnectString": "Copy connect string",
+    "copiedToast": "Copied",
+    "nextActionsCards": [
+      {
+        "label": "Apply a template",
+        "description": "Tune gameplay settings in one pass."
+      },
+      {
+        "label": "Install mods",
+        "description": "Browse Workshop mods for this server."
+      },
+      {
+        "label": "Set up backups",
+        "description": "Schedule automatic world backups."
+      },
+      {
+        "label": "Set up PanelBridge",
+        "description": "Weather, teleport, and in-world controls."
+      }
+    ],
+    "dashboardButton": "Go to Dashboard"
+  },
+  "fullInstallFlow": {
+    "heading": "Fresh Install",
+    "description": "Download, configure, and register a new dedicated server.",
+    "steps": [
+      "SteamCMD",
+      "Server",
+      "Settings",
+      "Install"
+    ],
+    "chooseSetupType": "Choose Setup Type",
+    "back": "Back",
+    "nextStep": "Next Step"
+  },
+  "quickSetupFlow": {
+    "heading": "Quick Setup",
+    "description": "Create and register a server using existing dedicated server files.",
+    "steps": [
+      "Location",
+      "Configure",
+      "Create"
+    ],
+    "chooseSetupType": "Choose Setup Type",
+    "back": "Back",
+    "nextStep": "Next Step"
+  },
+  "dockerSetup": {
+    "heading": "Create Docker Server",
+    "description": "Review your settings and create the container.",
+    "steps": [
+      "Prerequisites",
+      "Configure",
+      "Create"
+    ],
+    "labels": {
+      "serverName": "Server Name",
+      "gamePort": "Game Port",
+      "rconPort": "RCON Port",
+      "jvmMemory": "JVM Memory",
+      "restartPolicy": "Restart Policy",
+      "containerMemory": "Container Memory",
+      "cpuLimit": "CPU Limit",
+      "cpuCore": "core",
+      "cpuCores": "cores",
+      "timezone": "Timezone"
+    },
+    "phaseLabels": {
+      "creating": "Creating volumes...",
+      "pulling": "Pulling image...",
+      "container": "Creating container...",
+      "starting": "Starting server...",
+      "done": "Done!"
+    },
+    "preparing": "Preparing…",
+    "creationFailed": "Creation failed",
+    "backButton": "Back",
+    "createButton": "Create Docker Server",
+    "downloadHint": "This may take a few minutes if the image needs to download.",
+    "successMessage": "Docker server created successfully!",
+    "successDetail": "Your server {{serverName}} is ready. Head to the dashboard to manage it.",
+    "openDashboard": "Open Dashboard"
+  },
+  "dockerPrereqStep": {
+    "heading": "Docker Prerequisites",
+    "description": "Checking that Docker is accessible and server files are available.",
+    "checking": "Checking prerequisites...",
+    "failedCheck": "Failed to check prerequisites",
+    "dockerSocket": "Docker Socket",
+    "dockerAvailable": "Docker is available and connected",
+    "dockerNotMounted": "Mount the Docker socket into the panel container (-v /var/run/docker.sock:/var/run/docker.sock)",
+    "sharedServerFiles": "Shared Server Files",
+    "baseVolumePopulated": "Base volume is populated",
+    "serverFilesNeeded": "Server Files Needed",
+    "serverFilesDescription": "Point to an existing PZ server folder, or download fresh files (~7GB).",
+    "useExistingFiles": "Use existing server files",
+    "existingFilesPlaceholder": "/pz-server or /mnt/user/appdata/...",
+    "browseFolders": "Browse folders",
+    "verifyButton": "Verify",
+    "pathHelp": "Browse or type the path to your PZ server folder (should contain start-server.sh or ProjectZomboid64).",
+    "selectFolderTitle": "Select PZ Server Folder",
+    "validPathFound": "Valid PZ server files found",
+    "downloadOption": "If you don't have server files yet, use the download option below.",
+    "or": "or",
+    "downloadingFiles": "Downloading server files... {{progress}}%",
+    "retryDownload": "Retry Download",
+    "downloadFiles": "Download Server Files (~7GB)",
+    "chooseSetupType": "Choose Setup Type",
+    "continueButton": "Continue"
+  },
+  "macDockerGuide": {
+    "heading": "🍎 macOS Detected",
+    "description": "PZ dedicated server runs on Linux — you'll need Docker to run it on your Mac.",
+    "installOptions": [
+      {
+        "label": "Install OrbStack (Recommended)",
+        "description": "Lightweight, fast Docker runtime built for macOS."
+      },
+      {
+        "label": "Install Docker Desktop",
+        "description": "Docker's official desktop app for macOS."
+      }
+    ],
+    "restartMessage": "After installing, restart the panel and try again.",
+    "remoteServerButton": "I have a remote PZ server",
+    "skipButton": "Skip for now"
+  },
+  "windowsFirewallGuide": {
+    "title": "🪟 Windows Firewall",
+    "description": "Allow PZ through Windows Firewall so players outside your network can connect.",
+    "ports": [
+      {
+        "proto": "UDP",
+        "port": "16261",
+        "purpose": "Game traffic"
+      },
+      {
+        "proto": "TCP",
+        "port": "27015",
+        "purpose": "RCON"
+      }
+    ],
+    "instructionsLink": "Open Windows Firewall instructions"
+  },
+  "platformGuidanceCard": {
+    "platforms": {
+      "darwin": "macOS",
+      "win32": "Windows",
+      "linux": "Linux"
+    },
+    "runtimes": {
+      "orbstack": "OrbStack",
+      "docker-desktop": "Docker Desktop",
+      "colima": "Colima",
+      "native": "Docker"
+    },
+    "dismiss": "Dismiss",
+    "detected": "detected",
+    "withDocker": "+ Docker",
+    "dockerDetected": "Docker detected ({{runtime}}) — you can run PZ server in a container.",
+    "needsDocker": "PZ dedicated server runs on Linux — you'll need Docker to run it on {{platform}}."
+  }
+}

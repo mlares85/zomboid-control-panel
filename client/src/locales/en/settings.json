@@ -1,0 +1,243 @@
+{
+  "page": {
+    "title": "Settings",
+    "description": "Panel port, remote access, server integrations, backups, and security.",
+    "eyebrow": "Configuration",
+    "saving": "Saving...",
+    "saveSettings": "Save Settings",
+    "noUnsavedChanges": "No Unsaved Changes"
+  },
+  "tabs": {
+    "general": {
+      "label": "General",
+      "description": "Port this admin interface listens on, plus theme."
+    },
+    "updates": {
+      "label": "Updates",
+      "description": "Panel release checks, downloads, and how updates apply."
+    },
+    "https": {
+      "label": "HTTPS",
+      "description": "TLS termination. Enable this when exposing the panel beyond your LAN."
+    },
+    "access": {
+      "label": "Remote access",
+      "description": "Which origins may reach this panel from another machine, and why requests get blocked."
+    },
+    "security": {
+      "label": "Security",
+      "description": "Panel account password and sign-in controls."
+    },
+    "connection": {
+      "label": "RCON",
+      "description": "RCON connection used for commands, plus whether the game server starts with the panel."
+    },
+    "bridge": {
+      "label": "PanelBridge",
+      "description": "PanelBridge Lua mod link for weather, teleport, and item control. Supports remote servers over SFTP."
+    },
+    "mods": {
+      "label": "Mods & Workshop",
+      "description": "Workshop update detection, collection sync, and the Steam Web API key they rely on."
+    },
+    "backups": {
+      "label": "Backups",
+      "description": "Automatic world backups and per-character export copies."
+    },
+    "notifications": {
+      "label": "Notifications",
+      "description": "Pushover push notifications, and the alert conditions that trigger them."
+    },
+    "map": {
+      "label": "World Map",
+      "description": "How often the panel checks map.projectzomboid.com for new map builds, and local tile cache status."
+    },
+    "about": {
+      "label": "About",
+      "description": "Panel version and runtime details, plus where the remaining settings live."
+    }
+  },
+  "general": {
+    "title": "Panel Settings",
+    "description": "Port this panel listens on, and how it looks.",
+    "port": {
+      "label": "Panel Port",
+      "help": "The HTTP port the panel's web interface listens on.",
+      "context": "Change this if port 3001 conflicts with another service on this machine. You'll need to restart the panel and update your bookmark/URL afterward.",
+      "placeholder": "3001",
+      "hint": "Port used to access the panel (default: 3001)."
+    },
+    "restart": {
+      "alert": "Restart Required",
+      "message": "Port changes require a restart. Save first, then restart.",
+      "button": "Restart Panel",
+      "restarting": "Restarting...",
+      "savingHint": "Save settings before restarting"
+    },
+    "startup": {
+      "title": "Startup",
+      "description": "Control whether the panel launches automatically.",
+      "startWithWindows": "Start with Windows",
+      "startDescription": "Launch the panel automatically when you log in.",
+      "startHelp": "Creates a Windows Task Scheduler entry that launches the panel when you log in.",
+      "startContext": "The panel runs as a normal (non-elevated) process. A console window will appear on login — close it to stop the panel.",
+      "autoStartEnabled": "Auto-start enabled",
+      "autoStartEnabledMessage": "The panel will start automatically when you log in to Windows.",
+      "autoStartDisabled": "Auto-start disabled",
+      "autoStartDisabledMessage": "The panel will no longer start automatically.",
+      "failedToUpdate": "Failed to update auto-start"
+    },
+    "appearance": {
+      "title": "Appearance",
+      "description": "Panel theme and visual style.",
+      "theme": "Theme",
+      "themeDescription": "Choose between the gritty survival look or a clean light theme.",
+      "themeHelp": "Switches the panel's color scheme between the dark 'Survival' look and a clean light theme.",
+      "themeContext": "Purely cosmetic — pick whichever is easier on your eyes. Applies instantly, no restart or save needed."
+    }
+  },
+  "connection": {
+    "title": "RCON Connection",
+    "description": "Test the connection and set reconnect behavior. Host, port, and password are configured per-server on the Servers page.",
+    "testConnection": "Test Connection",
+    "autoReconnect": "Auto-reconnect on disconnect",
+    "autoReconnectDescription": "Automatically retries the RCON connection if it drops.",
+    "autoReconnectHelp": "Automatically retries the RCON connection if it drops.",
+    "autoReconnectContext": "Keeps the panel talking to your server without manual intervention after network blips or server restarts.",
+    "reconnectInterval": "Reconnect Interval (seconds)",
+    "reconnectIntervalHelp": "How long the panel waits between RCON reconnect attempts."
+  },
+  "https": {
+    "title": "HTTPS",
+    "description": "Encrypt panel traffic with a TLS certificate.",
+    "recommended": "Recommended Setup (Most Servers)",
+    "recommendedHelp": "Enable HTTPS, leave certificate paths empty, save, then restart.",
+    "recommendedContext": "The panel creates a local self-signed certificate automatically.",
+    "useRecommendedDefaults": "Use Recommended Defaults",
+    "enableHttps": "Enable HTTPS",
+    "enableHttpsDescription": "Serve the panel over HTTPS.",
+    "enableHttpsHelp": "Serves the panel's web interface over encrypted HTTPS instead of plain HTTP.",
+    "enableHttpsContext": "Recommended for most setups, especially if you access the panel outside your local network. Leave certificate paths empty to use an auto-generated self-signed cert.",
+    "httpUrl": "HTTP URL:",
+    "httpsUrl": "HTTPS URL:",
+    "httpsPort": "HTTPS Port",
+    "httpsPortHelp": "The port the panel listens on for HTTPS connections.",
+    "httpsPortContext": "3443 is fine for most setups. Change it only if that port is already in use or your reverse proxy expects a different port.",
+    "httpsPortHint": "HTTPS listener port (recommended 3443).",
+    "customCertificatePath": "Custom Certificate Path",
+    "customCertificatePathOptional": "(optional)",
+    "customCertificatePathHelp": "Path to your own TLS certificate file, if you have one from a CA like Let's Encrypt.",
+    "customCertificatePathContext": "Only needed if you don't want the panel's auto-generated self-signed cert (which browsers flag as untrusted). Must be paired with a matching key path.",
+    "customCertificatePathPlaceholder": "Example: C:\\certs\\panel.fullchain.pem",
+    "customCertificatePathHint": "Set both certificate and key paths, or leave both empty.",
+    "customKeyPath": "Custom Key Path",
+    "customKeyPathHelp": "Path to the private key file that matches your custom certificate.",
+    "customKeyPathContext": "Must be set together with Custom Certificate Path — leave both empty to use the panel's auto-generated certificate instead.",
+    "customKeyPathPlaceholder": "Example: C:\\certs\\panel.privkey.pem",
+    "customKeyPathHint": "Supports PEM key files that Node.js can read.",
+    "partialCertPathAlert": "Provide Both Certificate Files",
+    "partialCertPathMessage": "Set both certificate and key paths, or clear both to use auto-generated certs.",
+    "autoGeneratedAlert": "Auto-Generated Certificate Mode",
+    "autoGeneratedMessage": "The panel will create and reuse a local self-signed certificate.",
+    "reverseProxyNote": "Reverse Proxy Note",
+    "reverseProxyMessage": "If TLS is terminated by Nginx, Caddy, or Cloudflare Tunnel, keep panel HTTPS off and proxy local HTTP.",
+    "restartRequired": "Restart Required",
+    "restartMessage": "HTTPS changes require restart. Save first, then restart from Panel Settings."
+  },
+  "access": {
+    "title": "Remote Access (CORS)",
+    "description": "Controls which devices and browsers can connect to this panel. If you only access the panel from this machine, these defaults are fine.",
+    "quickStart": "Quick Start for VPS Remote Access",
+    "quickStartStep1": "Keep Allow private/LAN origins on.",
+    "quickStartStep2": "Add one origin per line in the list below (example: http://YOUR_PUBLIC_IP:3001).",
+    "quickStartStep3": "Save settings, then click Reload CORS Rules.",
+    "allowPrivateLAN": "Allow Private/LAN Origins",
+    "allowPrivateLANDescription": "Automatically allow connections from localhost and private/LAN IP ranges.",
+    "allowPrivateLANHelp": "Automatically trusts browser requests coming from localhost and private/LAN IP ranges.",
+    "allowPrivateLANContext": "Keep this on for typical home/LAN setups. Turning it off can lock you out of the panel from other devices on your network until you add their origin manually below.",
+    "showPublicIP": "Show Public IP Address",
+    "showPublicIPDescription": "Look up this machine's public IP (via api.ipify.org) to display on the dashboard. Off by default — an unnecessary external dependency and small privacy leak for LAN-only setups. The result is cached, so this calls out at most once per restart.",
+    "showPublicIPHelp": "Looks up and displays this machine's public IP address on the dashboard.",
+    "showPublicIPContext": "Purely cosmetic convenience for sharing your server's address with players. Off by default to avoid the external lookup call and minor privacy leak for LAN-only setups.",
+    "dashboardLANAddress": "Dashboard LAN Address",
+    "dashboardLANAddressDescription": "Which network interface's address the dashboard shows. Useful when this host has more than one, e.g. Tailscale and ZeroTier at once — pick the one you actually want to share with players.",
+    "dashboardLANAddressHelp": "Which of this machine's network interface addresses the dashboard displays to you.",
+    "dashboardLANAddressContext": "Display-only — has no effect on CORS or who can actually connect. Auto-detect works for most single-NIC setups; pick manually if you run Tailscale, ZeroTier, or multiple network adapters.",
+    "autoDetect": "Auto-Detect",
+    "origins": "Origins",
+    "originsDescription": "List of additional origins that are allowed to access this panel.",
+    "originsHelp": "Enter one origin per line. Requests from these origins will be allowed through CORS.",
+    "reloadCorsRules": "Reload CORS Rules",
+    "clearBlocked": "Clear Blocked List",
+    "diagnosticsTitle": "CORS Diagnostics",
+    "diagnosticsLoading": "Loading diagnostics...",
+    "blockedRequests": "Blocked Requests"
+  },
+  "security": {
+    "title": "Security & Authentication",
+    "description": "Change your password and review access details.",
+    "role": "Role",
+    "changePassword": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "passwordMinimum": "Password must be at least 6 characters.",
+    "passwordMismatch": "Passwords do not match.",
+    "updatePassword": "Update Password",
+    "updatingPassword": "Updating...",
+    "passwordChanged": "Password changed successfully",
+    "passwordChangeFailed": "Failed to change password",
+    "recoveryCodesTitle": "Recovery Codes",
+    "recoveryCodesDescription": "Use these codes to regain access if you lose your authenticator app.",
+    "viewRecoveryCodes": "View Recovery Codes",
+    "localPasswordReset": "Local Password Reset"
+  },
+  "updates": {
+    "title": "Panel Auto Update",
+    "description": "Check for a new release, download it, then apply on restart.",
+    "checking": "Checking...",
+    "downloading": "Downloading...",
+    "updateAvailable": "Update available",
+    "cannotReachUpdater": "Cannot reach updater",
+    "notChecked": "Not checked",
+    "upToDate": "Up to date",
+    "updaterError": "Updater Error",
+    "retry": "Retry",
+    "installed": "Installed",
+    "latest": "Latest",
+    "checkForUpdates": "Check for Updates",
+    "downloadUpdate": "Download Update",
+    "downloadingUpdate": "Downloading...",
+    "applyUpdate": "Apply Update",
+    "applyingUpdate": "Applying...",
+    "notCheckedYet": "Not checked yet"
+  },
+  "about": {
+    "settingsElsewhere": "Settings kept on other pages",
+    "settingsElsewhereDescription": "These features own their own configuration, so it lives with the feature instead of here.",
+    "serverProfiles": "Server profiles",
+    "serverProfilesDetail": "Install paths, RCON host and password, memory, and SteamCMD.",
+    "discordBot": "Discord bot",
+    "discordBotDetail": "Bot token, channels, event notifications, and the chat bridge.",
+    "scheduledTasks": "Scheduled tasks",
+    "scheduledTasksDetail": "Restarts, announcements, and recurring commands.",
+    "gameServerConfig": "Game server config",
+    "gameServerConfigDetail": "Server INI options and sandbox rules.",
+    "chatQuickMessages": "Chat quick messages",
+    "chatQuickMessagesDetail": "Preset messages shown above the chat input.",
+    "title": "About",
+    "description": "Panel version, runtime info, and helpful links.",
+    "installedVersion": "Installed version",
+    "latestAvailable": "Latest available",
+    "aboutDescription": "A web-based management panel for Project Zomboid dedicated servers. Includes RCON, player management, mod update detection, scheduled restarts, world backups, Discord integration, and the PanelBridge Lua mod for in-world actions.",
+    "enjoying": "Enjoying the panel?",
+    "supportDescription": "Support development to keep updates and new features coming.",
+    "buyMeCoffee": "Buy me a coffee",
+    "joinDiscord": "Join Discord",
+    "githubRepository": "GitHub repository",
+    "releasesChangelog": "Releases & changelog",
+    "reportIssue": "Report an issue",
+    "builtWith": "Built with React, Node.js, and Socket.IO",
+    "licensed": "MIT licensed"
+  }
+}

@@ -58,5 +58,79 @@
   "language": {
     "label": "Language",
     "switchTo": "Switch language"
+  },
+  "status": {
+    "running": "Running",
+    "stopped": "Stopped",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "connecting": "Connecting",
+    "active": "Active",
+    "offline": "Offline",
+    "unknown": "Unknown",
+    "notApplicable": "N/A",
+    "notInstalled": "Not Installed",
+    "up": "Up",
+    "down": "Down"
+  },
+  "discovery": {
+    "title": "Connect Discovered Server",
+    "description": "PZ server files were found at this mount. Review the settings below and connect.",
+    "installPath": "Install Path",
+    "dataPath": "Data Path",
+    "noConfigFound": "No server config found",
+    "noConfigHint": "Run the server once to create the INI file, then rescan.",
+    "serverConfig": "Server Configuration",
+    "selectServer": "Choose a server...",
+    "displayName": "Display Name",
+    "gamePort": "Game Port:",
+    "rconPort": "RCON Port:",
+    "rconPassword": "RCON Password",
+    "rconPasswordPlaceholder": "Read from the server's INI file",
+    "noRconPassword": "No RCON password found in {{serverName}}.ini — set one there, or enter it here.",
+    "passwordSet": "Password set",
+    "creating": "Creating...",
+    "createServer": "Create Server",
+    "serverConnected": "Server connected!",
+    "goToDashboard": "Go to Dashboard",
+    "successTitle": "Server Connected",
+    "successDescription": "\"{{serverName}}\" added to panel"
+  },
+  "folderBrowser": {
+    "defaultTitle": "Select Folder",
+    "description": "Browse server filesystem and select a folder",
+    "goParent": "Go to parent directory",
+    "thisPC": "This PC",
+    "enterPath": "Enter path...",
+    "go": "Go",
+    "backToDrives": "Back to drives",
+    "emptyFolder": "Empty folder",
+    "selectFolder": "Select Folder",
+    "noFolderSelected": "No folder selected"
+  },
+  "connection": {
+    "connected": "Connected",
+    "realTimeUpdatesActive": "Real-time updates active",
+    "reconnecting": "Reconnecting...",
+    "reconnectAttempt": "Attempt {{current}}/10",
+    "panelDisconnected": "Panel Disconnected",
+    "connectionLost": "WebSocket connection to the panel backend lost"
+  },
+  "bridge": {
+    "connected": "Bridge connected",
+    "waiting": "Bridge waiting",
+    "watchingMod": "Watching for PZ mod — start/restart the server",
+    "offline": "Bridge offline",
+    "configureHint": "Go to Settings → Bridge to configure",
+    "checking": "Checking…"
+  },
+  "mountDiscovery": {
+    "detectedTitle": "PZ server files detected at",
+    "connectHint": "Connect it to skip typing paths and RCON settings by hand.",
+    "dismiss": "Dismiss",
+    "connect": "Connect"
+  },
+  "actions": {
+    "fixThis": "Fix this →"
   }
 }

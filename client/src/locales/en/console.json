@@ -1,0 +1,127 @@
+{
+  "page": {
+    "title": "Console",
+    "description": "Server log output and RCON commands"
+  },
+  "tabs": {
+    "server_log": "server log",
+    "rcon_console": "rcon console",
+    "loading": "checking server target"
+  },
+  "no_server": {
+    "title": "No active server configured",
+    "description": "Add or select a server in My Servers before opening the console."
+  },
+  "server_log": {
+    "path_label": "path",
+    "loading": "loading…",
+    "pause": "pause",
+    "resume": "resume",
+    "filter": "filter",
+    "filter_all": "all",
+    "follow": "follow",
+    "follow_on": "on",
+    "follow_off": "off",
+    "clear": "clear",
+    "stream": "stream",
+    "live": "live",
+    "paused": "paused",
+    "streaming": "streaming",
+    "no_stream": "no stream output",
+    "hidden_by_filter": "{{count}} lines hidden by filter · show all",
+    "shown": "shown",
+    "hidden": "hidden",
+    "loaded": "loaded",
+    "updates_suspended": "updates suspended",
+    "poll_interval": "poll · 2s",
+    "not_found_title": "Server console log not found",
+    "not_found_desc": "Make sure the server is running",
+    "not_configured_title": "Server log path not configured",
+    "not_configured_desc": "Set the server install path or Zomboid data path in My Servers first.",
+    "remote_unavailable_title": "Server log unavailable for remote servers",
+    "remote_unavailable_desc": "Remote servers expose RCON only. Use the RCON tab for live commands.",
+    "unavailable": "Log stream unavailable — server may be offline",
+    "retry": "retry",
+    "clear_title": "Log Cleared",
+    "clear_desc": "Server console log has been cleared",
+    "clear_error": "Failed to clear server log"
+  },
+  "rcon": {
+    "link_label": "link",
+    "checking": "checking…",
+    "not_configured": "rcon not configured",
+    "unknown": "unknown",
+    "online": "rcon online",
+    "offline": "rcon offline",
+    "recheck": "recheck",
+    "config_error_title": "rcon not configured",
+    "config_error_desc": "Set the host, port, and password in My Servers before using live commands.",
+    "unreachable_title": "host unreachable",
+    "unreachable_desc": "Start the server, then confirm RCON host, port, and password in Panel Settings.",
+    "output": "rcon output",
+    "entries": "entries",
+    "no_commands": "No commands yet",
+    "no_commands_desc": "Run an RCON command to see the response here.",
+    "prompt": "$",
+    "enter_command": "enter · run · ↑↓ history"
+  },
+  "command_input": {
+    "placeholder": "type a command…",
+    "aria_label": "RCON command input"
+  },
+  "quick_commands": [
+    { "label": "Players" },
+    { "label": "Save" },
+    { "label": "Show Options" },
+    { "label": "Check Mods" },
+    { "label": "Help" },
+    { "label": "Server Info" },
+    { "label": "Get Memory" }
+  ],
+  "broadcast": {
+    "title": "broadcast",
+    "subtitle": "message all online",
+    "channel_tag": "Channel tag",
+    "channel_tag_desc": "Cosmetic label prefixed to the broadcast text.",
+    "channel_tag_context": "RCON's servermsg command cannot target specific in-game chat channels — every option sends the same server-wide broadcast, just with a different bracketed tag such as [ADMIN] in front.",
+    "placeholder_all": "Write the message players should see…",
+    "placeholder_tagged": "Tagged [{{channel}}] — write the message…",
+    "send_info": "Sends via <code>servermsg</code>. Tags are cosmetic — RCON cannot route to real chat channels.",
+    "send_button": "Send",
+    "sent_title": "Broadcast Sent",
+    "sent_desc_all": "Your message was broadcast to all players",
+    "sent_desc_tagged": "Sent with the [{{channel}}] tag",
+    "error": "Failed to send broadcast"
+  },
+  "broadcast_templates": [
+    { "label": "Restart 15min", "message": "SERVER RESTART in 15 minutes - Please find a safe location!" },
+    { "label": "Restart 5min", "message": "SERVER RESTART in 5 minutes - Save your progress!" },
+    { "label": "Restart 1min", "message": "SERVER RESTART in 1 minute - Disconnecting soon!" },
+    { "label": "Maintenance", "message": "Server entering MAINTENANCE MODE - Please disconnect" },
+    { "label": "Back Online", "message": "Server maintenance complete - Welcome back!" },
+    { "label": "Save Warning", "message": "Server is saving - Brief lag expected" }
+  ],
+  "channel_options": [
+    { "value": "all", "label": "All players", "description": "No tag — plain broadcast" },
+    { "value": "admin", "label": "[ADMIN] tag", "description": "Marks the message as admin" },
+    { "value": "say", "label": "[SAY] tag", "description": "Cosmetic local-chat label" },
+    { "value": "faction", "label": "[FACTION] tag", "description": "Cosmetic faction label" },
+    { "value": "safehouse", "label": "[SAFEHOUSE] tag", "description": "Cosmetic safehouse label" }
+  ],
+  "history": {
+    "title": "history",
+    "entry": "entry",
+    "entries": "entries",
+    "no_history": "No command history",
+    "no_history_desc": "Commands you run will be logged here.",
+    "search_placeholder": "Search command history...",
+    "search_aria": "Search command history"
+  },
+  "toasts": {
+    "history_unavailable": "History Unavailable",
+    "history_unavailable_desc": "Recent RCON command history could not be loaded.",
+    "error": "Error",
+    "command_failed": "Command failed",
+    "broadcast_failed": "Failed to send broadcast"
+  }
+}
