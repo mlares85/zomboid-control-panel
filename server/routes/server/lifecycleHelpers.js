@@ -6,6 +6,7 @@ import { createLogger } from "../../utils/logger.js";
 import { getActiveServer } from "../../database/init.js";
 import { sanitizeIniValue } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
+import { normalizeToLf, restoreLineEnding } from "../../utils/iniLineEndings.js";
 import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Server");
@@ -78,7 +79,8 @@ export async function ensureRconConfigured() {
       if (!readResult.success) {
         throw new Error(readResult.error);
       }
-      let content = readResult.data.replace(/\r\n/g, "\n");
+      const { normalized, eol } = normalizeToLf(readResult.data);
+      let content = normalized;
       const hasCorrectPassword = content.includes(
         `RCONPassword=${rconPassword}`,
       );
@@ -115,7 +117,10 @@ export async function ensureRconConfigured() {
         content += `\nRCONPort=${rconPort}`;
       }
 
-      writeFileAtomic(iniPath, content, { encoding: "utf-8", mode: 0o600 });
+      writeFileAtomic(iniPath, restoreLineEnding(content, eol), {
+        encoding: "utf-8",
+        mode: 0o600,
+      });
       log.info("RCON auto-configured successfully in server .ini file");
       return true;
     });

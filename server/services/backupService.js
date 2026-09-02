@@ -12,6 +12,7 @@ import {
   logServerEvent,
 } from "../database/init.js";
 import { sanitizeError } from "../utils/sanitize.js";
+import { computeChecksum } from "../utils/backupCompression.js";
 import { listRecords, deleteRecord } from "./backupRecords.js";
 
 // Dynamic import for unzipper (CommonJS module)
@@ -710,6 +711,26 @@ export class BackupService {
 
       if (!fs.existsSync(backupPath)) {
         throw new Error(`Backup not found: ${safeName}`);
+      }
+
+      // Verify checksum against the backup record before restoring
+      const records = await listRecords();
+      const record = records.find(
+        (r) => r.filename === safeName || r.name === safeName,
+      );
+      if (record?.checksum) {
+        const fileChecksum = await computeChecksum(backupPath);
+        if (fileChecksum !== record.checksum) {
+          log.error(
+            `Checksum mismatch for ${safeName}: expected ${record.checksum}, got ${fileChecksum}`,
+          );
+          return {
+            success: false,
+            message:
+              "Backup file checksum does not match the recorded checksum. The file may be corrupted.",
+          };
+        }
+        log.info(`Checksum verified for ${safeName}`);
       }
 
       log.info(`Starting restore from: ${safeName}`);

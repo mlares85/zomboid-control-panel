@@ -10,6 +10,7 @@
 import path from "path";
 import { withFileLock } from "../utils/fileWriteQueue.js";
 import { escapeRegExp } from "../utils/regex.js";
+import { detectLineEnding, restoreLineEnding } from "../utils/iniLineEndings.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("ServerConfigIo");
@@ -89,9 +90,11 @@ export async function writeServerConfig(
 
   await withFileLock(configPath, async () => {
     let content = "";
+    let eol = "\n";
     if (await fileAccess.exists(configPath)) {
       const readResult = await fileAccess.readFile(configPath, "utf-8");
       content = readResult.success ? readResult.data : "";
+      if (content) eol = detectLineEnding(content);
     }
 
     for (const [key, value] of Object.entries(config)) {
@@ -111,9 +114,11 @@ export async function writeServerConfig(
       }
     }
 
-    const writeResult = await fileAccess.writeFile(configPath, content, {
-      atomic: true,
-    });
+    const writeResult = await fileAccess.writeFile(
+      configPath,
+      restoreLineEnding(content, eol),
+      { atomic: true },
+    );
     if (!writeResult.success) throw new Error(writeResult.error);
   });
 }

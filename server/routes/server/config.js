@@ -4,6 +4,7 @@ import { createLogger } from "../../utils/logger.js";
 import { setSetting, getSetting, getActiveServer } from "../../database/init.js";
 import { sanitizeError, sanitizeIniValue } from "../../utils/sanitize.js";
 import { withFileLock, writeFileAtomic } from "../../utils/fileWriteQueue.js";
+import { normalizeToLf, restoreLineEnding } from "../../utils/iniLineEndings.js";
 import { validateInt } from "./shared.js";
 import { LocalFiles } from "../../services/fileAccess/index.js";
 
@@ -71,7 +72,8 @@ function registerConfigureRconRoute(router) {
         if (!readResult.success) {
           throw new Error(readResult.error);
         }
-        let content = readResult.data.replace(/\r\n/g, "\n");
+        const { normalized: rconNormalized, eol: rconEol } = normalizeToLf(readResult.data);
+        let content = rconNormalized;
 
         // Update RCONPassword (sanitize to prevent INI injection via newlines)
         // Anchored to line start (^) with multiline flag to avoid matching
@@ -96,7 +98,10 @@ function registerConfigureRconRoute(router) {
           content += `\nRCONPort=${rconPort}`;
         }
 
-        writeFileAtomic(iniPath, content, { encoding: "utf-8", mode: 0o600 });
+        writeFileAtomic(iniPath, restoreLineEnding(content, rconEol), {
+          encoding: "utf-8",
+          mode: 0o600,
+        });
       });
 
       // Also save to app settings
@@ -150,7 +155,8 @@ function registerConfigureNetworkRoute(router) {
         if (!readResult.success) {
           throw new Error(readResult.error);
         }
-        let content = readResult.data.replace(/\r\n/g, "\n");
+        const { normalized: netNormalized, eol: netEol } = normalizeToLf(readResult.data);
+        let content = netNormalized;
 
         // Update DefaultPort — anchored to line start to avoid matching
         // inside values like ServerWelcomeMessage
@@ -181,7 +187,10 @@ function registerConfigureNetworkRoute(router) {
           content += `\nUPnP=${upnpValue}`;
         }
 
-        writeFileAtomic(iniPath, content, { encoding: "utf-8", mode: 0o600 });
+        writeFileAtomic(iniPath, restoreLineEnding(content, netEol), {
+          encoding: "utf-8",
+          mode: 0o600,
+        });
       });
 
       // Also save to app settings
