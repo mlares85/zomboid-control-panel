@@ -93,10 +93,12 @@ export async function ensureRconConfigured() {
       log.info(`Auto-configuring RCON in ${iniPath}`);
 
       // Update RCONPassword (sanitize to prevent INI injection via newlines)
+      // Anchored to line start (^) with multiline flag to avoid matching
+      // inside values like ServerWelcomeMessage
       const safePassword = sanitizeIniValue(rconPassword);
       if (content.includes("RCONPassword=")) {
         content = content.replace(
-          /RCONPassword=.*/g,
+          /^RCONPassword=.*/gm,
           () => `RCONPassword=${safePassword}`,
         );
       } else {
@@ -105,7 +107,10 @@ export async function ensureRconConfigured() {
 
       // Update RCONPort
       if (content.includes("RCONPort=")) {
-        content = content.replace(/RCONPort=.*/g, () => `RCONPort=${rconPort}`);
+        content = content.replace(
+          /^RCONPort=.*/gm,
+          () => `RCONPort=${rconPort}`,
+        );
       } else {
         content += `\nRCONPort=${rconPort}`;
       }

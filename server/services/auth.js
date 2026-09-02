@@ -39,7 +39,7 @@ function isPublicAuthPath(reqPath) {
 }
 
 const BCRYPT_ROUNDS = 12;
-const ACCESS_TOKEN_EXPIRY = "24h";
+const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_EXPIRY = "30d";
 const REFRESH_TOKEN_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_REFRESH_SESSIONS = 5;
@@ -169,6 +169,13 @@ class AuthService {
         secret = crypto.randomBytes(64).toString("hex");
         await setSetting("jwtSecret", secret);
         log.info("Generated new JWT secret");
+      }
+      if (secret.length < 32) {
+        log.error(
+          `JWT_SECRET is only ${secret.length} characters — minimum 32 required. Generating a new one.`,
+        );
+        secret = crypto.randomBytes(64).toString("hex");
+        await setSetting("jwtSecret", secret);
       }
       this.jwtSecret = secret;
       this.initialized = true;

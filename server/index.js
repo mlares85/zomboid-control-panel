@@ -13,6 +13,7 @@ import os from "os";
 import readline from "readline";
 import { randomUUID } from "crypto";
 import { fileURLToPath } from "url";
+import { safeIo } from "./utils/safeEmit.js";
 import { exec, execSync, spawn } from "child_process";
 import cookieParser from "cookie-parser";
 
@@ -525,6 +526,12 @@ const io = new Server(httpServer, {
   },
 });
 
+// Wrap Socket.IO so a synchronous throw in .emit() (disconnected socket,
+// circular JSON, etc.) is caught instead of crashing the Node process.
+const safeSocketIo = safeIo(io);
+// app.set exposes the safe wrapper to routes that need to emit
+app.set("io", safeSocketIo);
+
 // Security middleware
 // HSTS and upgrade-insecure-requests are conditionally enabled:
 // - On LAN/HTTP setups: disabled (would break plain HTTP access)
@@ -1000,7 +1007,7 @@ rconService.on("disconnected", async () => {
         log.info(
           "RCON disconnected and server process gone — emitting stopped status",
         );
-        io.emit("server:status", { running: false });
+        safeSocketIo.emit("server:status", { running: false });
         await logServerEvent(
           "server_stop",
           "Server process exited (detected after RCON disconnect)",
@@ -1019,25 +1026,25 @@ rconService.on("disconnected", async () => {
 
 // Emit PanelBridge status changes to connected clients via Socket.IO
 panelBridge.on("started", () => {
-  io.emit("panelBridge:status", {
+  safeSocketIo.emit("panelBridge:status", {
     isRunning: true,
     bridgePath: panelBridge.bridgePath,
   });
 });
 
 panelBridge.on("stopped", () => {
-  io.emit("panelBridge:status", {
+  safeSocketIo.emit("panelBridge:status", {
     isRunning: false,
     bridgePath: panelBridge.bridgePath,
   });
 });
 
 panelBridge.on("modStatus", (status) => {
-  io.emit("panelBridge:modStatus", status);
+  safeSocketIo.emit("panelBridge:modStatus", status);
 });
 
 panelBridge.on("configured", ({ path }) => {
-  io.emit("panelBridge:configured", { bridgePath: path });
+  safeSocketIo.emit("panelBridge:configured", { bridgePath: path });
 });
 
 // PanelBridge is the preferred source of truth for player presence (its
@@ -1078,7 +1085,7 @@ app.set("scheduler", scheduler);
 app.set("discordBot", discordBot);
 backupService.setServerManager(serverManager);
 app.set("backupService", backupService);
-app.set("io", io);
+app.set("io", safeSocketIo);
 app.set("refreshCorsConfig", refreshCorsConfig);
 app.set("getCorsDebugSnapshot", getCorsDebugSnapshot);
 app.set("clearCorsBlockedOrigins", clearCorsBlockedOrigins);
@@ -1168,7 +1175,7 @@ if (dockerClient?.available) {
   dockerClient.watchEvents(
     (event) => {
       if (event.Type === "container") {
-        io.emit("docker:event", {
+        safeSocketIo.emit("docker:event", {
           action: event.Action,
           containerId: event.Actor?.ID,
           name: event.Actor?.Attributes?.name,
@@ -1185,7 +1192,7 @@ const updateChecker = new UpdateChecker(io, { rconService, serverManager });
 app.set("updateChecker", updateChecker);
 
 // Initialize panel self-update checker
-const panelUpdateChecker = new PanelUpdateChecker(io);
+const panelUpdateChecker = new PanelUpdateChecker(safeSocketIo);
 app.set("panelUpdateChecker", panelUpdateChecker);
 
 // Map version checker — periodically checks map.projectzomboid.com for new
@@ -1768,7 +1775,7 @@ io.on("connection", (socket) => {
 // Stream logs to Socket.IO clients
 onLog((logEntry) => {
   addLogToBuffer(logEntry.level, logEntry.message, logEntry.source);
-  io.to("logs").emit("log:entry", logEntry);
+  safeSocketIo.to("logs").emit("log:entry", logEntry);
 });
 
 // ============================================
@@ -1888,7 +1895,7 @@ function startPlayerPolling() {
 
           lastPlayerList = result.players;
           // Broadcast to all clients in the 'players' room
-          io.to("players").emit("players:update", result.players);
+          safeSocketIo.to("players").emit("players:update", result.players);
           log.debug(
             `Player list updated: ${result.players.length} players online`,
           );
@@ -2112,7 +2119,7 @@ async function startPerfPolling() {
       // also emit to "logs" — anyone subscribed to the log stream got perf
       // spam they never asked for, for no reason (unrelated rooms, no
       // shared subscribers by design).
-      io.to("perf").emit("perf:snapshot", snapshot);
+      safeSocketIo.to("perf").emit("perf:snapshot", snapshot);
     } catch (err) {
       log.debug(`Perf snapshot failed: ${err.message}`);
     }
@@ -2160,7 +2167,7 @@ function startStatusWatchdog() {
         log.info(
           `Status watchdog: server state changed → ${running ? "running" : "stopped"}`,
         );
-        io.emit("server:status", { running });
+        safeSocketIo.emit("server:status", { running });
         if (!running) {
           logServerEvent(
             "server_stop",
@@ -2322,7 +2329,7 @@ async function start() {
     // and the client discards a message whose id it has already seen.
     let chatMessageSeq = 0;
     logTailer.on("chatMessage", (data) => {
-      io.emit("chat:message", {
+      safeSocketIo.emit("chat:message", {
         id: `${Date.now()}-${chatMessageSeq++}`,
         type: data.type || "general",
         author: data.author,
@@ -2358,14 +2365,14 @@ async function start() {
         .catch((err) =>
           log.debug(`Discord playerDeath notification failed: ${err.message}`),
         );
-      io.emit("player:death", data);
+      safeSocketIo.emit("player:death", data);
     });
 
     // Initialize scheduler first (needed by modChecker for auto-restart)
     await scheduler.init();
 
     // Initialize mod checker with scheduler, serverManager, and socket.io
-    await modChecker.init(scheduler, serverManager, io);
+    await modChecker.init(scheduler, serverManager, safeSocketIo);
 
     // Start mod checker if workshop ACF file is found
     if (modChecker.workshopAcfPath) {

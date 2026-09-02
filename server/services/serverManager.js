@@ -655,6 +655,11 @@ export class ServerManager {
       };
     }
 
+    // Guard against concurrent stop calls (e.g. user click + scheduler race)
+    if (this._stopping) {
+      return { success: true, message: "Stop already in progress" };
+    }
+
     // Block overlapping starts while kill/state-clear is pending.
     this._stopping = true;
     try {

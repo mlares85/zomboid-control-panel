@@ -248,7 +248,7 @@ export function loadOrCreateCerts(customKeyPath, customCertPath) {
   // Generate new self-signed cert
   try {
     if (!fs.existsSync(CERT_DIR)) {
-      fs.mkdirSync(CERT_DIR, { recursive: true });
+      fs.mkdirSync(CERT_DIR, { recursive: true, mode: 0o700 });
     }
 
     const { key, cert } = generateSelfSignedCert();
