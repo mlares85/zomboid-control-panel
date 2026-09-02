@@ -4,7 +4,7 @@ import { createLogger } from "../../../utils/logger.js";
 import { LocalFiles } from "../../../services/fileAccess/index.js";
 import { sanitizeError, sanitizeIniList, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
-import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
+import { readTextFile, withIniLock, parseIniList } from "../../../utils/mods/iniFile.js";
 import { findAllModIdsFromWorkshop, findModIdFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { findMapFoldersFromWorkshop } from "../../../utils/mods/workshopPaths.js";
 import { filterOwnedClientModIds } from "../../../utils/mods/modIdFilter.js";
@@ -61,11 +61,11 @@ router.post("/remove-from-ini", async (req, res) => {
 
       // Get current workshop items
       const workshopMatch = content.match(/^WorkshopItems=(.*)$/m);
-      let workshopIds = workshopMatch?.[1]?.split(";").filter(Boolean) || [];
+      let workshopIds = parseIniList(workshopMatch?.[1]);
 
       // Get current mod IDs
       const modsMatch = content.match(/^Mods=(.*)$/m);
-      let modIds = modsMatch?.[1]?.split(";").filter(Boolean) || [];
+      let modIds = parseIniList(modsMatch?.[1]);
 
       // Remove from workshop items
       workshopIds = workshopIds.filter((id) => id !== String(workshopId));

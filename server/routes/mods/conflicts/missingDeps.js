@@ -3,7 +3,7 @@ import path from "path";
 import { createLogger } from "../../../utils/logger.js";
 import { sanitizeError, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
-import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
+import { readTextFile, withIniLock, parseIniList } from "../../../utils/mods/iniFile.js";
 import { findMapFoldersFromWorkshop } from "../../../utils/mods/workshopPaths.js";
 import { fetchModIdFromWorkshop } from "../../../utils/mods/workshopFetch.js";
 import { findModIdFromWorkshop, getModDetailsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
@@ -70,7 +70,7 @@ router.post("/add-missing-dep", async (req, res) => {
 
       // Add to WorkshopItems if not present
       const wsMatch = content.match(/^WorkshopItems=(.*)$/m);
-      const currentWs = wsMatch?.[1]?.split(";").filter(Boolean) || [];
+      const currentWs = parseIniList(wsMatch?.[1]);
       let wsAdded = false;
       if (!currentWs.includes(wsIdStr)) {
         currentWs.push(wsIdStr);
@@ -89,7 +89,7 @@ router.post("/add-missing-dep", async (req, res) => {
       let modIdAdded = false;
       if (resolvedModId) {
         const modsMatch = content.match(/^Mods=(.*)$/m);
-        const currentMods = modsMatch?.[1]?.split(";").filter(Boolean) || [];
+        const currentMods = parseIniList(modsMatch?.[1]);
         if (!currentMods.includes(resolvedModId)) {
           currentMods.push(resolvedModId);
           if (content.includes("Mods=")) {

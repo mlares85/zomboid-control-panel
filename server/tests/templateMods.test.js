@@ -70,6 +70,15 @@ describe("captureModsFromIni", () => {
     const mods = captureModsFromIni(ini);
     expect(mods).toHaveLength(2);
   });
+
+  it("tolerates whitespace around entries and separators", () => {
+    const ini = "WorkshopItems= 111 ; 222 \nMods=ModA ; ModB\n";
+    const mods = captureModsFromIni(ini);
+    expect(mods).toEqual([
+      { workshopId: "111", modId: "ModA" },
+      { workshopId: "222", modId: "ModB" },
+    ]);
+  });
 });
 
 // ─── applyModsToIni (pure function) ────────────────────────────────────────

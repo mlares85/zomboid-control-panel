@@ -4,7 +4,7 @@ import { createLogger } from "../../../utils/logger.js";
 import { LocalFiles } from "../../../services/fileAccess/index.js";
 import { sanitizeError } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
-import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
+import { readTextFile, withIniLock, parseIniList } from "../../../utils/mods/iniFile.js";
 import { findMapFoldersFromWorkshop } from "../../../utils/mods/workshopPaths.js";
 
 const log = createLogger("API:Mods");
@@ -47,7 +47,7 @@ router.post("/repair-map-entries", async (req, res) => {
       const currentMaps = mapMatch?.[1]?.split(";").filter(Boolean) || [];
 
       const workshopMatch = content.match(/^WorkshopItems=(.*)$/m);
-      const workshopIds = workshopMatch?.[1]?.split(";").filter(Boolean) || [];
+      const workshopIds = parseIniList(workshopMatch?.[1]);
 
       const validMapFolders = new Set();
       for (const wsId of workshopIds) {

@@ -8,7 +8,7 @@ import {
   fetchPublishedFileTitles,
 } from "../../../services/workshopCollectionSync.js";
 import { getServerConfigPath, getServerName } from "../../../utils/mods/serverConfig.js";
-import { readTextFile } from "../../../utils/mods/iniFile.js";
+import { readTextFile, parseIniList } from "../../../utils/mods/iniFile.js";
 import { LocalFiles } from "../../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
@@ -45,8 +45,8 @@ router.get("/collection/diff", async (req, res) => {
           const workshopMatch = readTextFile(iniPath).match(
             /^WorkshopItems=(.*)$/m,
           );
-          for (const id of workshopMatch?.[1]?.split(";") || []) {
-            if (id) configuredWorkshopIds.add(id);
+          for (const id of parseIniList(workshopMatch?.[1])) {
+            configuredWorkshopIds.add(id);
           }
           serverConfigRead = true;
         }

@@ -3,7 +3,7 @@ import path from "path";
 import { createLogger } from "../../../utils/logger.js";
 import { sanitizeError } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
-import { readTextFile } from "../../../utils/mods/iniFile.js";
+import { readTextFile, parseIniList } from "../../../utils/mods/iniFile.js";
 import { getModDetailsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { LocalFiles } from "../../../services/fileAccess/index.js";
 
@@ -41,10 +41,8 @@ router.get("/validate-config", async (req, res) => {
     const workshopMatch = content.match(/^WorkshopItems=(.*)$/m);
     const modsMatch = content.match(/^Mods=(.*)$/m);
 
-    const workshopIds = workshopMatch
-      ? workshopMatch[1].split(";").filter(Boolean)
-      : [];
-    const modIds = modsMatch ? modsMatch[1].split(";").filter(Boolean) : [];
+    const workshopIds = parseIniList(workshopMatch?.[1]);
+    const modIds = parseIniList(modsMatch?.[1]);
 
     const warnings = [];
     const errors = [];

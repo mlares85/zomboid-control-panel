@@ -4,7 +4,7 @@ import { createLogger } from "../../../utils/logger.js";
 import { LocalFiles } from "../../../services/fileAccess/index.js";
 import { sanitizeError, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
-import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
+import { readTextFile, withIniLock, parseIniList } from "../../../utils/mods/iniFile.js";
 import { findAllModIdsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { fetchModIdFromWorkshop } from "../../../utils/mods/workshopFetch.js";
 
@@ -37,9 +37,9 @@ router.post("/sync-mod-ids", async (req, res) => {
     // First pass: read INI to get workshop IDs list (no lock needed for read-only)
     const preContent = readTextFile(iniPath);
     const preWorkshopMatch = preContent.match(/^WorkshopItems=(.*)$/m);
-    const workshopIds = (
-      preWorkshopMatch?.[1]?.split(";").filter(Boolean) || []
-    ).filter((id) => /^\d{1,15}$/.test(id));
+    const workshopIds = parseIniList(preWorkshopMatch?.[1]).filter((id) =>
+      /^\d{1,15}$/.test(id),
+    );
 
     // Pre-resolve all mod IDs BEFORE taking the lock (async operations)
     const resolvedMap = new Map(); // workshopId -> { availableModIds, fallbackId, error }
@@ -70,7 +70,7 @@ router.post("/sync-mod-ids", async (req, res) => {
       let content = readTextFile(iniPath);
 
       const modsMatch = content.match(/^Mods=(.*)$/m);
-      const currentModIds = modsMatch?.[1]?.split(";").filter(Boolean) || [];
+      const currentModIds = parseIniList(modsMatch?.[1]);
       const finalModIds = [...currentModIds];
 
       const syncedMods = [];

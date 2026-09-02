@@ -10,6 +10,7 @@
 import path from "path";
 import { withFileLock } from "../utils/fileWriteQueue.js";
 import { escapeRegExp } from "../utils/regex.js";
+import { parseIniList } from "../utils/mods/iniFile.js";
 import { detectLineEnding, restoreLineEnding } from "../utils/iniLineEndings.js";
 import { createLogger } from "../utils/logger.js";
 
@@ -125,10 +126,8 @@ export async function writeServerConfig(
 
 export function extractModList(config) {
   if (!config?.Mods) return [];
-  const mods = config.Mods.split(";").filter((m) => m.trim());
-  const workshopIds = config.WorkshopItems
-    ? config.WorkshopItems.split(";").filter((m) => m.trim())
-    : [];
+  const mods = parseIniList(config.Mods);
+  const workshopIds = parseIniList(config.WorkshopItems);
   return mods.map((mod, index) => ({
     name: mod,
     workshopId: workshopIds[index] || null,

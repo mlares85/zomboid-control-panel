@@ -9,6 +9,7 @@ import fs from "fs";
 import path from "path";
 import { escapeRegExp } from "./regex.js";
 import { writeFileAtomic } from "./fileWriteQueue.js";
+import { parseIniList } from "./mods/iniFile.js";
 
 function escapeLuaString(str) {
   return String(str).replace(/[\\"'\n\r\t]/g, (c) => {
@@ -161,7 +162,7 @@ export function mergeSandboxSections(content, sectionUpdates) {
 
 function readIniList(content, key) {
   const match = content.match(new RegExp(`^${escapeRegExp(key)}=(.*)$`, "m"));
-  return match?.[1]?.split(";").filter(Boolean) || [];
+  return parseIniList(match?.[1]);
 }
 
 /** Extract paired Workshop IDs + mod IDs from a server INI. */

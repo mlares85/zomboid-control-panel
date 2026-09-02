@@ -8,7 +8,7 @@ import {
 } from "../../database/init.js";
 import { sanitizeError, sanitizeIniList, sanitizeModIdList } from "../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getSanitizedIniPath } from "../../utils/mods/serverConfig.js";
-import { readTextFile, withIniLock } from "../../utils/mods/iniFile.js";
+import { readTextFile, withIniLock, parseIniList } from "../../utils/mods/iniFile.js";
 import { LocalFiles } from "../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
@@ -64,10 +64,8 @@ router.post("/presets", async (req, res) => {
     const workshopMatch = content.match(/^WorkshopItems=(.*)$/m);
     const modsMatch = content.match(/^Mods=(.*)$/m);
 
-    const workshopIds = workshopMatch
-      ? workshopMatch[1].split(";").filter(Boolean)
-      : [];
-    const modIds = modsMatch ? modsMatch[1].split(";").filter(Boolean) : [];
+    const workshopIds = parseIniList(workshopMatch?.[1]);
+    const modIds = parseIniList(modsMatch?.[1]);
 
     const preset = await createModPreset(
       name,

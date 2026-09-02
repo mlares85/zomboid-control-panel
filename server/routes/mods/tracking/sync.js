@@ -5,7 +5,7 @@ import { createLogger } from "../../../utils/logger.js";
 import { addTrackedMod, clearModUpdates, isModIgnored } from "../../../database/init.js";
 import { sanitizeError } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName } from "../../../utils/mods/serverConfig.js";
-import { readTextFile } from "../../../utils/mods/iniFile.js";
+import { readTextFile, parseIniList } from "../../../utils/mods/iniFile.js";
 
 const log = createLogger("API:Mods");
 const router = express.Router();
@@ -54,8 +54,8 @@ router.post("/sync-from-server", async (req, res) => {
     const modsMatch = content.match(/^Mods=(.*)$/m);
     const workshopMatch = content.match(/^WorkshopItems=(.*)$/m);
 
-    const modIds = modsMatch?.[1]?.split(";").filter(Boolean) || [];
-    const workshopIds = workshopMatch?.[1]?.split(";").filter(Boolean) || [];
+    const modIds = parseIniList(modsMatch?.[1]);
+    const workshopIds = parseIniList(workshopMatch?.[1]);
 
     log.info(
       `sync-from-server: Found ${modIds.length} mod IDs and ${workshopIds.length} workshop IDs`,

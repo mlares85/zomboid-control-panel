@@ -5,7 +5,7 @@ import { removeIgnoredMod, addTrackedMod } from "../../../database/init.js";
 import { sanitizeError, sanitizeIniList, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { syncSingleChange as autoSyncCollection } from "../../../services/workshopCollectionSync.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
-import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
+import { readTextFile, withIniLock, parseIniList } from "../../../utils/mods/iniFile.js";
 import { findAllModIdsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { findMapFoldersFromWorkshop } from "../../../utils/mods/workshopPaths.js";
 import { LocalFiles } from "../../../services/fileAccess/index.js";
@@ -97,10 +97,9 @@ router.post("/add-mod-advanced", async (req, res) => {
       let content = readTextFile(iniPath);
 
       const workshopMatch = content.match(/^WorkshopItems=(.*)$/m);
-      const currentWorkshopIds =
-        workshopMatch?.[1]?.split(";").filter(Boolean) || [];
+      const currentWorkshopIds = parseIniList(workshopMatch?.[1]);
       const modsMatch = content.match(/^Mods=(.*)$/m);
-      const currentModIds = modsMatch?.[1]?.split(";").filter(Boolean) || [];
+      const currentModIds = parseIniList(modsMatch?.[1]);
 
       const workshopAlreadyExists = currentWorkshopIds.includes(
         String(workshopId),

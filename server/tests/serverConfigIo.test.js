@@ -206,6 +206,14 @@ describe("extractModList", () => {
       { name: "ModA", workshopId: null },
     ]);
   });
+
+  it("trims whitespace around entries and separators", () => {
+    const config = { Mods: "ModA ; ModB", WorkshopItems: " 111 ; 222 " };
+    expect(extractModList(config)).toEqual([
+      { name: "ModA", workshopId: "111" },
+      { name: "ModB", workshopId: "222" },
+    ]);
+  });
 });
 
 describe("extractGamePort", () => {

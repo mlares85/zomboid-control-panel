@@ -13,7 +13,7 @@ import {
 import { sanitizeError } from "../../../utils/sanitize.js";
 import { fetchPublishedFileTitles, syncSingleChange as autoSyncCollection } from "../../../services/workshopCollectionSync.js";
 import { getServerConfigPath, getServerName } from "../../../utils/mods/serverConfig.js";
-import { readTextFile } from "../../../utils/mods/iniFile.js";
+import { readTextFile, parseIniList } from "../../../utils/mods/iniFile.js";
 import { requireModChecker } from "../../../middleware/requireModChecker.js";
 
 const log = createLogger("API:Mods");
@@ -59,8 +59,7 @@ router.get("/tracked", async (req, res) => {
           if (fs.existsSync(iniPath)) {
             const content = readTextFile(iniPath);
             const workshopMatch = content.match(/^WorkshopItems=(.*)$/m);
-            const workshopIds =
-              workshopMatch?.[1]?.split(";").filter(Boolean) || [];
+            const workshopIds = parseIniList(workshopMatch?.[1]);
             const configuredIds = new Set(
               workshopIds.filter((id) => /^\d{1,15}$/.test(id)),
             );

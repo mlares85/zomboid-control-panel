@@ -2,7 +2,7 @@ import express from "express";
 import { createLogger } from "../../../utils/logger.js";
 import { sanitizeError } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath, getSanitizedIniPath } from "../../../utils/mods/serverConfig.js";
-import { readTextFile } from "../../../utils/mods/iniFile.js";
+import { readTextFile, parseIniList } from "../../../utils/mods/iniFile.js";
 import { getModDetailsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { LocalFiles } from "../../../services/fileAccess/index.js";
 
@@ -48,8 +48,8 @@ router.get("/current-config", async (req, res) => {
     const workshopMatch = content.match(/^WorkshopItems=(.*)$/m);
     const mapMatch = content.match(/^Map=(.*)$/m);
 
-    const modIds = modsMatch?.[1]?.split(";").filter(Boolean) || [];
-    const workshopIds = workshopMatch?.[1]?.split(";").filter(Boolean) || [];
+    const modIds = parseIniList(modsMatch?.[1]);
+    const workshopIds = parseIniList(workshopMatch?.[1]);
     const maps = mapMatch?.[1]?.split(";").filter(Boolean) || ["Muldraugh, KY"];
 
     // Build workshop → modId mapping from disk

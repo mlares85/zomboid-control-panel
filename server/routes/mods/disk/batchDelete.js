@@ -3,7 +3,7 @@ import { createLogger } from "../../../utils/logger.js";
 import { getTrackedMods, removeTrackedMod, addIgnoredMod } from "../../../database/init.js";
 import { sanitizeError, sanitizeIniList, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
-import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
+import { readTextFile, withIniLock, parseIniList } from "../../../utils/mods/iniFile.js";
 import { findAllModIdsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { getWorkshopPaths } from "../../../utils/mods/workshopPaths.js";
 import path from "path";
@@ -70,10 +70,9 @@ router.post("/batch-delete-disk-mods", async (req, res) => {
         let content = readTextFile(iniPath);
         const wsMatch = content.match(/^WorkshopItems=(.*)$/m);
         if (wsMatch) {
-          const wsList = wsMatch[1]
-            .split(";")
-            .filter(Boolean)
-            .filter((id) => !cleaned.includes(id));
+          const wsList = parseIniList(wsMatch[1]).filter(
+            (id) => !cleaned.includes(id),
+          );
           content = content.replace(
             /^WorkshopItems=.*/m,
             `WorkshopItems=${sanitizeIniList(wsList)}`,
@@ -81,10 +80,9 @@ router.post("/batch-delete-disk-mods", async (req, res) => {
         }
         const modsMatch = content.match(/^Mods=(.*)$/m);
         if (modsMatch && allModIdsToStrip.size > 0) {
-          const modsList = modsMatch[1]
-            .split(";")
-            .filter(Boolean)
-            .filter((id) => !allModIdsToStrip.has(id));
+          const modsList = parseIniList(modsMatch[1]).filter(
+            (id) => !allModIdsToStrip.has(id),
+          );
           content = content.replace(
             /^Mods=.*/m,
             `Mods=${sanitizeModIdList(modsList)}`,

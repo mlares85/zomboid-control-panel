@@ -3,7 +3,7 @@ import path from "path";
 import { createLogger } from "../../../utils/logger.js";
 import { sanitizeError, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
-import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
+import { readTextFile, withIniLock, parseIniList } from "../../../utils/mods/iniFile.js";
 import { findMapFoldersFromWorkshop } from "../../../utils/mods/workshopPaths.js";
 import { findModIdFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { fetchModIdFromWorkshop } from "../../../utils/mods/workshopFetch.js";
@@ -77,11 +77,9 @@ router.post("/add-all-resolved-deps", async (req, res) => {
     const lockResult = await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
       const wsMatch = content.match(/^WorkshopItems=(.*)$/m);
-      const currentWs = new Set(wsMatch?.[1]?.split(";").filter(Boolean) || []);
+      const currentWs = new Set(parseIniList(wsMatch?.[1]));
       const modsMatch = content.match(/^Mods=(.*)$/m);
-      const currentMods = new Set(
-        modsMatch?.[1]?.split(";").filter(Boolean) || [],
-      );
+      const currentMods = new Set(parseIniList(modsMatch?.[1]));
       const mapMatch = content.match(/^Map=(.*)$/m);
       const currentMaps = mapMatch?.[1]?.split(";").filter(Boolean) || [];
 

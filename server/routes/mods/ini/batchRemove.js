@@ -6,7 +6,7 @@ import { getTrackedMods, removeTrackedMod, addIgnoredMod } from "../../../databa
 import { sanitizeError, sanitizeIniList, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { syncSingleChange as autoSyncCollection } from "../../../services/workshopCollectionSync.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
-import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
+import { readTextFile, withIniLock, parseIniList } from "../../../utils/mods/iniFile.js";
 import { findAllModIdsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { findMapFoldersFromWorkshop } from "../../../utils/mods/workshopPaths.js";
 
@@ -84,11 +84,10 @@ router.post("/batch-remove", async (req, res) => {
 
             // Parse current lists
             const workshopMatch = content.match(/^WorkshopItems=(.*)$/m);
-            let iniWorkshopIds =
-              workshopMatch?.[1]?.split(";").filter(Boolean) || [];
+            let iniWorkshopIds = parseIniList(workshopMatch?.[1]);
 
             const modsMatch = content.match(/^Mods=(.*)$/m);
-            let iniModIds = modsMatch?.[1]?.split(";").filter(Boolean) || [];
+            let iniModIds = parseIniList(modsMatch?.[1]);
 
             const mapMatch = content.match(/^Map=(.*)$/m);
             let iniMaps = mapMatch?.[1]?.split(";").filter(Boolean) || [];

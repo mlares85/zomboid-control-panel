@@ -4,7 +4,7 @@ import { createLogger } from "../../../utils/logger.js";
 import { getIgnoredMods, removeIgnoredMod } from "../../../database/init.js";
 import { sanitizeError, sanitizeIniList, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
-import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
+import { readTextFile, withIniLock, parseIniList } from "../../../utils/mods/iniFile.js";
 import { findAllModIdsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { LocalFiles } from "../../../services/fileAccess/index.js";
 
@@ -36,8 +36,7 @@ router.get("/disk-only", async (req, res) => {
         if (await fileAccess.exists(iniPath)) {
           const content = readTextFile(iniPath);
           const m = content.match(/^WorkshopItems=(.*)$/m);
-          for (const id of m?.[1]?.split(";").filter(Boolean) || [])
-            inIni.add(id);
+          for (const id of parseIniList(m?.[1])) inIni.add(id);
         }
       }
     }
@@ -127,7 +126,7 @@ router.post("/enable-disk-mod", async (req, res) => {
 
       // WorkshopItems
       const wsMatch = content.match(/^WorkshopItems=(.*)$/m);
-      const wsList = wsMatch?.[1]?.split(";").filter(Boolean) || [];
+      const wsList = parseIniList(wsMatch?.[1]);
       if (!wsList.includes(wsId)) wsList.push(wsId);
       const wsLine = `WorkshopItems=${sanitizeIniList(wsList)}`;
       content = wsMatch
@@ -136,7 +135,7 @@ router.post("/enable-disk-mod", async (req, res) => {
 
       // Mods
       const modsMatch = content.match(/^Mods=(.*)$/m);
-      const existing = modsMatch?.[1]?.split(";").filter(Boolean) || [];
+      const existing = parseIniList(modsMatch?.[1]);
       // Sanitize existing entries (strips mis-pasted workshop IDs), then
       // union with mod.info-verified IDs — those are authoritative so they
       // bypass the numeric-ID filter (some mods use their workshop ID as

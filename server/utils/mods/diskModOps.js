@@ -3,7 +3,7 @@ import fs from "fs";
 import { createLogger } from "../logger.js";
 import { sanitizeIniList, sanitizeModIdList } from "../sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "./serverConfig.js";
-import { readTextFile, withIniLock } from "./iniFile.js";
+import { readTextFile, withIniLock, parseIniList } from "./iniFile.js";
 import { findAllModIdsFromWorkshop } from "./workshopModInfo.js";
 import { findMapFoldersFromWorkshop, getWorkshopPaths } from "./workshopPaths.js";
 
@@ -54,10 +54,7 @@ export async function deleteModFromDiskAndIni(wsId) {
       let content = readTextFile(iniPath);
       const wsMatch = content.match(/^WorkshopItems=(.*)$/m);
       if (wsMatch) {
-        const wsList = wsMatch[1]
-          .split(";")
-          .filter(Boolean)
-          .filter((id) => id !== wsId);
+        const wsList = parseIniList(wsMatch[1]).filter((id) => id !== wsId);
         content = content.replace(
           /^WorkshopItems=.*/m,
           `WorkshopItems=${sanitizeIniList(wsList)}`,
@@ -65,10 +62,9 @@ export async function deleteModFromDiskAndIni(wsId) {
       }
       const modsMatch = content.match(/^Mods=(.*)$/m);
       if (modsMatch && modIdsToStrip.length > 0) {
-        const modsList = modsMatch[1]
-          .split(";")
-          .filter(Boolean)
-          .filter((id) => !modIdsToStrip.includes(id));
+        const modsList = parseIniList(modsMatch[1]).filter(
+          (id) => !modIdsToStrip.includes(id),
+        );
         content = content.replace(
           /^Mods=.*/m,
           `Mods=${sanitizeModIdList(modsList)}`,

@@ -21,3 +21,15 @@ export function stripBom(str) {
 export function readTextFile(filePath) {
   return stripBom(fs.readFileSync(filePath, "utf-8")).replace(/\r\n/g, "\n");
 }
+
+// Parse a semicolon-delimited INI list value (Mods=, WorkshopItems=, ...),
+// tolerating trailing/embedded whitespace around entries and separators
+// (e.g. "mod1 ; mod2 " -> ["mod1", "mod2"]). Accepts the raw regex-match
+// capture directly, including undefined when the key wasn't present.
+export function parseIniList(value) {
+  if (!value) return [];
+  return value
+    .split(";")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}

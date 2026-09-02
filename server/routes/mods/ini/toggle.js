@@ -3,7 +3,7 @@ import path from "path";
 import { createLogger } from "../../../utils/logger.js";
 import { sanitizeError, sanitizeModIdList, looksLikeWorkshopId } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName } from "../../../utils/mods/serverConfig.js";
-import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
+import { readTextFile, withIniLock, parseIniList } from "../../../utils/mods/iniFile.js";
 import { LocalFiles } from "../../../services/fileAccess/index.js";
 
 const log = createLogger("API:Mods");
@@ -60,7 +60,7 @@ router.post("/toggle-mod-id", async (req, res) => {
     const result = await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
       const modsMatch = content.match(/^Mods=(.*)$/m);
-      let currentModIds = modsMatch?.[1]?.split(";").filter(Boolean) || [];
+      let currentModIds = parseIniList(modsMatch?.[1]);
 
       if (enabled) {
         if (!currentModIds.includes(modId)) {
@@ -163,7 +163,7 @@ router.post("/batch-toggle-mod-ids", async (req, res) => {
     const result = await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
       const modsMatch = content.match(/^Mods=(.*)$/m);
-      let currentModIds = modsMatch?.[1]?.split(";").filter(Boolean) || [];
+      let currentModIds = parseIniList(modsMatch?.[1]);
 
       // Apply all changes
       for (const { modId, enabled } of changes) {
@@ -232,7 +232,7 @@ router.post("/deduplicate-mod-ids", async (req, res) => {
     const lockResult = await withIniLock(iniPath, async () => {
       let content = readTextFile(iniPath);
       const modsMatch = content.match(/^Mods=(.*)$/m);
-      const currentMods = modsMatch?.[1]?.split(";").filter(Boolean) || [];
+      const currentMods = parseIniList(modsMatch?.[1]);
 
       const seen = new Map();
       const deduped = [];

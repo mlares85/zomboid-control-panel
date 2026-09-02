@@ -4,7 +4,7 @@ import { createLogger } from "../../../utils/logger.js";
 import { getIgnoredMods } from "../../../database/init.js";
 import { sanitizeError, sanitizeIniList, sanitizeModIdList } from "../../../utils/sanitize.js";
 import { getServerConfigPath, getServerName, getServerPath } from "../../../utils/mods/serverConfig.js";
-import { readTextFile, withIniLock } from "../../../utils/mods/iniFile.js";
+import { readTextFile, withIniLock, parseIniList } from "../../../utils/mods/iniFile.js";
 import { findAllModIdsFromWorkshop } from "../../../utils/mods/workshopModInfo.js";
 import { getWorkshopPaths } from "../../../utils/mods/workshopPaths.js";
 import { LocalFiles } from "../../../services/fileAccess/index.js";
@@ -103,10 +103,9 @@ router.post("/resolve-orphan-workshop", async (req, res) => {
       if (wsToDrop.size > 0) {
         const wsMatch = content.match(/^WorkshopItems=(.*)$/m);
         if (wsMatch) {
-          const wsList = wsMatch[1]
-            .split(";")
-            .filter(Boolean)
-            .filter((id) => !wsToDrop.has(id));
+          const wsList = parseIniList(wsMatch[1]).filter(
+            (id) => !wsToDrop.has(id),
+          );
           content = content.replace(
             /^WorkshopItems=.*/m,
             `WorkshopItems=${sanitizeIniList(wsList)}`,
@@ -116,7 +115,7 @@ router.post("/resolve-orphan-workshop", async (req, res) => {
 
       if (modIdsToAdd.size > 0) {
         const modsMatch = content.match(/^Mods=(.*)$/m);
-        const existing = modsMatch?.[1]?.split(";").filter(Boolean) || [];
+        const existing = parseIniList(modsMatch?.[1]);
         // Sanitize the EXISTING list (strips mis-pasted workshop IDs that
         // were polluting Mods=), then union with the IDs we just resolved
         // from mod.info. Those are authoritative, so they bypass the
