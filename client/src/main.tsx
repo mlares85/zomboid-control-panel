@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, HashRouter } from 'react-router-dom'
 import App from './App'
+import './i18n' // Initialize i18next before rendering
 import './index.css'
 import './known-issues.css'
 import { isDemoMode, installDemoFetchShim } from './lib/demo'

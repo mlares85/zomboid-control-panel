@@ -1,0 +1,62 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "players": "Players",
+    "console": "Console",
+    "scheduler": "Scheduler",
+    "mods": "Mods",
+    "events": "Events",
+    "backups": "Backups",
+    "chat": "Chat",
+    "settings": "Settings",
+    "servers": "Servers",
+    "templates": "Templates",
+    "serverConfig": "Server Config",
+    "worldMap": "World Map",
+    "wiki": "Wiki",
+    "debug": "Debug"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "close": "Close",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "start": "Start",
+    "stop": "Stop",
+    "restart": "Restart",
+    "refresh": "Refresh",
+    "search": "Search",
+    "noData": "No data available",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "yes": "Yes",
+    "no": "No",
+    "on": "On",
+    "off": "Off",
+    "actions": "Actions",
+    "status": "Status",
+    "name": "Name",
+    "type": "Type",
+    "version": "Version",
+    "back": "Back",
+    "next": "Next",
+    "apply": "Apply",
+    "reset": "Reset"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "username": "Username",
+    "password": "Password"
+  },
+  "language": {
+    "label": "Language",
+    "switchTo": "Switch language"
+  }
+}

@@ -40,6 +40,7 @@ import { serversApi, ServerInstance, updateApi, UpdateStatus, serverApi, modsApi
 import { SocketContext } from '@/contexts/SocketContext'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { LanguageSwitcher } from './LanguageSwitcher'
 import { useToast } from '@/components/ui/use-toast'
 import {
   DropdownMenu,
@@ -890,6 +891,7 @@ export default function Layout({ children }: LayoutProps) {
               <div className="flex items-center gap-2 text-[11px]">
                 <ConnectionStatus />
                 <AuthFooter />
+                <LanguageSwitcher />
               </div>
               <div className="flex items-center gap-2 text-[11px]">
                 <span className="flex items-center gap-2">
