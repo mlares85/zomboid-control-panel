@@ -1,6 +1,8 @@
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom'
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import type { Socket } from 'socket.io-client'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from './lib/queryClient'
 import Layout from './components/Layout'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import {
@@ -605,15 +607,17 @@ function AppContent() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <TooltipProvider delayDuration={400}>
-          <AuthProvider>
-            <ConfirmProvider>
-              <AppContent />
-            </ConfirmProvider>
-          </AuthProvider>
-        </TooltipProvider>
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <TooltipProvider delayDuration={400}>
+            <AuthProvider>
+              <ConfirmProvider>
+                <AppContent />
+              </ConfirmProvider>
+            </AuthProvider>
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   )
 }

@@ -12,6 +12,7 @@ import { PanelUpdateBanner, ErrorBanner, NotConfiguredBanner } from '@/component
 import { QuickStartGuide } from '@/components/dashboard/QuickStartGuide'
 import { LiveActivityFeed } from '@/components/dashboard/LiveActivityFeed'
 import { TelemetrySection } from '@/components/dashboard/TelemetrySection'
+import { WorldStats } from '@/components/dashboard/WorldStats'
 import { WorkSidebar } from '@/components/dashboard/WorkSidebar'
 import { ConfirmDialog } from '@/components/dashboard/ConfirmDialog'
 import { WipeDialog } from '@/components/dashboard/WipeDialog'
@@ -87,6 +88,7 @@ export default function Dashboard() {
             <LiveActivityFeed activity={d.playerActivity} online={d.online} status={d.status} />
             <TelemetrySection history={d.performanceHistory} online={d.online}
               showCharts={d.showPerformanceCharts} maxMemoryGB={d.maxMemoryGB} />
+            {d.online && <WorldStats bridgeConnected={!!d.bridgeStatus?.modConnected} />}
           </main>
 
           <WorkSidebar
