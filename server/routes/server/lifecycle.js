@@ -3,7 +3,7 @@ import { createLogger } from "../../utils/logger.js";
 import { logServerEvent, getActiveServer } from "../../database/init.js";
 import { sanitizeError } from "../../utils/sanitize.js";
 import { ensureRconConfigured, startServerReadyPolling } from "./lifecycleHelpers.js";
-import { generateStartupScripts, writeStartupScriptFiles } from "./startupScripts.js";
+import { regenerateStartupScriptsForServer } from "./startupScripts.js";
 
 const log = createLogger("API:Server");
 
@@ -42,32 +42,11 @@ export function registerLifecycleRoutes(router) {
       }
 
       // Regenerate startup scripts so any config changes (admin password, memory, etc.) take effect
-      if (
-        activeServer &&
-        !activeServer.startCommand &&
-        activeServer.installPath
-      ) {
-        try {
-          const scripts = await generateStartupScripts({
-            installPath: activeServer.installPath,
-            serverName: activeServer.serverName,
-            minMemory: activeServer.minMemory || 4,
-            maxMemory: activeServer.maxMemory || 8,
-            zomboidDataPath: activeServer.zomboidDataPath || "",
-            adminPassword: activeServer.adminPassword || "",
-            serverPort: activeServer.serverPort || 16261,
-            useNoSteam: activeServer.useNoSteam || false,
-            useDebug: activeServer.useDebug || false,
-          });
-          writeStartupScriptFiles(
-            activeServer.installPath,
-            activeServer.serverName,
-            scripts,
-          );
-          log.info("Regenerated startup scripts with current server config");
-        } catch (scriptErr) {
-          log.warn(`Could not regenerate startup scripts: ${scriptErr.message}`);
-        }
+      const scriptResult = await regenerateStartupScriptsForServer(activeServer);
+      if (!scriptResult.success) {
+        log.warn(`Could not regenerate startup scripts: ${scriptResult.error}`);
+      } else if (!scriptResult.skipped) {
+        log.info("Regenerated startup scripts with current server config");
       }
 
       const result = await serverManager.startServer();

@@ -5,12 +5,14 @@ import panelBridge from "./panelBridge.js";
 import { createEnhancedBackup } from "./backupOrchestrator.js";
 import { RconService } from "./rcon.js";
 import { ServerManager } from "./serverManager.js";
+import { regenerateStartupScriptsForServer } from "../routes/server/startupScripts.js";
 import {
   getScheduledTasks,
   updateTaskLastRun,
   logServerEvent,
   logScheduleExecution,
   getActiveServer,
+  getServer,
 } from "../database/init.js";
 
 // Built-in PanelBridge actions exposed to the scheduler via the
@@ -641,6 +643,27 @@ export class Scheduler {
     }
   }
 
+  // Manual start (routes/server/lifecycle.js POST /start) regenerates the
+  // launch script from current DB config before every launch so settings
+  // changes (admin password, memory, port, etc.) take effect. Scheduled
+  // restarts used to skip this step, letting the on-disk script drift from
+  // the DB — this brings performRestart's own (re)launches in line with it.
+  // Best-effort: a regeneration failure must never block the restart itself.
+  async _regenerateLaunchScript(pinnedServerId) {
+    try {
+      const server =
+        pinnedServerId != null
+          ? await getServer(pinnedServerId)
+          : await getActiveServer();
+      const result = await regenerateStartupScriptsForServer(server);
+      if (!result.success) {
+        log.warn(`Auto-restart: could not regenerate startup scripts: ${result.error}`);
+      }
+    } catch (error) {
+      log.warn(`Auto-restart: startup script regeneration failed: ${error.message}`);
+    }
+  }
+
   // `rconService`/`serverManager` default to the shared singletons
   // (unchanged behaviour for restart-now and the AUTO_RESTART_CRON job —
   // both always target "the active server" by design). The Scheduler passes
@@ -714,6 +737,7 @@ export class Scheduler {
         log.info(
           "Auto-restart triggered but server was not running - starting server",
         );
+        await this._regenerateLaunchScript(pinnedServerId);
         const started = await serverManager.startServer();
         if (!started?.success) {
           log.warn(
@@ -940,6 +964,7 @@ export class Scheduler {
         // Start server — skip the running check since we just confirmed the server stopped
         log.info("Auto-restart: Starting server...");
         await this._ensureRestartTarget(serverManager, pinnedServerId);
+        await this._regenerateLaunchScript(pinnedServerId);
         const restarted = await serverManager.startServer({
           skipRunningCheck: true,
         });
