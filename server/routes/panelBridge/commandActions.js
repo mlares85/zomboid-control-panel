@@ -85,6 +85,7 @@ export const VALID_ACTIONS = new Set([
   "getTimeSpeed",
   "setTimeSpeed",
   "triggerHelicopterEvent",
+  "stopHelicopterEvent",
   "triggerSwarmEvent",
   "runEventSequence",
   "getInfrastructureSnapshot",

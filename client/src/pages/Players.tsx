@@ -85,6 +85,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { EmptyState } from '@/components/EmptyState'
 import { FieldHelp } from '@/components/FieldHelp'
 import { SpawnBrowser } from '@/components/SpawnBrowser'
+import { PlayerVitals } from '@/components/players/PlayerVitals'
+import { KillPlayerButton } from '@/components/players/KillPlayerButton'
 import { playersApi, panelBridgeApi, configApi } from '@/lib/api'
 import { PageHeader } from '@/components/PageHeader'
 import { cn, copyText } from '@/lib/utils'
@@ -1436,6 +1438,7 @@ export default function Players() {
                             <Ban className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Ban</span>
                           </Button>
+                          <KillPlayerButton username={selectedPlayer} onKilled={fetchPlayers} />
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="outline" size="sm" className="h-8 w-8 p-0" aria-label="More player actions">
@@ -1505,12 +1508,22 @@ export default function Players() {
             <Tabs defaultValue="moderation">
               <div className="overflow-x-auto pb-1">
                 <TabsList className="inline-flex h-auto min-w-max gap-1 rounded-md border border-border/55 bg-muted/30 p-1">
+                  <TabsTrigger value="vitals" className="min-h-8 shrink-0 px-3 text-xs font-medium">Vitals</TabsTrigger>
                   <TabsTrigger value="moderation" className="min-h-8 shrink-0 px-3 text-xs font-medium">Moderation</TabsTrigger>
                   <TabsTrigger value="spawn" className="min-h-8 shrink-0 px-3 text-xs font-medium">Spawn</TabsTrigger>
                   <TabsTrigger value="powers" className="min-h-8 shrink-0 px-3 text-xs font-medium">Powers</TabsTrigger>
                   <TabsTrigger value="notes" className="min-h-8 shrink-0 px-3 text-xs font-medium" onClick={() => fetchActivityLogs()}>Notes &amp; Log</TabsTrigger>
                 </TabsList>
               </div>
+
+              {/* Vitals Tab */}
+              <TabsContent value="vitals" className="space-y-4 mt-4">
+                {selectedPlayer ? (
+                  <PlayerVitals username={selectedPlayer} />
+                ) : (
+                  <EmptyState type="noData" title="Select a player to view live vitals" />
+                )}
+              </TabsContent>
 
               {/* Moderation Tab */}
               <TabsContent value="moderation" className="space-y-4 mt-4">

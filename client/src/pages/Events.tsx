@@ -61,86 +61,12 @@ import { getUserErrorMessage, getErrorFixUrl } from '@/lib/errorMessage'
 import { errorToastContent } from '@/lib/errorToast'
 import { FixThisAction } from '@/components/ui/fix-this-action'
 import { FieldHelp } from '@/components/FieldHelp'
+import { TacticalPanel, SectionHeader } from '@/components/events/panels'
+import { CurrentConditionsCard } from '@/components/events/CurrentConditionsCard'
 
 interface Player {
   name: string
   online: boolean
-}
-
-type PanelTone = 'primary' | 'warning' | 'destructive' | 'info' | 'success'
-
-function toneBorder(tone: PanelTone): string {
-  switch (tone) {
-    case 'warning': return 'border-amber-400/55'
-    case 'destructive': return 'border-destructive/55'
-    case 'info': return 'border-info/55'
-    case 'success': return 'border-emerald-400/55'
-    default: return 'border-primary/55'
-  }
-}
-
-function toneText(tone: PanelTone): string {
-  switch (tone) {
-    case 'warning': return 'text-amber-400/85'
-    case 'destructive': return 'text-destructive/85'
-    case 'info': return 'text-info/85'
-    case 'success': return 'text-emerald-400/85'
-    default: return 'text-primary/75'
-  }
-}
-
-function TacticalPanel({
-  children,
-  tone = 'primary',
-  className,
-}: {
-  children: React.ReactNode
-  tone?: PanelTone
-  className?: string
-}) {
-  return (
-    <div className={cn(
-      'self-start overflow-hidden rounded-md border bg-card shadow-sm flex flex-col',
-      toneBorder(tone),
-      className
-    )}>
-      {children}
-    </div>
-  )
-}
-
-function SectionHeader({
-  label,
-  sublabel,
-  icon: Icon,
-  action,
-  tone = 'primary',
-}: {
-  label: string
-  sublabel?: string
-  icon?: React.ComponentType<{ className?: string }>
-  action?: React.ReactNode
-  tone?: PanelTone
-}) {
-  const isBridgeOffline = sublabel?.startsWith('bridge offline')
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3 select-none">
-      <span className="flex min-w-0 items-center gap-2">
-        {Icon && <Icon className={cn('h-4 w-4 shrink-0', toneText(tone))} />}
-        <span className="truncate text-sm font-semibold text-foreground">{label}</span>
-        {sublabel && (
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="text-muted-foreground/35">/</span>
-            <span className={cn(
-              'truncate text-xs font-normal',
-              isBridgeOffline ? 'text-amber-400/70' : 'text-muted-foreground/65'
-            )}>{sublabel}</span>
-          </span>
-        )}
-      </span>
-      {action && <div className="flex items-center gap-1.5 shrink-0">{action}</div>}
-    </div>
-  )
 }
 
 function getEventSuccessCopy(action: string) {
@@ -193,6 +119,8 @@ function getEventSuccessCopy(action: string) {
       return { title: 'Water Restored', description: 'Water service is back online.' }
     case 'Helicopter':
       return { title: 'Helicopter Triggered', description: 'A helicopter event is now active.' }
+    case 'Stop Helicopter':
+      return { title: 'Helicopter Stopped', description: 'The active helicopter event has been cleared.' }
     case 'Gunshot':
     case 'Gunshot Sound':
     case 'Gunshot at Coords':
@@ -882,6 +810,9 @@ const EVENT_SECTION_INDEX: Record<EventSectionKey, EventSectionMeta> = Object.fr
 
 // Sections whose commands act on a chosen player rather than the whole world.
 const TARGETED_SECTIONS: EventSectionKey[] = ['quickSounds', 'targetedSounds', 'horde', 'teleport']
+
+// Sections where the live weather readout belongs above the controls.
+const WEATHER_SECTIONS: EventSectionKey[] = ['rain', 'severe', 'climate']
 
 interface ActivityEntry {
   key: number
@@ -1826,6 +1757,10 @@ export default function Events() {
             </Alert>
           )}
 
+          {WEATHER_SECTIONS.includes(activeSection) && (
+            <CurrentConditionsCard enabled={bridgeConnected} />
+          )}
+
         {activeSection === 'rain' && (
             <TacticalPanel>
               <SectionHeader label="rain & storms" sublabel="rcon · always available" icon={CloudRain} />
@@ -2304,6 +2239,10 @@ export default function Events() {
                   <Button variant="outline" onClick={() => handleAction('Helicopter', triggerChopper)} disabled={loading !== null || players.length === 0} title={players.length === 0 ? 'No players online' : undefined} className="h-9 gap-2 text-xs font-medium">
                     {loading === 'Helicopter' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Crosshair className="w-3.5 h-3.5" />}
                     helicopter
+                  </Button>
+                  <Button variant="outline" onClick={() => handleBridgeAction('Stop Helicopter', () => panelBridgeApi.stopHelicopterEvent())} disabled={bridgeLoading !== null || !bridgeConnected} title={!bridgeConnected ? 'Requires the PanelBridge connection' : undefined} className="h-9 gap-2 text-xs font-medium text-destructive/85 hover:text-destructive hover:border-destructive/40">
+                    {bridgeLoading === 'Stop Helicopter' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                    stop helicopter
                   </Button>
                   <Button variant="outline" onClick={() => handleAction('Gunshot', triggerGunshot)} disabled={loading !== null || players.length === 0} title={players.length === 0 ? 'No players online' : undefined} className="h-9 gap-2 text-xs font-medium">
                     {loading === 'Gunshot' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Volume2 className="w-3.5 h-3.5" />}

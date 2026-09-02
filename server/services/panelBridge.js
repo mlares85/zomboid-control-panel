@@ -1682,6 +1682,16 @@ class PanelBridge extends EventEmitter {
     }
     return this.sendCommand('clearErrors', {});
   }
+
+  /**
+   * Convenience method: stop an active helicopter event
+   */
+  async stopHelicopterEvent() {
+    if (!this.isRunning) {
+      throw new Error('Bridge not running');
+    }
+    return this.sendCommand('stopHelicopterEvent', {});
+  }
 }
 
 // Export singleton instance

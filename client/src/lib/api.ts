@@ -1861,6 +1861,52 @@ export const serverFilesApi = {
   },
 };
 
+// Live vitals + status for a single player, from the mod's getPlayerDetails
+export interface PlayerVitalsDetail {
+  username: string;
+  displayName: string;
+  x: number;
+  y: number;
+  z: number;
+  accessLevel: string;
+  isAlive: boolean;
+  isAsleep?: boolean;
+  isSneaking?: boolean;
+  isRunning?: boolean;
+  stats?: {
+    hunger?: number;
+    thirst?: number;
+    fatigue?: number;
+    stress?: number;
+    boredom?: number;
+    unhappiness?: number;
+    pain?: number;
+    endurance?: number;
+  };
+  health?: {
+    overallBodyHealth?: number;
+    isInfected?: boolean;
+    isBleeding?: boolean;
+    health?: number;
+    temperature?: number;
+    wetness?: number;
+  };
+}
+
+// Weather conditions from the getWeather bridge action
+export interface WeatherConditions {
+  temperature?: number;
+  windSpeed?: number;
+  windAngle?: number;
+  precipitationIntensity?: number;
+  isRaining?: boolean;
+  fogIntensity?: number;
+  cloudIntensity?: number;
+  humidity?: number;
+  isSnowing?: boolean;
+  isThunderStorming?: boolean;
+}
+
 // Panel Bridge API (for direct Lua mod communication)
 export const panelBridgeApi = {
   // Get bridge status
@@ -2112,7 +2158,14 @@ export const panelBridgeApi = {
     apiPost("/panel-bridge/command", { action, args }),
 
   // Get weather info
-  getWeather: () => apiGet("/panel-bridge/weather"),
+  getWeather: () =>
+    apiGet("/panel-bridge/weather") as Promise<{
+      success: boolean;
+      data: WeatherConditions;
+    }>,
+  // Stop helicopter event
+  stopHelicopterEvent: () =>
+    apiPost("/panel-bridge/events/helicopter/stop", {}),
 
   // Get server info from mod
   getServerInfo: () => apiGet("/panel-bridge/server-info"),
@@ -2218,7 +2271,12 @@ export const panelBridgeApi = {
       };
     }>,
   getPlayerDetails: (username: string) =>
-    apiGet(`/panel-bridge/players/${encodeURIComponent(username)}`),
+    apiGet(`/panel-bridge/players/${encodeURIComponent(username)}`) as Promise<{
+      success: boolean;
+      data: PlayerVitalsDetail;
+    }>,
+  killPlayer: (username: string) =>
+    apiPost(`/panel-bridge/players/${encodeURIComponent(username)}/kill`, {}),
   teleportPlayerBridge: (username: string, x: number, y: number, z?: number) =>
     apiPost(`/panel-bridge/players/${encodeURIComponent(username)}/teleport`, {
       x,
